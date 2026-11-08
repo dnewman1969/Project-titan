@@ -41,13 +41,22 @@ class ApiConfig(_Section):
     cors_origins: list[str] = ["app://titan"]
 
 
+ServiceMode = Literal["managed", "external"]
+"""`managed`: the supervisor runs the server. `external`: someone else does; health-check only."""
+
+
 class PostgresConfig(_Section):
     host: str = "127.0.0.1"
     port: int = Field(default=54329, ge=1, le=65535)
     database: str = "titan"
     user: str = "titan"
+    # Development and CI only. Otherwise the superuser password lives in the OS keyring as
+    # 'titan/postgres', generated on first run (M1.T1).
     password: SecretStr | None = None
+    mode: ServiceMode = "managed"
     data_dir: str = "%LOCALAPPDATA%/Titan/data/pg"
+    # Directory with initdb/pg_ctl. Unset: the bundled or third_party/ copy, then pg_config.
+    bin_dir: str | None = None
 
     def sqlalchemy_url(self, driver: str = "asyncpg") -> str:
         from urllib.parse import quote
@@ -60,11 +69,21 @@ class PostgresConfig(_Section):
 
 class RedisConfig(_Section):
     url: str = "redis://127.0.0.1:63790/0"
+    # Development and CI only. Otherwise `requirepass` comes from the OS keyring as 'titan/redis'.
+    password: SecretStr | None = None
 
 
 class ChromaConfig(_Section):
+    host: str = "127.0.0.1"
     port: int = Field(default=8766, ge=1, le=65535)
+    mode: ServiceMode = "managed"
     data_dir: str = "%LOCALAPPDATA%/Titan/data/chroma"
+    # Server command before `run ...`. Unset: `chroma` from the venv or PATH, else `uvx` (dev).
+    command: list[str] | None = None
+
+    @property
+    def url(self) -> str:
+        return f"http://{self.host}:{self.port}"
 
 
 class PathsConfig(_Section):
@@ -120,6 +139,29 @@ class NetworkConfig(_Section):
     allowlist_file: str = "config/egress.yaml"
 
 
+ProcessName = Literal["postgres", "redis", "chroma", "migrate", "api"]
+SUPERVISED_PROCESSES: tuple[ProcessName, ...] = ("postgres", "redis", "chroma", "migrate", "api")
+
+
+class SupervisorConfig(_Section):
+    host: str = "127.0.0.1"
+    port: int = Field(default=8769, ge=1, le=65535)
+    # Start order (Section 2.3). Each step waits up to start_timeout_s for health, then moves on.
+    processes: list[ProcessName] = list(SUPERVISED_PROCESSES)
+    start_timeout_s: float = Field(default=20, gt=0)
+
+    @property
+    def url(self) -> str:
+        return f"http://{self.host}:{self.port}"
+
+
+class MetricsConfig(_Section):
+    sample_hz: float = Field(default=1, gt=0, le=10)
+    # PresentMon console executable. Unset: the bundled or third_party/ copy, then PATH.
+    presentmon_path: str | None = None
+    nvml: bool = True
+
+
 class OtelConfig(_Section):
     enabled: bool = False
 
@@ -158,6 +200,8 @@ class TitanConfig(BaseSettings):
     safety: SafetyConfig = SafetyConfig()
     logging: LoggingConfig = LoggingConfig()
     network: NetworkConfig = NetworkConfig()
+    supervisor: SupervisorConfig = SupervisorConfig()
+    metrics: MetricsConfig = MetricsConfig()
     otel: OtelConfig = OtelConfig()
     features: FeaturesConfig = FeaturesConfig()
 

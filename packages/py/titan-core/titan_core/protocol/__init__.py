@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 from pydantic import BaseModel
 
-from titan_core.protocol import envelope, events, payloads, telemetry, ws
+from titan_core.protocol import envelope, events, payloads, system, telemetry, ws
 from titan_core.protocol.envelope import ENVELOPE_SCHEMA, Address, Envelope, make_envelope
 from titan_core.protocol.events import GameEvent
 from titan_core.protocol.payloads import MESSAGE_TYPES, parse_payload
@@ -61,6 +61,18 @@ SCHEMA_FILES: tuple[SchemaFile, ...] = (
         tuple(dict.fromkeys(_WS_MODELS)),
         type_maps={"x-titan-ws-message-types": dict(ws.WS_MESSAGE_TYPES)},
     ),
+    SchemaFile(
+        "system",
+        "System status and safety",
+        (
+            system.SystemStatus,
+            system.SupervisorStatus,
+            system.GameTarget,
+            system.SafetyKillRequest,
+            system.SafetyResumeRequest,
+            system.SafetyArmRequest,
+        ),
+    ),
 )
 
 __all__ = [
@@ -79,6 +91,7 @@ __all__ = [
     "make_envelope",
     "parse_payload",
     "payloads",
+    "system",
     "telemetry",
     "ws",
 ]

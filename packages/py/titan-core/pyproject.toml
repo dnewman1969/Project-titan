@@ -5,9 +5,13 @@ description = "Project Titan shared foundation: config, logging, ids, clock, err
 requires-python = ">=3.12,<3.13"
 license = "Apache-2.0"
 dependencies = [
+  "asyncpg>=0.30",
+  "httpx>=0.28,<1",
+  "keyring>=25.5",
   "pydantic>=2.11,<3",
   "pydantic-settings>=2.6,<3",
   "pyyaml>=6.0",
+  "redis>=5.2",
   "structlog>=24.4",
 ]
 

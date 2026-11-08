@@ -252,6 +252,13 @@ export const DamageSchema = z.object({
 }).strict();
 export type Damage = z.infer<typeof DamageSchema>;
 
+export const DependencyStateSchema = z.object({
+  state: z.enum(["up", "down", "starting", "degraded", "failed", "stopped", "unknown"]),
+  version: z.string().nullable().optional(),
+  detail: z.string().nullable().optional(),
+}).strict();
+export type DependencyState = z.infer<typeof DependencyStateSchema>;
+
 export const DirectorReportSchema = z.object({
   period_s: z.number().int().gte(0),
   goals: z.array(z.string()),
@@ -380,6 +387,12 @@ export const GameEventSchema = z.object({
   marker: EventMarkerSchema.nullable().optional(),
 }).strict();
 export type GameEvent = z.infer<typeof GameEventSchema>;
+
+/** `PUT /metrics/game` on the supervisor: the process PresentMon tracks (null stops tracking). */
+export const GameTargetSchema = z.object({
+  pid: z.number().int().gte(1).nullable(),
+}).strict();
+export type GameTarget = z.infer<typeof GameTargetSchema>;
 
 export const GapFrameSchema = z.object({
   op: z.literal("gap"),
@@ -523,11 +536,23 @@ export const ResourceSchema = z.object({
 }).strict();
 export type Resource = z.infer<typeof ResourceSchema>;
 
+export const SafetyArmRequestSchema = z.object({
+  session_id: z.string(),
+  confirm: z.literal("ARM"),
+}).strict();
+export type SafetyArmRequest = z.infer<typeof SafetyArmRequestSchema>;
+
 export const SafetyKillSchema = z.object({
   source: z.enum(["hotkey", "ui", "api", "watchdog", "policy"]),
   detail: z.string().nullable().optional(),
 }).strict();
 export type SafetyKill = z.infer<typeof SafetyKillSchema>;
+
+export const SafetyKillRequestSchema = z.object({
+  /** hotkey, button, voice, api, ... */
+  source: z.string().min(1).max(32),
+}).strict();
+export type SafetyKillRequest = z.infer<typeof SafetyKillRequestSchema>;
 
 export const SafetyOverrideSchema = z.object({
   control_owner: z.enum(["human", "ai", "none"]),
@@ -539,6 +564,11 @@ export const SafetyResumeSchema = z.object({
   by: z.literal("user"),
 }).strict();
 export type SafetyResume = z.infer<typeof SafetyResumeSchema>;
+
+export const SafetyResumeRequestSchema = z.object({
+  confirm: z.literal("RESUME"),
+}).strict();
+export type SafetyResumeRequest = z.infer<typeof SafetyResumeRequestSchema>;
 
 export const SafetyStateSchema = z.object({
   killed: z.boolean(),
@@ -553,6 +583,18 @@ export type SafetyState = z.infer<typeof SafetyStateSchema>;
 /** Any frame the server may send. */
 export const ServerFrameSchema = z.discriminatedUnion("op", [AckFrameSchema, MsgFrameSchema, PongFrameSchema, GapFrameSchema]);
 export type ServerFrame = z.infer<typeof ServerFrameSchema>;
+
+export const ServiceStateSchema = z.object({
+  name: z.string(),
+  state: z.enum(["up", "down", "starting", "degraded", "failed", "stopped", "unknown"]),
+  pid: z.number().int().nullable().optional(),
+  restarts: z.number().int().gte(0).optional(),
+  /** When the current state began */
+  since: z.string().datetime({ offset: true }).nullable().optional(),
+  detail: z.string().nullable().optional(),
+  kind: z.enum(["managed", "external", "oneshot"]).optional(),
+}).strict();
+export type ServiceState = z.infer<typeof ServiceStateSchema>;
 
 export const SessionEndedDataSchema = z.object({
   report_url: z.string(),
@@ -571,6 +613,27 @@ export const StageSchema = z.object({
   dv_ms: z.number().nullable(),
 }).strict();
 export type Stage = z.infer<typeof StageSchema>;
+
+export const SupervisorEventSchema = z.object({
+  /** Increases by one per event; use it to fetch only new events */
+  seq: z.number().int().gte(1),
+  ts: z.string().datetime({ offset: true }),
+  process: z.string(),
+  kind: z.enum(["starting", "healthy", "unhealthy", "exited", "restarting", "circuit_open", "stopped", "adopted"]),
+  detail: z.string().nullable().optional(),
+}).strict();
+export type SupervisorEvent = z.infer<typeof SupervisorEventSchema>;
+
+/** `GET /status` on the supervisor's internal endpoint (127.0.0.1:8769). */
+export const SupervisorStatusSchema = z.object({
+  started_at: z.string().datetime({ offset: true }),
+  /** Every process in the start order has been healthy at least once */
+  ready: z.boolean(),
+  services: z.array(ServiceStateSchema),
+  /** Most recent events, oldest first */
+  events: z.array(SupervisorEventSchema),
+}).strict();
+export type SupervisorStatus = z.infer<typeof SupervisorStatusSchema>;
 
 export const SystemMetricsSchema = z.object({
   ts: z.string().datetime({ offset: true }),
@@ -595,6 +658,14 @@ export const SystemNoticeDataSchema = z.object({
   level: z.enum(["info", "warning", "error"]),
 }).strict();
 export type SystemNoticeData = z.infer<typeof SystemNoticeDataSchema>;
+
+/** `GET /system/status`. */
+export const SystemStatusSchema = z.object({
+  services: z.array(ServiceStateSchema),
+  dependencies: z.record(z.string(), DependencyStateSchema),
+  resource_guard_level: z.enum(["L0", "L1", "L2", "L3", "L4"]).optional(),
+}).strict();
+export type SystemStatus = z.infer<typeof SystemStatusSchema>;
 
 export const TaskAcceptSchema = z.object({
   task_id: z.string().uuid(),

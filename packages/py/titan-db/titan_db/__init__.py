@@ -1,5 +1,5 @@
 """PostgreSQL access for Project Titan (Section 4).
 
-Phase 1 milestone M0 ships the Alembic environment and the initial migration that creates
-every table in Section 4.2. SQLAlchemy models and async repositories arrive in M2.
+Provides Alembic migrations for Section 4.2 DDL, SQLAlchemy 2.0 ORM models (``titan_db.models``),
+and (M2+) async repositories.
 """

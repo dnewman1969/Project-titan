@@ -1,0 +1,35 @@
+name: Mission Control
+purpose: Default KSP operations crew for observe-mode sessions.
+template_slug: ksp.default
+agents:
+  - role: director
+    persona_slug: ksp.director.wernher
+    is_director: true
+    tick_interval_ms: 15000
+    event_subscriptions: ["ksp.*"]
+    topics: [mission status, go/no-go]
+  - role: flight_engineer
+    persona_slug: ksp.flight_engineer.gene
+    tick_interval_ms: 10000
+    event_subscriptions:
+      - ksp.staging
+      - ksp.max_q
+      - ksp.overheat_warning
+      - ksp.high_g
+      - ksp.stage_fuel_depleted
+    topics: [engines, fuel, heat, structure]
+  - role: mission_planner
+    persona_slug: ksp.mission_planner.linus
+    tick_interval_ms: 10000
+    event_subscriptions: [ksp.apoapsis_target, ksp.orbit_achieved, ksp.soi_changed]
+    topics: [trajectory, delta-v, burns]
+  - role: navigator
+    persona_slug: ksp.navigator.val
+    tick_interval_ms: 12000
+    event_subscriptions: [ksp.launch, ksp.soi_changed, ksp.landed]
+    topics: [orbit, attitude, landing]
+  - role: commentator.host
+    persona_slug: ksp.commentator.jeb
+    tick_interval_ms: 20000
+    event_subscriptions: ["ksp.*"]
+    topics: [storytelling, recap, humour]

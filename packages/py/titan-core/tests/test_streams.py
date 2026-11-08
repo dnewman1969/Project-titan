@@ -32,6 +32,14 @@ def test_entry_data_requires_the_data_field() -> None:
         streams.entry_data({"other": "{}"})
 
 
+def test_session_stream_names_roundtrip() -> None:
+    sid = "01933e7a-0000-7000-8000-000000000001"
+    bus = streams.session_bus_stream(sid)
+    assert streams.parse_session_stream(bus, tail=":bus") == sid
+    events = streams.session_events_stream(sid)
+    assert streams.parse_session_stream(events, tail=":events") == sid
+
+
 async def test_redis_client_uses_the_configured_password() -> None:
     client = streams.redis_client(RedisConfig(url="redis://127.0.0.1:1/0", password=SecretStr("pw")))
     kwargs = client.connection_pool.connection_kwargs

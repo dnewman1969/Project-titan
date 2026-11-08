@@ -37,6 +37,7 @@ def client() -> Iterator[TestClient]:
         checks={"postgres": fake_probe},
         supervisor=no_supervisor,
         redis=fakeredis.FakeAsyncRedis(decode_responses=True),
+        start_persister=False,
     )
 
     extra = APIRouter()

@@ -10,13 +10,14 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
 
 from titan_core.config import load_config
+from titan_db.models import metadata as target_metadata
 
 config = context.config
 url = config.get_main_option("sqlalchemy.url") or load_config().postgres.sqlalchemy_url("asyncpg")
 
 
 def _run(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=None, transaction_per_migration=True)
+    context.configure(connection=connection, target_metadata=target_metadata, transaction_per_migration=True)
     with context.begin_transaction():
         context.run_migrations()
 
@@ -29,7 +30,7 @@ async def _run_online() -> None:
 
 
 if context.is_offline_mode():
-    context.configure(url=url, literal_binds=True, target_metadata=None)
+    context.configure(url=url, literal_binds=True, target_metadata=target_metadata)
     with context.begin_transaction():
         context.run_migrations()
 else:

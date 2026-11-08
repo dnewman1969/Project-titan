@@ -95,6 +95,11 @@ exclude = ["migrations/versions/"]
 module = ["pynvml"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# ORM mirrors Section 4.2 JSONB/ARRAY columns as dict/list.
+module = ["titan_db.models.*"]
+disallow_any_generics = false
+
 [tool.pydantic-mypy]
 init_forbid_extra = true
 init_typed = true

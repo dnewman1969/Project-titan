@@ -1,0 +1,21 @@
+# LF everywhere except Windows scripts (Section 3).
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.ico binary
+*.icns binary
+*.zst binary
+
+# Telemetry fixtures go through Git LFS (Section "How coding workers use this spec").
+# Every recorded fixture is zstd NDJSON; small hand-written fixtures stay plain *.ndjson.
+games/**/fixtures/**/*.zst filter=lfs diff=lfs merge=lfs -text
+tests/**/fixtures/**/*.zst filter=lfs diff=lfs merge=lfs -text
+
+# Generated code: collapse in diffs.
+schemas/*.json linguist-generated=true
+packages/ts/protocol/src/generated/** linguist-generated=true

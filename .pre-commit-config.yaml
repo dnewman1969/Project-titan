@@ -1,0 +1,47 @@
+# Install once with `uvx pre-commit install`. Hooks use the repo's own pinned tools via uv and pnpm,
+# so versions never drift from CI (Section 3).
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: mypy
+        name: mypy --strict
+        entry: uv run mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: lint-imports
+        name: import boundaries
+        entry: uv run python tools/lint-imports/run.py
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: eslint
+        name: eslint
+        entry: pnpm exec eslint --max-warnings 0
+        language: system
+        types_or: [ts, tsx, javascript]
+      - id: prettier
+        name: prettier
+        entry: pnpm exec prettier --write --ignore-unknown
+        language: system
+        types_or: [ts, tsx, javascript, json, yaml, markdown]
+      - id: codegen-check
+        name: codegen-check
+        entry: uv run python tools/codegen.py --check
+        language: system
+        pass_filenames: false
+        files: ^(packages/py/titan-core/titan_core/protocol/|tools/codegen\.py|schemas/|packages/ts/protocol/src/generated/)
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks

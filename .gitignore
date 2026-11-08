@@ -46,11 +46,11 @@ __pycache__/
 .venv/
 venv/
 env/
-.python-version
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
+coverage.xml
 htmlcov/
 *.sqlite3
 *.db
@@ -60,3 +60,12 @@ data/
 recordings/
 *.mp4
 *.mkv
+
+# Titan: third-party downloads, model weights, local service data (Section 3)
+third_party/cache/
+*.gguf
+*.safetensors
+*.onnx
+chroma/
+pgdata/
+.import_linter_cache/

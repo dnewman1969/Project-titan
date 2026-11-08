@@ -35,55 +35,80 @@ pnpm lint               # ruff, mypy, import boundaries, eslint, prettier, tsc
 
 `pnpm test` passes without any services: database and service tests skip when nothing is listening.
 Set `TITAN_REQUIRE_POSTGRES=1` and `TITAN_REQUIRE_SERVICES=1` to make them fail instead, as CI does.
+`TITAN_REQUIRE_SUPERVISOR_E2E=1` also runs the M1 acceptance test
+(`tests/integration/test_supervisor_e2e.py`), which needs PostgreSQL 16 binaries and a Redis with
+`requirepass` (`TITAN__REDIS__PASSWORD`).
 
 The first `pnpm dev` downloads the Electron binary (about 110 MB) into `node_modules/electron/dist`.
 
 ## 3. Backing services
 
-M0 code needs only PostgreSQL 16; Redis and Chroma are used by the integration tests. From M1 the
-supervisor manages portable Postgres itself (D1), and users install Memurai (D5).
+`titan-supervisor` (M1) starts everything in the order `postgres, redis, chroma, migrate, api`.
+Postgres and Chroma each run in one of two modes (`config/titan.yaml`, `mode:`):
 
-**With Docker (ADR 0020):**
+- **managed** (the default, and what users get): the supervisor runs portable PostgreSQL 16 (D1) and
+  Chroma as its own children, restarts them when they die and stops them on quit. On first start it
+  runs `initdb` with a random superuser password stored in Windows Credential Manager as
+  `titan/postgres`. Data lives under `%LOCALAPPDATA%\Titan\data`.
+- **external**: something else runs the service on the configured port (Docker, a native install); the
+  supervisor only health-checks it.
+
+Redis is always external: users install Memurai (D5), configured with `requirepass`. The Redis check
+reports `degraded` when the server accepts clients without a password.
+
+**With Docker (ADR 0020):** `tools/dev-up.ps1` (or `tools/dev-up.sh`) runs `docker compose up` and
+sets external mode plus the throwaway dev passwords:
 
 ```powershell
-docker compose up -d --wait          # postgres:16.15 :54329, redis:7.4.12 :63790, chroma 1.5.9 :8766
-$env:TITAN__POSTGRES__PASSWORD = "titan"
-uv run titan-db upgrade              # apply migrations to the dev database
+docker compose up -d --wait          # postgres:16.15 :54329, redis:7.4.12 :63790 (requirepass), chroma 1.5.9 :8766
+$env:TITAN__POSTGRES__MODE = "external"; $env:TITAN__CHROMA__MODE = "external"
+$env:TITAN__POSTGRES__PASSWORD = "titan"; $env:TITAN__REDIS__PASSWORD = "titan-dev"
 ```
 
-**Without Docker:**
+**Without Docker (managed):** `.\tools\dev-up.ps1 -Managed`. You need:
 
-- **PostgreSQL 16:** install from <https://www.enterprisedb.com/downloads/postgres-postgresql-downloads>
-  and create a `titan` login with the CREATEDB privilege. Either run it on port 54329 or set
-  `TITAN__POSTGRES__PORT=5432`. Set `TITAN__POSTGRES__PASSWORD` to that login's password.
-- **Redis:** Memurai Developer (<https://www.memurai.com/get-memurai>) configured for port 63790.
-- **Chroma:** `uvx --from chromadb==1.5.9 chroma run --host 127.0.0.1 --port 8766 --path $env:LOCALAPPDATA\Titan\dev\chroma`
+- **PostgreSQL 16 binaries:** `uv run python tools/fetch-third-party.py postgresql --extract` puts the
+  portable build under `third_party/cache/postgresql/pgsql/bin`, which the supervisor finds on its
+  own (or set `TITAN__POSTGRES__BIN_DIR`). Nothing needs to be installed or running.
+- **Redis:** Memurai Developer (<https://www.memurai.com/get-memurai>) on port 63790 with
+  `requirepass`. Store the password once with
+  `uv run python -c "from titan_core.secrets import set_secret; set_secret('redis', input())"`,
+  or set `TITAN__REDIS__PASSWORD`.
+- **Chroma:** nothing; the supervisor runs `chroma` from the venv, or `uvx --from chromadb==1.5.9 chroma`.
 
-The ports match `config/titan.yaml`. Every setting can be overridden with `TITAN__<SECTION>__<KEY>`
-environment variables (Section 9.5).
+Secrets come from the OS keyring (service `titan`, entries `postgres` and `redis`) unless
+`TITAN__POSTGRES__PASSWORD` / `TITAN__REDIS__PASSWORD` are set. On Linux without a keyring, set the
+environment variables. The ports match `config/titan.yaml`. Every setting can be overridden with
+`TITAN__<SECTION>__<KEY>` environment variables (Section 9.5).
 
 ## 4. Run the app
 
 ```powershell
-.\tools\dev-up.ps1                   # docker compose up, migrate, then pnpm dev
-.\tools\dev-up.ps1 -NoServices       # same, with services you started yourself
-pnpm dev                             # just the app
+.\tools\dev-up.ps1                   # docker compose up, then pnpm dev
+.\tools\dev-up.ps1 -NoCompose        # containers you already started
+.\tools\dev-up.ps1 -Managed          # no Docker: portable Postgres and Chroma under the supervisor
+pnpm dev                             # just the app, with whatever TITAN__* settings you exported
 ```
 
 `pnpm dev` starts electron-vite with hot reload. The Electron main process generates a per-launch
-bearer token and starts the API (`uv run titan-api`) with it. The status bar shows the API and
-database health; the menus and `Ctrl+Shift+F12` kill switch are wired.
+bearer token and starts `uv run titan-supervisor` with it (and its own PID, so the supervisor exits
+if Electron dies). The supervisor brings up the services, runs migrations and starts the API; a boot
+splash shows progress. Its output appears in the terminal prefixed `[supervisor]`. The status bar
+shows API, database and services health, the telemetry bar shows live CPU/GPU/RAM/FPS over the
+WebSocket gateway, and `Ctrl+Shift+F12` engages the kill switch through `POST /safety/kill`.
+Quitting the app stops every child.
 
-To run the API on its own, for example under a debugger:
+To run the backend on its own, for example under a debugger:
 
 ```powershell
 $env:TITAN_LAUNCH_TOKEN = "dev-token"
 $env:TITAN__API__CORS_ORIGINS = '["app://titan","http://localhost:5173"]'
-uv run titan-api                     # http://127.0.0.1:8765/api/v1/docs
-# in a second shell, with the same TITAN_LAUNCH_TOKEN set, `pnpm dev` uses this API instead
+uv run titan-supervisor              # everything; status at http://127.0.0.1:8769/status (bearer token)
+uv run titan-api                     # or only the API: http://127.0.0.1:8765/api/v1/docs
+# in a second shell, with the same TITAN_LAUNCH_TOKEN set, `pnpm dev` uses this backend instead
 ```
 
-Set `TITAN_BACKEND=none` to start the shell without any API.
+Set `TITAN_BACKEND=none` to start the shell without any backend.
 
 ## 5. Common tasks
 
@@ -106,11 +131,12 @@ same for users.
 | Tool                                   | Needed from | Notes                                                                         |
 | -------------------------------------- | ----------- | ----------------------------------------------------------------------------- |
 | Ollama                                 | M3          | `winget install Ollama.Ollama`; listens on `127.0.0.1:11434`. Pull `qwen3:8b` |
-| Memurai                                | M1.T2       | Redis 7 API on `127.0.0.1:63790`                                              |
+| Memurai                                | M1.T2       | Redis 7 API on `127.0.0.1:63790` with `requirepass`                           |
 | OBS Studio 30+                         | M8          | Enable obs-websocket v5 under Tools > WebSocket Server Settings               |
 | Kerbal Space Program 1.12 + kRPC 0.5.4 | M4/M5       | Pinned in `third_party/manifest.yaml`; Titan installs it after consent        |
 | ETS2/ATS + scs-sdk-plugin 1.12.1       | M4/M5       | Pinned DLL hash in `third_party/manifest.yaml`                                |
 | NVIDIA driver with NVML                | M1.T6       | GPU metrics; other GPUs show `n/a`                                            |
+| PresentMon 2.x console                 | M1.T6       | Game FPS. Needs admin or the Performance Log Users group (D18); else `n/a`    |
 
 ## 7. Branch protection (repository settings)
 
@@ -130,6 +156,12 @@ PR titles use Conventional Commits with the task ID, for example `feat(api): M1.
   `pnpm --filter @titan/desktop exec install-electron`.
 - **Port already in use:** another service is on 8765, 54329, 63790 or 8766. Stop it, or override the
   port with the matching `TITAN__…__PORT` variable.
-- **API pill stays red in `pnpm dev`:** check the `[api]` lines in the terminal. The usual cause is `uv`
-  missing from `PATH` in the shell that started `pnpm dev`.
+- **API pill stays red in `pnpm dev`:** check the `[supervisor]` lines in the terminal. The usual cause
+  is `uv` missing from `PATH` in the shell that started `pnpm dev`.
 - **Database pill red:** Postgres is not reachable with the configured port and password; see section 3.
+  In managed mode the server log is `%LOCALAPPDATA%\Titan\logs\postgres\postgres.log`.
+- **Services pill shows `redis degraded`:** Redis accepts clients without a password; set
+  `requirepass` (section 3).
+- **`the cluster exists but the keyring has no titan/postgres password`:** the managed data directory
+  was created with a password that is no longer in Credential Manager. Set
+  `TITAN__POSTGRES__PASSWORD`, or delete `%LOCALAPPDATA%\Titan\data\pg` to start over.

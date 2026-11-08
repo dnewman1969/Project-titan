@@ -1,0 +1,36 @@
+# Section 9.3: tag vX.Y.Z -> Windows installer + SBOMs + licence report -> draft GitHub Release.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - name: Generated files are up to date
+        run: uv run python tools/codegen.py --check
+      - name: Unsigned NSIS installer
+        run: pnpm --filter @titan/desktop dist
+      - name: SBOMs (CycloneDX) and licence report
+        shell: bash
+        run: |
+          mkdir -p dist-meta
+          uv export --format cyclonedx1.5 --all-packages --frozen -o dist-meta/sbom-python.cdx.json
+          pnpm dlx @cyclonedx/cdxgen@11 -t js -o dist-meta/sbom-node.cdx.json .
+          pnpm licenses list --prod --json > dist-meta/licenses-node.json
+          cp third_party/manifest.yaml dist-meta/third-party-manifest.yaml
+      - uses: softprops/action-gh-release@v3
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            apps/desktop/release/**/*.exe
+            dist-meta/*

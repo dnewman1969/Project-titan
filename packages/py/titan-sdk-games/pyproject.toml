@@ -1,0 +1,17 @@
+[project]
+name = "titan-sdk-games"
+version = "0.1.0"
+description = "Project Titan gameadapter abc, manifest model, discovery scanners, rule engine types and adapter test harness"
+requires-python = ">=3.12,<3.13"
+license = "Apache-2.0"
+dependencies = ["titan-core"]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["titan_sdk_games"]
+
+[tool.uv.sources]
+titan-core = { workspace = true }

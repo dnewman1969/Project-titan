@@ -1,0 +1,9 @@
+# Outbound network allowlist (Section 9.7). Enforced by titan_core.http (M1); 127.0.0.1 is always
+# allowed and network.offline_mode: true blocks everything else. Only titan-worker-io and the
+# model-pull job may use non-localhost egress. Later phases append domains here (P2 research
+# connectors, P7 Google/YouTube).
+allowlist:
+  - domain: registry.ollama.ai
+    purpose: Model pulls, on user action only
+  - domain: huggingface.co
+    purpose: Embedding model download at first run (BAAI/bge-small-en-v1.5)

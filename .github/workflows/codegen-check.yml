@@ -1,0 +1,23 @@
+# Fails when schemas/ or packages/ts/protocol/src/generated/ differ from what the Pydantic
+# protocol models generate (D14). Called by ci.yml; can also be run by hand.
+name: codegen-check
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codegen-check:
+    name: codegen-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          node: "false"
+      - name: Generated files are up to date
+        run: uv run python tools/codegen.py --check

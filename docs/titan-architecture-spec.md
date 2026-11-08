@@ -467,7 +467,7 @@ class GameAdapter(ABC):
 - Disk guard: refuse to start under 20 GB free. Warn at 10 minutes of remaining capacity based on the measured bitrate.
 
 ### 2.13 UI architecture and layout
-Electron with `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`. Preload exposes `window.titan = { apiBase, token, platform, onKillSwitch() }`. State is Redux Toolkit. Server data comes from RTK Query. Realtime data comes from one `WsClient` middleware that dispatches into slices (`chat`, `telemetry`, `events`, `recording`, `system`, `safety`). The telemetry slice keeps a ring buffer (600 frames) for Recharts sparklines.
+Electron with `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`. Preload exposes `window.titan = { apiBase, token, platform, onKillSwitch(), onMenuCommand() }` (plus read-only `backend`, `killHotkey` and `versions` for the About dialog). The packaged renderer is served from the privileged `app://titan` scheme, not `file://` (Section 9.6). State is Redux Toolkit. Server data comes from RTK Query. Realtime data comes from one `WsClient` middleware that dispatches into slices (`chat`, `telemetry`, `events`, `recording`, `system`, `safety`). The telemetry slice keeps a ring buffer (600 frames) for Recharts sparklines.
 ```
 +--------------------------------------------------------------------------------+
 | FILE | EDIT | VIEW | AI | RECORD | TOOLS | HELP              [REC 00:12:31] [KILL] |
@@ -510,10 +510,13 @@ titan/
 |-- .editorconfig / .gitattributes     LF everywhere except *.bat/*.ps1; LFS rules for fixtures > 5 MB
 |-- .gitignore                         data/, recordings, *.env, node_modules, .venv, dist
 |-- .pre-commit-config.yaml            ruff, mypy (changed pkgs), eslint, prettier, codegen-check, gitleaks
+|-- docker-compose.yml                 Dev/CI only: Postgres 16, Redis 7, Chroma on 127.0.0.1 (ADR 0020); never used by the app
 |-- .github/
 |   |-- workflows/ci.yml               Lint, type-check, unit, contract, integration (Linux), Windows jobs (Sec 9.3)
 |   |-- workflows/release.yml          Tag -> Windows installer build -> draft GitHub Release
 |   |-- workflows/codegen-check.yml    Fails if generated schemas/types differ from committed ones
+|   |-- actions/setup/                 Composite action: Node/pnpm and uv with frozen lockfiles
+|   |-- dependabot.yml                 Weekly pip (uv), npm and Actions updates
 |   |-- PULL_REQUEST_TEMPLATE.md       Task ID, acceptance criteria checklist, ADR link, test evidence
 |   `-- CODEOWNERS                     Protected paths: schemas/, packages/py/titan-core/protocol, services/actions
 |-- docs/
@@ -527,12 +530,12 @@ titan/
 |       |-- package.json               electron, electron-vite, react, @mui/material, @reduxjs/toolkit, recharts
 |       |-- electron.vite.config.ts    Build config for main/preload/renderer
 |       |-- electron-builder.yml       NSIS installer; extraResources: python, pgsql, ffmpeg, config
-|       |-- src/main/index.ts          App lifecycle, window, menus, spawns supervisor, launch token
+|       |-- src/main/index.ts          App lifecycle, window, menus, spawns supervisor, launch token, app:// protocol
 |       |-- src/main/menu.ts           FILE/EDIT/VIEW/AI/RECORD/TOOLS/HELP menu definition
 |       |-- src/main/killSwitch.ts     globalShortcut Ctrl+Shift+F12 -> API /safety/kill + named pipe
 |       |-- src/main/supervisor.ts     Spawn/monitor titan-supervisor, tree-kill on quit
 |       |-- src/main/gamePreview.ts    desktopCapturer source lookup for game window
-|       |-- src/preload/index.ts       contextBridge: window.titan {apiBase, token, onKillSwitch}
+|       |-- src/preload/index.ts       contextBridge: window.titan {apiBase, token, platform, onKillSwitch, onMenuCommand}
 |       |-- src/renderer/main.tsx      React root, theme, store provider
 |       |-- src/renderer/app/store.ts  Redux store, RTK Query api, WS middleware
 |       |-- src/renderer/app/ws.ts     WsClient: auth, subscribe, resume by seq, backoff
@@ -629,7 +632,7 @@ titan/
 |   |   `-- layouts/rencloud-1.12.yaml Versioned shared-memory layout
 |   |-- ets2/                          (P1) manifest, events.yaml, teams, fixtures (uses scs-common)
 |   `-- ats/                           (P1) manifest, events.yaml, teams, fixtures (uses scs-common)
-|-- schemas/                           GENERATED JSON Schemas (envelope.json, telemetry.json, ws.json, events.json)
+|-- schemas/                           GENERATED JSON Schemas (envelope.json, payloads.json, telemetry.json, ws.json, events.json)
 |-- config/
 |   |-- titan.yaml                     Defaults: ports, paths, rates, feature flags
 |   |-- models.yaml                    Role routing profiles (Sec 2.9.2)
@@ -1275,7 +1278,7 @@ One Chroma tenant `titan`, database `default`. Distance is `cosine` (`metadata={
 |---|---|---|---|
 | GET | `/health` | none | `{"status":"ok"}` |
 | GET | `/system/status` | none | `{"services":[{"name":"postgres","state":"up","pid":1234,"restarts":0,"since":"..."}],"dependencies":{"ollama":{"state":"up","version":"0.x"},"obs":{"state":"down"}},"resource_guard_level":"L0"}` |
-| GET | `/system/metrics` | none | `SystemMetrics` (Section 5.4) |
+| GET | `/system/metrics` | none | `SystemMetrics` (Section 5.3) |
 | POST | `/system/diagnostics` | none | `202 {"job_id"}`, producing a zip with secrets stripped |
 
 #### Settings and models
@@ -1440,7 +1443,7 @@ Backpressure: each connection has a 512-frame send buffer. Telemetry is dropped 
 ## 6. Agent communication protocol
 
 ### 6.1 Envelope
-Every message on `titan:s:{sid}:bus` is an `Envelope`. The Pydantic model in `titan_core.protocol.envelope` is the source. Its generated JSON Schema:
+Every message on `titan:s:{sid}:bus` is an `Envelope`. The Pydantic model in `titan_core.protocol.envelope` is the source. Its generated JSON Schema, shown condensed (the committed `schemas/envelope.json` is semantically equivalent: Pydantic writes nullable fields as `anyOf: [..., {"type": "null"}]` and includes defaults; the contract samples in `tests/contract/` are validated against both the Python models and the zod schemas):
 
 ```json
 {
@@ -2161,11 +2164,11 @@ There are no network calls in tests (enforced with `pytest-socket`, except local
 - **UI:** TOOLS > Logs (tail and filter by process and session) and Diagnostics bundle (`tools/diag-bundle.py`: logs, config with secrets removed, `/system/status`, versions).
 
 ### 9.5 Configuration
-- Precedence (lowest to highest): `config/*.yaml` in the app, then `%APPDATA%\Titan\config\titan.yaml`, then the `settings` table (UI-edited values), then environment variables `TITAN__<SECTION>__<KEY>` (for example `TITAN__API__PORT=8765`), then CLI flags. Loaded through `pydantic-settings` into one typed `TitanConfig`. Unknown keys fail at startup.
+- Precedence (lowest to highest): `config/titan.yaml` in the app, then `%APPDATA%\Titan\config\titan.yaml`, then the `settings` table (UI-edited values), then environment variables `TITAN__<SECTION>__<KEY>` (for example `TITAN__API__PORT=8765`), then CLI flags. Loaded through `pydantic-settings` into one typed `TitanConfig`. Unknown keys fail at startup. The other files in `config/` (`models.yaml`, `safety.yaml`, `recording.yaml`, `egress.yaml`, `personas/`) are not part of `TitanConfig`: the subsystem that owns each one loads and validates it.
 - Excerpt of `config/titan.yaml`:
 ```yaml
-api:        { host: 127.0.0.1, port: 8765 }
-postgres:   { port: 54329, data_dir: "%LOCALAPPDATA%/Titan/data/pg" }
+api:        { host: 127.0.0.1, port: 8765, cors_origins: ["app://titan"] }
+postgres:   { host: 127.0.0.1, port: 54329, database: titan, user: titan, data_dir: "%LOCALAPPDATA%/Titan/data/pg" }
 redis:      { url: "redis://127.0.0.1:63790/0" }        # password from keyring 'titan/redis'
 chroma:     { port: 8766, data_dir: "%LOCALAPPDATA%/Titan/data/chroma" }
 paths:      { recordings_root: "%USERPROFILE%/Videos/Titan" }
@@ -2178,13 +2181,14 @@ recording:  { default_preset: "1080p60", min_free_gb: 20 }
 safety:     { kill_hotkey: "Ctrl+Shift+F12" }        # actions disabled in P1 regardless
 logging:    { level: INFO, llm_prompts: false }
 network:    { offline_mode: false, allowlist_file: "config/egress.yaml" }
+otel:       { enabled: false }
 features:   { research: false, factory: false, actions: false, tts: false, video: false, publish: false }
 ```
-Feature flags gate later-phase code paths. They stay `false` until the phase's exit criteria pass.
+Feature flags gate later-phase code paths. They stay `false` until the phase's exit criteria pass. Passwords never appear in YAML: `postgres.password` comes from Credential Manager in production and from `TITAN__POSTGRES__PASSWORD` in development and CI.
 
 ### 9.6 Security
 - **Local-only surface.** Every listener binds `127.0.0.1`. The API requires the per-launch bearer token. Redis uses `requirepass`, Chroma uses a token, and Postgres uses a password and `pg_hba` limited to `host all all 127.0.0.1/32 scram-sha-256`. All of these secrets are random at first run and stored in Windows Credential Manager (`keyring`, service names `titan/*`).
-- **Electron hardening:** `contextIsolation`, `sandbox`, no `nodeIntegration`, a strict CSP (`default-src 'self'; connect-src http://127.0.0.1:8765 ws://127.0.0.1:8765 http://127.0.0.1:8767; img-src 'self' data: blob: http://127.0.0.1:8767`), no remote content, `will-navigate` blocked, `setWindowOpenHandler` denies all, and Electron fuses set (`RunAsNode` off, `EnableNodeCliInspectArguments` off). Auto-update is off by default. When enabled, it only uses signed GitHub Releases.
+- **Electron hardening:** `contextIsolation`, `sandbox`, no `nodeIntegration`, a strict CSP (`default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src http://127.0.0.1:8765 ws://127.0.0.1:8765 http://127.0.0.1:8767; img-src 'self' data: blob: http://127.0.0.1:8767; object-src 'none'; base-uri 'none'; form-action 'none'`; inline styles are required by MUI/Emotion, inline scripts never are), no remote content, `will-navigate` blocked, `setWindowOpenHandler` denies all, and Electron fuses set (`RunAsNode` off, `EnableNodeCliInspectArguments` off, `EnableNodeOptionsEnvironmentVariable` off, `GrantFileProtocolExtraPrivileges` off). The packaged renderer is served from a privileged `app://titan` scheme rather than `file://`, so it has a real origin: the API allows CORS only from `api.cors_origins` (default `app://titan`; the development shell adds its Vite dev-server origin), without credentials, because auth is the bearer header. Auto-update is off by default. When enabled, it only uses signed GitHub Releases.
 - **YouTube OAuth (P7):** OAuth 2.0 for installed apps with **PKCE** and a loopback redirect (`http://127.0.0.1:<ephemeral>/oauth/callback`) opened in the system browser, never an embedded webview. Minimum scopes: `https://www.googleapis.com/auth/youtube.upload` and `https://www.googleapis.com/auth/youtube.readonly`, plus `https://www.googleapis.com/auth/yt-analytics.readonly` in P8. The refresh token lives in Credential Manager (`titan/youtube/<channel_id>`). Access tokens are memory-only. The client ID and secret come from the user's own Google Cloud project and are also stored in Credential Manager. Revocation is available from the UI. Every upload requires `upload_jobs.approved_at`, set only through the UI approval endpoint, which needs a typed confirmation.
 - **Secrets hygiene:** gitleaks in CI and pre-commit. The logging processor redacts keys matching `(?i)(token|secret|password|authorization|api_key)`. The diagnostics bundle strips them too.
 - **Plugins:** game and model-provider plugins are Python code with full privileges. Built-in plugins ship in the app. Third-party wheels load only from `%APPDATA%\Titan\plugins\` after the user explicitly trusts each one (SHA-256 recorded in `settings`). Integration installs (kRPC, SCS plugin) are hash-pinned.

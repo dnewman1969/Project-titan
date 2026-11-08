@@ -1,0 +1,181 @@
+# Section 9.3. Every job here is a required check on main (see docs/dev-setup.md).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_COLOR: "1"
+  GITLEAKS_VERSION: "8.30.1"
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: ruff
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: mypy --strict
+        run: uv run mypy
+      - name: import boundaries (import-linter + input choke point)
+        run: uv run python tools/lint-imports/run.py
+      - name: eslint
+        run: pnpm exec eslint .
+      - name: prettier
+        run: pnpm exec prettier --check .
+      - name: tsc
+        run: pnpm -r typecheck
+      - name: gitleaks
+        run: |
+          curl -sSfL -o /tmp/gitleaks.tgz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  /tmp/gitleaks.tgz" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
+          /tmp/gitleaks git . --redact --no-banner
+
+  codegen-check:
+    uses: ./.github/workflows/codegen-check.yml
+
+  test-py-linux:
+    name: test-py-linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16.15
+        env:
+          POSTGRES_USER: titan
+          POSTGRES_PASSWORD: titan
+          POSTGRES_DB: titan
+        ports: ["54329:5432"]
+        options: >-
+          --health-cmd "pg_isready -U titan -d titan" --health-interval 2s --health-timeout 3s --health-retries 30
+      redis:
+        image: redis:7.4.12
+        ports: ["63790:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      TITAN__POSTGRES__PASSWORD: titan
+      TITAN_REQUIRE_POSTGRES: "1"
+      TITAN_REQUIRE_SERVICES: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Start Chroma
+        run: |
+          docker run -d --name chroma -p 127.0.0.1:8766:8000 -e ANONYMIZED_TELEMETRY=FALSE chromadb/chroma:1.5.9
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8766/api/v2/heartbeat && exit 0
+            sleep 1
+          done
+          docker logs chroma
+          exit 1
+      - uses: ./.github/actions/setup
+        with:
+          node: "false"
+      - name: Migrate the service database (smoke test of the titan-db CLI)
+        run: uv run titan-db upgrade
+      - name: pytest (unit, contract, migrations, integration)
+        run: uv run pytest --cov --cov-report=term --cov-report=xml
+      - name: Coverage gates (Section 9.2)
+        run: |
+          uv run coverage report --include="packages/*" --fail-under=85
+          uv run coverage report --include="services/*" --fail-under=70
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: coverage-linux
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  test-ts:
+    name: test-ts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          python: "false"
+      - name: vitest
+        run: pnpm test:ts
+      - name: electron-vite build
+        run: pnpm --filter @titan/desktop build
+
+  test-windows:
+    name: test-windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      TITAN__POSTGRES__PASSWORD: titan
+      TITAN_REQUIRE_POSTGRES: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      # The runner's preinstalled PostgreSQL is 17; D1 pins 16, so use the portable build from the
+      # manifest (the same zip M1.T1 ships), which also exercises tools/fetch-third-party.py.
+      - uses: actions/cache@v5
+        with:
+          path: third_party/cache/postgresql-16.15-1-windows-x64-binaries.zip
+          key: pgsql-${{ hashFiles('third_party/manifest.yaml') }}
+      - name: Portable PostgreSQL 16 on 127.0.0.1:54329
+        shell: pwsh
+        run: |
+          uv run python tools/fetch-third-party.py postgresql --extract
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $bin = Resolve-Path third_party/cache/postgresql/pgsql/bin
+          $data = Join-Path $env:RUNNER_TEMP pgdata
+          $pw = Join-Path $env:RUNNER_TEMP pgpw.txt
+          Set-Content -Path $pw -Value $env:TITAN__POSTGRES__PASSWORD -NoNewline
+          & "$bin/initdb.exe" -D $data -U titan --pwfile=$pw -A scram-sha-256 -E UTF8 --locale=C
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & "$bin/pg_ctl.exe" -D $data -l (Join-Path $env:RUNNER_TEMP pg.log) -w `
+            -o "-p 54329 -c listen_addresses=127.0.0.1" start
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $env:PGPASSWORD = $env:TITAN__POSTGRES__PASSWORD
+          & "$bin/createdb.exe" -h 127.0.0.1 -p 54329 -U titan titan
+          & "$bin/psql.exe" -h 127.0.0.1 -p 54329 -U titan -tAc "SHOW server_version;"
+      # M0 acceptance: a fresh clone runs `pnpm i && uv sync && pnpm codegen && pnpm test` green.
+      - name: pnpm codegen
+        run: pnpm codegen
+      - name: Codegen is deterministic on Windows
+        run: git diff --exit-code -- schemas packages/ts/protocol/src/generated
+      - name: pnpm test
+        run: pnpm test
+      - name: Electron build and unpacked package (validates electron-builder config and fuses)
+        run: pnpm --filter @titan/desktop dist:dir
+
+  build-installer:
+    name: build-installer
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [lint, codegen-check, test-py-linux, test-ts, test-windows]
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          python: "false"
+      - name: Unsigned NSIS installer
+        run: pnpm --filter @titan/desktop dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: titan-installer-${{ github.sha }}
+          path: apps/desktop/release/**/*.exe
+          if-no-files-found: error

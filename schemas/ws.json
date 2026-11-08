@@ -1,0 +1,2244 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://titan.local/schemas/ws.json",
+  "title": "WebSocket protocol",
+  "x-titan-ws-message-types": {
+    "chat.start": "#/$defs/ChatStartData",
+    "chat.delta": "#/$defs/ChatDeltaData",
+    "chat.final": "#/$defs/ChatFinalData",
+    "chat.cancelled": "#/$defs/ChatCancelledData",
+    "user.say": "#/$defs/UserSayData",
+    "system.notice": "#/$defs/SystemNoticeData",
+    "agent.state": "#/$defs/AgentStateData",
+    "task.update": "#/$defs/TaskUpdateData",
+    "floor.state": "#/$defs/FloorStateData",
+    "bb.update": "#/$defs/BBUpdateData",
+    "telemetry.frame": "#/$defs/TelemetryFrameUI",
+    "game.event": "#/$defs/GameEvent",
+    "session.state": "#/$defs/SessionStateData",
+    "session.ended": "#/$defs/SessionEndedData",
+    "recording.status": "#/$defs/RecordingStatus",
+    "system.metrics": "#/$defs/SystemMetrics",
+    "safety.state": "#/$defs/SafetyState",
+    "job.update": "#/$defs/JobUpdateData"
+  },
+  "$defs": {
+    "AckError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "detail"
+      ],
+      "title": "AckError",
+      "type": "object"
+    },
+    "AckFrame": {
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "const": "ack",
+          "type": "string"
+        },
+        "req_id": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AckError"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "op",
+        "req_id",
+        "ok"
+      ],
+      "title": "AckFrame",
+      "type": "object"
+    },
+    "AgentStateData": {
+      "additionalProperties": false,
+      "properties": {
+        "instance_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "spawning",
+            "ready",
+            "busy",
+            "paused",
+            "terminating",
+            "terminated",
+            "crashed"
+          ],
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "instance_id",
+        "state"
+      ],
+      "title": "AgentStateData",
+      "type": "object"
+    },
+    "Attitude": {
+      "additionalProperties": false,
+      "properties": {
+        "heading_deg": {
+          "type": "number"
+        },
+        "pitch_deg": {
+          "type": "number"
+        },
+        "roll_deg": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "heading_deg",
+        "pitch_deg",
+        "roll_deg"
+      ],
+      "title": "Attitude",
+      "type": "object"
+    },
+    "AuthFrame": {
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "const": "auth",
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "client": {
+          "description": "e.g. 'desktop/1.0.0'",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "token",
+        "client"
+      ],
+      "title": "AuthFrame",
+      "type": "object"
+    },
+    "BBUpdateData": {
+      "additionalProperties": false,
+      "properties": {
+        "section": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "author": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "section",
+        "key",
+        "version",
+        "author"
+      ],
+      "title": "BBUpdateData",
+      "type": "object"
+    },
+    "ChatCancelledData": {
+      "additionalProperties": false,
+      "properties": {
+        "message_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "reason"
+      ],
+      "title": "ChatCancelledData",
+      "type": "object"
+    },
+    "ChatDeltaData": {
+      "additionalProperties": false,
+      "properties": {
+        "message_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "delta": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "delta"
+      ],
+      "title": "ChatDeltaData",
+      "type": "object"
+    },
+    "ChatFinalData": {
+      "additionalProperties": false,
+      "properties": {
+        "message_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "tokens": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "model": {
+          "type": "string"
+        },
+        "latency_ms": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mentions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "message_id",
+        "text",
+        "tokens",
+        "model",
+        "latency_ms",
+        "mentions"
+      ],
+      "title": "ChatFinalData",
+      "type": "object"
+    },
+    "ChatSender": {
+      "additionalProperties": false,
+      "properties": {
+        "instance_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "persona_slug": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "color_hex": {
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "type": "string"
+        },
+        "portrait_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "instance_id",
+        "persona_slug",
+        "display_name",
+        "role",
+        "color_hex",
+        "portrait_url"
+      ],
+      "title": "ChatSender",
+      "type": "object"
+    },
+    "ChatStartData": {
+      "additionalProperties": false,
+      "properties": {
+        "message_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "sender": {
+          "$ref": "#/$defs/ChatSender"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "event_ref": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "const": "say",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "sender",
+        "reply_to",
+        "event_ref",
+        "kind"
+      ],
+      "title": "ChatStartData",
+      "type": "object"
+    },
+    "ClientFrame": {
+      "description": "Any frame the client may send.",
+      "discriminator": {
+        "mapping": {
+          "auth": "#/$defs/AuthFrame",
+          "ping": "#/$defs/PingFrame",
+          "subscribe": "#/$defs/SubscribeFrame",
+          "unsubscribe": "#/$defs/UnsubscribeFrame"
+        },
+        "propertyName": "op"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AuthFrame"
+        },
+        {
+          "$ref": "#/$defs/SubscribeFrame"
+        },
+        {
+          "$ref": "#/$defs/UnsubscribeFrame"
+        },
+        {
+          "$ref": "#/$defs/PingFrame"
+        }
+      ],
+      "title": "ClientFrame"
+    },
+    "Controls": {
+      "additionalProperties": false,
+      "properties": {
+        "throttle": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "brake": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "steer": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "clutch": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gear": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sas": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rcs": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parking_brake": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cruise_control_mps": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lights": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "throttle",
+        "brake",
+        "steer",
+        "clutch",
+        "gear",
+        "sas",
+        "rcs",
+        "parking_brake",
+        "cruise_control_mps",
+        "lights"
+      ],
+      "title": "Controls",
+      "type": "object"
+    },
+    "Damage": {
+      "additionalProperties": false,
+      "properties": {
+        "overall": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "0 = pristine, 1 = destroyed"
+        },
+        "parts": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "overall",
+        "parts"
+      ],
+      "title": "Damage",
+      "type": "object"
+    },
+    "Economy": {
+      "additionalProperties": false,
+      "properties": {
+        "funds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "science": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reputation": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "funds",
+        "science",
+        "reputation",
+        "currency"
+      ],
+      "title": "Economy",
+      "type": "object"
+    },
+    "Engine": {
+      "additionalProperties": false,
+      "properties": {
+        "running": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rpm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "temp_c": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_temp_ratio": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "running",
+        "rpm",
+        "temp_c",
+        "max_temp_ratio"
+      ],
+      "title": "Engine",
+      "type": "object"
+    },
+    "Environment": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "atmosphere_density": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dynamic_pressure_pa": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "static_pressure_pa": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "speed_limit_mps": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "weather": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "local_time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "body",
+        "atmosphere_density",
+        "dynamic_pressure_pa",
+        "static_pressure_pa",
+        "speed_limit_mps",
+        "weather",
+        "local_time"
+      ],
+      "title": "Environment",
+      "type": "object"
+    },
+    "EventMarker": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "highlight",
+            "achievement",
+            "failure",
+            "funny",
+            "tension",
+            "emotional",
+            "mission_complete",
+            "chapter",
+            "user"
+          ],
+          "type": "string"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "duration_ms"
+      ],
+      "title": "EventMarker",
+      "type": "object"
+    },
+    "FloorStateData": {
+      "additionalProperties": false,
+      "properties": {
+        "holder_instance_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "queue": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "holder_instance_id",
+        "queue"
+      ],
+      "title": "FloorStateData",
+      "type": "object"
+    },
+    "GameEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "seq": {
+          "description": "Per-session, monotonically increasing",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "description": "'<game>.<name>' or 'vehicle.<name>' for shared rules",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "game",
+            "agent",
+            "system",
+            "user",
+            "safety",
+            "recording"
+          ],
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "debug",
+            "info",
+            "notice",
+            "warning",
+            "critical"
+          ],
+          "type": "string"
+        },
+        "salience": {
+          "description": "0..1, drives commentary urgency and highlight scoring",
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "source": {
+          "description": "'rule:ksp.max_q' | 'adapter:scs' | 'capture'",
+          "type": "string"
+        },
+        "t_mono_ns": {
+          "type": "integer"
+        },
+        "t_session_ms": {
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "frame_seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "marker": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EventMarker"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "session_id",
+        "seq",
+        "type",
+        "category",
+        "severity",
+        "salience",
+        "source",
+        "t_mono_ns",
+        "t_session_ms",
+        "occurred_at",
+        "frame_seq",
+        "payload"
+      ],
+      "title": "GameEvent",
+      "type": "object"
+    },
+    "GapFrame": {
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "const": "gap",
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "from_seq": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "channel",
+        "from_seq",
+        "reason"
+      ],
+      "title": "GapFrame",
+      "type": "object"
+    },
+    "Geo": {
+      "additionalProperties": false,
+      "properties": {
+        "lat_deg": {
+          "type": "number"
+        },
+        "lon_deg": {
+          "type": "number"
+        },
+        "alt_m": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "lat_deg",
+        "lon_deg",
+        "alt_m"
+      ],
+      "title": "Geo",
+      "type": "object"
+    },
+    "GpuMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "util_pct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vram_used_mb": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vram_total_mb": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "temp_c": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "encoder_util_pct": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "index",
+        "name",
+        "util_pct",
+        "vram_used_mb",
+        "vram_total_mb",
+        "temp_c",
+        "encoder_util_pct"
+      ],
+      "title": "GpuMetrics",
+      "type": "object"
+    },
+    "Job": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "cargo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mass_kg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "destination": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "income": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deadline_game_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nav_distance_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nav_time_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trailer_attached": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cargo_damage": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "active",
+        "cargo",
+        "mass_kg",
+        "source",
+        "destination",
+        "income",
+        "currency",
+        "deadline_game_s",
+        "nav_distance_m",
+        "nav_time_s",
+        "trailer_attached",
+        "cargo_damage"
+      ],
+      "title": "Job",
+      "type": "object"
+    },
+    "JobUpdateData": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ],
+          "type": "string"
+        },
+        "progress": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "state",
+        "progress"
+      ],
+      "title": "JobUpdateData",
+      "type": "object"
+    },
+    "MsgFrame": {
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "const": "msg",
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "seq": {
+          "description": "Redis stream id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "data": {
+          "additionalProperties": true,
+          "type": "object"
+        }
+      },
+      "required": [
+        "op",
+        "channel",
+        "seq",
+        "ts",
+        "type",
+        "data"
+      ],
+      "title": "MsgFrame",
+      "type": "object"
+    },
+    "Orbit": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "apoapsis_m": {
+          "type": "number"
+        },
+        "periapsis_m": {
+          "type": "number"
+        },
+        "inclination_deg": {
+          "type": "number"
+        },
+        "eccentricity": {
+          "type": "number"
+        },
+        "period_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "time_to_apoapsis_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "time_to_periapsis_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "time_to_soi_change_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "body",
+        "apoapsis_m",
+        "periapsis_m",
+        "inclination_deg",
+        "eccentricity",
+        "period_s",
+        "time_to_apoapsis_s",
+        "time_to_periapsis_s",
+        "time_to_soi_change_s"
+      ],
+      "title": "Orbit",
+      "type": "object"
+    },
+    "PingFrame": {
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "const": "ping",
+          "type": "string"
+        },
+        "req_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "req_id"
+      ],
+      "title": "PingFrame",
+      "type": "object"
+    },
+    "PongFrame": {
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "const": "pong",
+          "type": "string"
+        },
+        "req_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "req_id"
+      ],
+      "title": "PongFrame",
+      "type": "object"
+    },
+    "Position": {
+      "additionalProperties": false,
+      "properties": {
+        "frame": {
+          "description": "ksp: body-centred 'body:<name>'; scs: 'scs_world' metres",
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "frame",
+        "x",
+        "y",
+        "z"
+      ],
+      "title": "Position",
+      "type": "object"
+    },
+    "RecordingStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "recording_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "elapsed_ms": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "obs_connected": {
+          "type": "boolean"
+        },
+        "disk_free_bytes": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "est_remaining_min": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tracks": {
+          "items": {
+            "$ref": "#/$defs/RecordingTrackStatus"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "recording_id",
+        "state",
+        "elapsed_ms",
+        "obs_connected",
+        "disk_free_bytes",
+        "est_remaining_min",
+        "tracks"
+      ],
+      "title": "RecordingStatus",
+      "type": "object"
+    },
+    "RecordingTrackStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "bitrate_kbps": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "dropped_frames": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "fps": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "level_dbfs": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind",
+        "state"
+      ],
+      "title": "RecordingTrackStatus",
+      "type": "object"
+    },
+    "Resource": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "capacity": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "vehicle",
+            "stage",
+            "trailer"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "amount",
+        "capacity",
+        "unit",
+        "scope"
+      ],
+      "title": "Resource",
+      "type": "object"
+    },
+    "SafetyState": {
+      "additionalProperties": false,
+      "properties": {
+        "killed": {
+          "type": "boolean"
+        },
+        "armed": {
+          "type": "boolean"
+        },
+        "control_owner": {
+          "enum": [
+            "none",
+            "ai",
+            "human"
+          ],
+          "type": "string"
+        },
+        "last_kill_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_kill_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "policy_version": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "killed",
+        "armed",
+        "control_owner",
+        "last_kill_at",
+        "last_kill_source",
+        "policy_version"
+      ],
+      "title": "SafetyState",
+      "type": "object"
+    },
+    "ServerFrame": {
+      "description": "Any frame the server may send.",
+      "discriminator": {
+        "mapping": {
+          "ack": "#/$defs/AckFrame",
+          "gap": "#/$defs/GapFrame",
+          "msg": "#/$defs/MsgFrame",
+          "pong": "#/$defs/PongFrame"
+        },
+        "propertyName": "op"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/AckFrame"
+        },
+        {
+          "$ref": "#/$defs/MsgFrame"
+        },
+        {
+          "$ref": "#/$defs/PongFrame"
+        },
+        {
+          "$ref": "#/$defs/GapFrame"
+        }
+      ],
+      "title": "ServerFrame"
+    },
+    "SessionEndedData": {
+      "additionalProperties": false,
+      "properties": {
+        "report_url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "report_url"
+      ],
+      "title": "SessionEndedData",
+      "type": "object"
+    },
+    "SessionStateData": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "created",
+            "starting",
+            "live",
+            "paused",
+            "stopping",
+            "ended",
+            "failed"
+          ],
+          "type": "string"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "enum": [
+                "success",
+                "partial",
+                "failure",
+                "aborted"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "title": "SessionStateData",
+      "type": "object"
+    },
+    "Stage": {
+      "additionalProperties": false,
+      "properties": {
+        "current": {
+          "type": "integer"
+        },
+        "total": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dv_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "current",
+        "total",
+        "dv_ms"
+      ],
+      "title": "Stage",
+      "type": "object"
+    },
+    "SubscribeFrame": {
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "const": "subscribe",
+          "type": "string"
+        },
+        "req_id": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "since_seq": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Last seen Redis stream id"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SubscribeOptions"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "op",
+        "req_id",
+        "channel"
+      ],
+      "title": "SubscribeFrame",
+      "type": "object"
+    },
+    "SubscribeOptions": {
+      "additionalProperties": false,
+      "properties": {
+        "full": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Include telemetry game_specific"
+        }
+      },
+      "title": "SubscribeOptions",
+      "type": "object"
+    },
+    "SystemMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "ts": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "game_fps": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "null when no game is running (UI shows n/a)"
+        },
+        "game_frametime_p99_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cpu_pct": {
+          "type": "number"
+        },
+        "ram_used_mb": {
+          "type": "integer"
+        },
+        "ram_total_mb": {
+          "type": "integer"
+        },
+        "gpu": {
+          "description": "Empty on non-NVIDIA GPUs in v1 (UI shows n/a)",
+          "items": {
+            "$ref": "#/$defs/GpuMetrics"
+          },
+          "type": "array"
+        },
+        "tokens_per_min": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "llm_queue_depth": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "goals_active": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tasks_open": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "resource_guard_level": {
+          "enum": [
+            "L0",
+            "L1",
+            "L2",
+            "L3",
+            "L4"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "ts",
+        "game_fps",
+        "game_frametime_p99_ms",
+        "cpu_pct",
+        "ram_used_mb",
+        "ram_total_mb",
+        "gpu",
+        "tokens_per_min",
+        "llm_queue_depth",
+        "goals_active",
+        "tasks_open",
+        "resource_guard_level"
+      ],
+      "title": "SystemMetrics",
+      "type": "object"
+    },
+    "SystemNoticeData": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "level"
+      ],
+      "title": "SystemNoticeData",
+      "type": "object"
+    },
+    "TaskUpdateData": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "assignee_instance_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "state",
+        "assignee_instance_id",
+        "title"
+      ],
+      "title": "TaskUpdateData",
+      "type": "object"
+    },
+    "TelemetryFrameUI": {
+      "additionalProperties": false,
+      "description": "`TelemetryFrame` without `game_specific`: what the UI receives on the telemetry channel.",
+      "properties": {
+        "schema": {
+          "const": "titan.telemetry/1",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "game": {
+          "description": "'ksp' | 'ets2' | 'ats' | ...",
+          "type": "string"
+        },
+        "adapter_version": {
+          "type": "string"
+        },
+        "seq": {
+          "description": "Per session, monotonic",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "t_mono_ns": {
+          "type": "integer"
+        },
+        "t_session_ms": {
+          "type": "integer"
+        },
+        "t_game_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "KSP UT seconds; SCS game time in seconds"
+        },
+        "paused": {
+          "type": "boolean"
+        },
+        "scene": {
+          "description": "ksp: flight|map|vab|sph|space_center|tracking|menu ; scs: driving|menu|loading|map",
+          "type": "string"
+        },
+        "domain": {
+          "enum": [
+            "space",
+            "ground_vehicle",
+            "aircraft",
+            "naval",
+            "strategy",
+            "other"
+          ],
+          "type": "string"
+        },
+        "vehicle": {
+          "$ref": "#/$defs/Vehicle"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/Resource"
+          },
+          "type": "array"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Environment"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "job": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Job"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "economy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Economy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema",
+        "session_id",
+        "game",
+        "adapter_version",
+        "seq",
+        "t_mono_ns",
+        "t_session_ms",
+        "t_game_s",
+        "paused",
+        "scene",
+        "domain",
+        "vehicle",
+        "resources",
+        "environment",
+        "job",
+        "economy"
+      ],
+      "title": "TelemetryFrameUI",
+      "type": "object"
+    },
+    "UnsubscribeFrame": {
+      "additionalProperties": false,
+      "properties": {
+        "op": {
+          "const": "unsubscribe",
+          "type": "string"
+        },
+        "req_id": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "req_id",
+        "channel"
+      ],
+      "title": "UnsubscribeFrame",
+      "type": "object"
+    },
+    "UserSayData": {
+      "additionalProperties": false,
+      "properties": {
+        "message_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "to": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "message_id",
+        "text",
+        "to"
+      ],
+      "title": "UserSayData",
+      "type": "object"
+    },
+    "Vehicle": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "'rocket', 'truck', ..."
+        },
+        "position": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Position"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "geo": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Geo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attitude": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Attitude"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "velocity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Velocity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "accel_g": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "controls": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Controls"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "engine": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Engine"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "damage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Damage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "situation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "ksp: pre_launch|flying|sub_orbital|orbiting|escaping|landed|splashed|docked"
+        },
+        "stage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Stage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "orbit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Orbit"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "position",
+        "geo",
+        "attitude",
+        "velocity",
+        "accel_g",
+        "controls",
+        "engine",
+        "damage",
+        "situation",
+        "stage",
+        "orbit"
+      ],
+      "title": "Vehicle",
+      "type": "object"
+    },
+    "Velocity": {
+      "additionalProperties": false,
+      "properties": {
+        "speed_mps": {
+          "type": "number"
+        },
+        "vertical_mps": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "horizontal_mps": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "speed_mps",
+        "vertical_mps",
+        "horizontal_mps"
+      ],
+      "title": "Velocity",
+      "type": "object"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+# Recording presets (Sections 2.5 and 5.3 recordings.preset). Read by titan-capture from M8.
+# config/titan.yaml recording.default_preset picks one by name.
+presets:
+  1080p60:
+    { width: 1920, height: 1080, fps: 60, encoder: jim_nvenc, cq: 20 }
+  1440p60:
+    { width: 2560, height: 1440, fps: 60, encoder: jim_nvenc, cq: 21 }
+  4k60:
+    { width: 3840, height: 2160, fps: 60, encoder: jim_nvenc, cq: 22 }
+  1080p60_x264:                  # non-NVIDIA fallback; higher CPU cost
+    { width: 1920, height: 1080, fps: 60, encoder: obs_x264, crf: 20 }
+tracks:
+  - gameplay_video
+  - game_audio
+  - mic_audio
+  - webcam_video

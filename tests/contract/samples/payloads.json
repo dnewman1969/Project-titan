@@ -1,0 +1,84 @@
+{
+  "byType": true,
+  "valid": [
+    {
+      "type": "floor.request",
+      "payload": {
+        "urgency": 0.7,
+        "topic": "max-Q passed",
+        "event_ref": "0193f1a2-7c00-7000-8000-000000000001",
+        "est_words": 20
+      }
+    },
+    {
+      "type": "floor.grant",
+      "payload": {
+        "request_id": "0193f1a2-7c10-7000-8000-000000000002",
+        "max_words": 30,
+        "deadline_ms": 2500
+      }
+    },
+    {
+      "type": "floor.deny",
+      "payload": { "request_id": "0193f1a2-7c10-7000-8000-000000000002", "reason": "stale" }
+    },
+    {
+      "type": "task.complete",
+      "payload": {
+        "task_id": "0193f1a2-7d00-7000-8000-0000000000c1",
+        "output": { "dv_ms": 912, "burn_time_s": 38 },
+        "summary": "Circularization needs 912 m/s, 38 s burn.",
+        "bb_refs": [{ "section": "facts", "key": "burn.circularize", "version": 1 }]
+      }
+    },
+    {
+      "type": "task.reject",
+      "payload": { "task_id": "0193f1a2-7d00-7000-8000-0000000000c1", "reason": "busy" }
+    },
+    { "type": "user.say", "payload": { "text": "Gene, are we good on fuel?", "to": ["persona:gene"] } },
+    {
+      "type": "agent.heartbeat",
+      "payload": {
+        "instance_id": "0193f19c-1111-7000-8000-000000000e01",
+        "state": "ready",
+        "inbox_depth": 0,
+        "open_tasks": 1
+      }
+    },
+    { "type": "safety.kill", "payload": { "source": "hotkey" } },
+    {
+      "type": "director.report",
+      "payload": {
+        "period_s": 300,
+        "goals": ["Reach orbit"],
+        "progress": "Ascent nominal.",
+        "issues": [],
+        "next": ["Circularize"]
+      }
+    },
+    {
+      "type": "action.propose",
+      "payload": {
+        "action_id": "ksp.stage",
+        "params": {},
+        "rationale": "Stage 2 is empty",
+        "risk": "irreversible",
+        "expected_effect": "Decouple stage 2"
+      }
+    }
+  ],
+  "invalid": [
+    { "type": "floor.request", "payload": { "urgency": 1.5, "topic": "x", "est_words": 3 } },
+    {
+      "type": "floor.deny",
+      "payload": { "request_id": "0193f1a2-7c10-7000-8000-000000000002", "reason": "bored" }
+    },
+    { "type": "task.reject", "payload": { "task_id": "not-a-uuid", "reason": "busy" } },
+    { "type": "safety.resume", "payload": { "by": "director" } },
+    { "type": "chat.delta", "payload": { "message_id": "0193f1a2-8000-7000-8000-000000000004" } },
+    {
+      "type": "bb.written",
+      "payload": { "section": "gossip", "key": "k", "version": 1, "op": "put", "bb_version": 3 }
+    }
+  ]
+}

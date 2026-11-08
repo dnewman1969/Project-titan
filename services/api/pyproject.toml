@@ -1,0 +1,26 @@
+[project]
+name = "titan-api"
+version = "0.1.0"
+description = "Project Titan local API: FastAPI REST and WebSocket gateway on 127.0.0.1:8765"
+requires-python = ">=3.12,<3.13"
+license = "Apache-2.0"
+dependencies = [
+  "titan-core",
+  "titan-db",
+  "fastapi>=0.115",
+  "uvicorn>=0.32",
+]
+
+[project.scripts]
+titan-api = "titan_api.__main__:main"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["titan_api"]
+
+[tool.uv.sources]
+titan-core = { workspace = true }
+titan-db = { workspace = true }

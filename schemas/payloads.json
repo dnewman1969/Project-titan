@@ -1,0 +1,1299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://titan.local/schemas/payloads.json",
+  "title": "Envelope payloads",
+  "x-titan-message-types": {
+    "task.assign": "#/$defs/TaskAssign",
+    "task.accept": "#/$defs/TaskAccept",
+    "task.reject": "#/$defs/TaskReject",
+    "task.progress": "#/$defs/TaskProgress",
+    "task.blocked": "#/$defs/TaskBlocked",
+    "task.complete": "#/$defs/TaskComplete",
+    "task.fail": "#/$defs/TaskFail",
+    "task.cancel": "#/$defs/TaskCancel",
+    "task.evaluate": "#/$defs/TaskEvaluate",
+    "bb.written": "#/$defs/BBWritten",
+    "conflict.raised": "#/$defs/ConflictRaised",
+    "query.ask": "#/$defs/QueryAsk",
+    "query.answer": "#/$defs/QueryAnswer",
+    "chat.say": "#/$defs/ChatSay",
+    "chat.delta": "#/$defs/ChatDelta",
+    "user.say": "#/$defs/UserSay",
+    "floor.request": "#/$defs/FloorRequest",
+    "floor.grant": "#/$defs/FloorGrant",
+    "floor.deny": "#/$defs/FloorDeny",
+    "floor.release": "#/$defs/FloorRelease",
+    "floor.preempt": "#/$defs/FloorPreempt",
+    "agent.spawn": "#/$defs/AgentSpawn",
+    "agent.ready": "#/$defs/AgentReady",
+    "agent.heartbeat": "#/$defs/AgentHeartbeat",
+    "agent.terminate": "#/$defs/AgentTerminate",
+    "agent.terminated": "#/$defs/AgentTerminated",
+    "game.event": "#/$defs/GameEvent",
+    "world.tick": "#/$defs/WorldStateTick",
+    "action.propose": "#/$defs/ActionPropose",
+    "action.decision": "#/$defs/ActionDecision",
+    "action.executed": "#/$defs/ActionExecuted",
+    "safety.kill": "#/$defs/SafetyKill",
+    "safety.override": "#/$defs/SafetyOverride",
+    "safety.resume": "#/$defs/SafetyResume",
+    "mission.update": "#/$defs/MissionUpdate",
+    "director.report": "#/$defs/DirectorReport"
+  },
+  "$defs": {
+    "ActionDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "proposal_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "decision": {
+          "enum": [
+            "approved",
+            "denied"
+          ],
+          "type": "string"
+        },
+        "by": {
+          "enum": [
+            "director",
+            "policy",
+            "user"
+          ],
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "proposal_id",
+        "decision",
+        "by"
+      ],
+      "title": "ActionDecision",
+      "type": "object"
+    },
+    "ActionExecuted": {
+      "additionalProperties": false,
+      "properties": {
+        "proposal_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "latency_ms": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "proposal_id",
+        "ok",
+        "latency_ms"
+      ],
+      "title": "ActionExecuted",
+      "type": "object"
+    },
+    "ActionPropose": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "type": "string"
+        },
+        "params": {},
+        "rationale": {
+          "type": "string"
+        },
+        "risk": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "irreversible"
+          ],
+          "type": "string"
+        },
+        "expected_effect": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_id",
+        "params",
+        "rationale",
+        "risk",
+        "expected_effect"
+      ],
+      "title": "ActionPropose",
+      "type": "object"
+    },
+    "AgentHeartbeat": {
+      "additionalProperties": false,
+      "properties": {
+        "instance_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "spawning",
+            "ready",
+            "busy",
+            "paused",
+            "terminating",
+            "terminated",
+            "crashed"
+          ],
+          "type": "string"
+        },
+        "inbox_depth": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "open_tasks": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "instance_id",
+        "state",
+        "inbox_depth",
+        "open_tasks"
+      ],
+      "title": "AgentHeartbeat",
+      "type": "object"
+    },
+    "AgentReady": {
+      "additionalProperties": false,
+      "properties": {
+        "instance_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "tools": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "instance_id",
+        "model",
+        "tools"
+      ],
+      "title": "AgentReady",
+      "type": "object"
+    },
+    "AgentSpawn": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "instance_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent_id",
+        "instance_id",
+        "reason"
+      ],
+      "title": "AgentSpawn",
+      "type": "object"
+    },
+    "AgentTerminate": {
+      "additionalProperties": false,
+      "properties": {
+        "instance_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "session_end",
+            "director_retire",
+            "user",
+            "crash_loop",
+            "resource_guard"
+          ],
+          "type": "string"
+        },
+        "grace_ms": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "instance_id",
+        "reason",
+        "grace_ms"
+      ],
+      "title": "AgentTerminate",
+      "type": "object"
+    },
+    "AgentTerminated": {
+      "additionalProperties": false,
+      "properties": {
+        "instance_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "final_report": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "instance_id",
+        "reason"
+      ],
+      "title": "AgentTerminated",
+      "type": "object"
+    },
+    "BBRef": {
+      "additionalProperties": false,
+      "properties": {
+        "section": {
+          "enum": [
+            "goals",
+            "plan",
+            "tasks",
+            "world_state",
+            "facts",
+            "hypotheses",
+            "risks",
+            "discoveries",
+            "lessons",
+            "notes"
+          ],
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "section",
+        "key",
+        "version"
+      ],
+      "title": "BBRef",
+      "type": "object"
+    },
+    "BBWritten": {
+      "additionalProperties": false,
+      "properties": {
+        "section": {
+          "enum": [
+            "goals",
+            "plan",
+            "tasks",
+            "world_state",
+            "facts",
+            "hypotheses",
+            "risks",
+            "discoveries",
+            "lessons",
+            "notes"
+          ],
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "op": {
+          "enum": [
+            "put",
+            "retract"
+          ],
+          "type": "string"
+        },
+        "bb_version": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "section",
+        "key",
+        "version",
+        "op",
+        "bb_version"
+      ],
+      "title": "BBWritten",
+      "type": "object"
+    },
+    "ChatDelta": {
+      "additionalProperties": false,
+      "properties": {
+        "message_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "delta": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "delta"
+      ],
+      "title": "ChatDelta",
+      "type": "object"
+    },
+    "ChatSay": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "say",
+            "aside"
+          ],
+          "type": "string"
+        },
+        "event_ref": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "mentions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "latency_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "text",
+        "kind"
+      ],
+      "title": "ChatSay",
+      "type": "object"
+    },
+    "ConflictRaised": {
+      "additionalProperties": false,
+      "properties": {
+        "section": {
+          "enum": [
+            "goals",
+            "plan",
+            "tasks",
+            "world_state",
+            "facts",
+            "hypotheses",
+            "risks",
+            "discoveries",
+            "lessons",
+            "notes"
+          ],
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "versions": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "authors": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "summary": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "section",
+        "key",
+        "versions",
+        "authors",
+        "summary"
+      ],
+      "title": "ConflictRaised",
+      "type": "object"
+    },
+    "DirectorReport": {
+      "additionalProperties": false,
+      "properties": {
+        "period_s": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "goals": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "progress": {
+          "type": "string"
+        },
+        "issues": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "next": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "period_s",
+        "goals",
+        "progress",
+        "issues",
+        "next"
+      ],
+      "title": "DirectorReport",
+      "type": "object"
+    },
+    "EventMarker": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "highlight",
+            "achievement",
+            "failure",
+            "funny",
+            "tension",
+            "emotional",
+            "mission_complete",
+            "chapter",
+            "user"
+          ],
+          "type": "string"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "duration_ms"
+      ],
+      "title": "EventMarker",
+      "type": "object"
+    },
+    "FloorDeny": {
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "busy",
+            "cooldown",
+            "low_urgency",
+            "muted",
+            "stale"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id",
+        "reason"
+      ],
+      "title": "FloorDeny",
+      "type": "object"
+    },
+    "FloorGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "max_words": {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        "deadline_ms": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_id",
+        "max_words",
+        "deadline_ms"
+      ],
+      "title": "FloorGrant",
+      "type": "object"
+    },
+    "FloorPreempt": {
+      "additionalProperties": false,
+      "properties": {
+        "holder": {
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "critical_event",
+            "user_speaking",
+            "kill"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "holder",
+        "reason"
+      ],
+      "title": "FloorPreempt",
+      "type": "object"
+    },
+    "FloorRelease": {
+      "additionalProperties": false,
+      "properties": {
+        "request_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "spoke": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "request_id",
+        "spoke"
+      ],
+      "title": "FloorRelease",
+      "type": "object"
+    },
+    "FloorRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "urgency": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "topic": {
+          "type": "string"
+        },
+        "event_ref": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "est_words": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "urgency",
+        "topic",
+        "est_words"
+      ],
+      "title": "FloorRequest",
+      "type": "object"
+    },
+    "GameEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "seq": {
+          "description": "Per-session, monotonically increasing",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "description": "'<game>.<name>' or 'vehicle.<name>' for shared rules",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "game",
+            "agent",
+            "system",
+            "user",
+            "safety",
+            "recording"
+          ],
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "debug",
+            "info",
+            "notice",
+            "warning",
+            "critical"
+          ],
+          "type": "string"
+        },
+        "salience": {
+          "description": "0..1, drives commentary urgency and highlight scoring",
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "source": {
+          "description": "'rule:ksp.max_q' | 'adapter:scs' | 'capture'",
+          "type": "string"
+        },
+        "t_mono_ns": {
+          "type": "integer"
+        },
+        "t_session_ms": {
+          "type": "integer"
+        },
+        "occurred_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "frame_seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "marker": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EventMarker"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "session_id",
+        "seq",
+        "type",
+        "category",
+        "severity",
+        "salience",
+        "source",
+        "t_mono_ns",
+        "t_session_ms",
+        "occurred_at",
+        "frame_seq",
+        "payload"
+      ],
+      "title": "GameEvent",
+      "type": "object"
+    },
+    "MissionUpdate": {
+      "additionalProperties": false,
+      "properties": {
+        "mission_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "planned",
+            "active",
+            "succeeded",
+            "failed",
+            "abandoned"
+          ],
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "mission_id",
+        "status"
+      ],
+      "title": "MissionUpdate",
+      "type": "object"
+    },
+    "QueryAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "answer": {
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "bb_refs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/BBRef"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "answer",
+        "confidence"
+      ],
+      "title": "QueryAnswer",
+      "type": "object"
+    },
+    "QueryAsk": {
+      "additionalProperties": false,
+      "properties": {
+        "question": {
+          "type": "string"
+        },
+        "context_refs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/BBRef"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "question"
+      ],
+      "title": "QueryAsk",
+      "type": "object"
+    },
+    "SafetyKill": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "enum": [
+            "hotkey",
+            "ui",
+            "api",
+            "watchdog",
+            "policy"
+          ],
+          "type": "string"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "title": "SafetyKill",
+      "type": "object"
+    },
+    "SafetyOverride": {
+      "additionalProperties": false,
+      "properties": {
+        "control_owner": {
+          "enum": [
+            "human",
+            "ai",
+            "none"
+          ],
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "control_owner",
+        "reason"
+      ],
+      "title": "SafetyOverride",
+      "type": "object"
+    },
+    "SafetyResume": {
+      "additionalProperties": false,
+      "properties": {
+        "by": {
+          "const": "user",
+          "type": "string"
+        }
+      },
+      "required": [
+        "by"
+      ],
+      "title": "SafetyResume",
+      "type": "object"
+    },
+    "TaskAccept": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "eta_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "title": "TaskAccept",
+      "type": "object"
+    },
+    "TaskAssign": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "analyze",
+            "plan",
+            "monitor",
+            "explain",
+            "compute",
+            "summarize"
+          ],
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "input": {},
+        "mission_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "deadline_ms": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "priority": {
+          "maximum": 9,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "acceptance": {
+          "description": "What \"done\" means",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "kind",
+        "title",
+        "input",
+        "deadline_ms",
+        "priority",
+        "acceptance"
+      ],
+      "title": "TaskAssign",
+      "type": "object"
+    },
+    "TaskBlocked": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "needs": {
+          "type": "string"
+        },
+        "from_role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "task_id",
+        "needs"
+      ],
+      "title": "TaskBlocked",
+      "type": "object"
+    },
+    "TaskCancel": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "reason"
+      ],
+      "title": "TaskCancel",
+      "type": "object"
+    },
+    "TaskComplete": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "output": {},
+        "summary": {
+          "type": "string"
+        },
+        "bb_refs": {
+          "items": {
+            "$ref": "#/$defs/BBRef"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "task_id",
+        "output",
+        "summary",
+        "bb_refs"
+      ],
+      "title": "TaskComplete",
+      "type": "object"
+    },
+    "TaskEvaluate": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "score",
+        "notes"
+      ],
+      "title": "TaskEvaluate",
+      "type": "object"
+    },
+    "TaskFail": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "task_id",
+        "reason",
+        "retryable"
+      ],
+      "title": "TaskFail",
+      "type": "object"
+    },
+    "TaskProgress": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "progress": {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "task_id",
+        "progress"
+      ],
+      "title": "TaskProgress",
+      "type": "object"
+    },
+    "TaskReject": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "busy",
+            "out_of_scope",
+            "missing_input",
+            "unsafe"
+          ],
+          "type": "string"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "task_id",
+        "reason"
+      ],
+      "title": "TaskReject",
+      "type": "object"
+    },
+    "UserSay": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "to": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "text",
+        "to"
+      ],
+      "title": "UserSay",
+      "type": "object"
+    },
+    "WorldStateTick": {
+      "additionalProperties": false,
+      "properties": {
+        "bb_version": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "scene": {
+          "type": "string"
+        },
+        "summary": {}
+      },
+      "required": [
+        "bb_version",
+        "scene",
+        "summary"
+      ],
+      "title": "WorldStateTick",
+      "type": "object"
+    }
+  }
+}

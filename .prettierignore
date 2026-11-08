@@ -1,0 +1,15 @@
+node_modules
+pnpm-lock.yaml
+uv.lock
+.venv
+**/out
+**/dist
+**/release
+**/coverage
+schemas/
+packages/ts/protocol/src/generated/
+docs/titan-architecture-spec.md
+*.py
+
+# Keep the spec's column-aligned flow style (Section 9.5 excerpt)
+config/**/*.yaml

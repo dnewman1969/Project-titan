@@ -1,0 +1,9 @@
+# Protected paths (Section 3). Changes here need a code-owner review.
+/schemas/                                        @dnewman1969
+/packages/py/titan-core/titan_core/protocol/     @dnewman1969
+/packages/ts/protocol/src/generated/             @dnewman1969
+/services/actions/                               @dnewman1969
+/config/safety.yaml                              @dnewman1969
+/tools/lint-imports/                             @dnewman1969
+/docs/titan-architecture-spec.md                 @dnewman1969
+/.github/                                        @dnewman1969

@@ -1,0 +1,50 @@
+{
+  "name": "@titan/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Titan desktop app: Electron main process and React Operations Center",
+  "license": "Apache-2.0",
+  "author": "Project Titan",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "dist": "electron-vite build && electron-builder --config electron-builder.yml",
+    "dist:dir": "electron-vite build && electron-builder --config electron-builder.yml --dir",
+    "typecheck": "tsc -p tsconfig.node.json --composite false --emitDeclarationOnly false --noEmit && tsc -p tsconfig.web.json --composite false --emitDeclarationOnly false --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^6.5.0",
+    "@mui/material": "^6.5.0",
+    "@reduxjs/toolkit": "^2.14.0",
+    "@titan/protocol": "workspace:*",
+    "@titan/ui-kit": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-is": "^18.3.1",
+    "react-redux": "^9.3.1",
+    "recharts": "^3.10.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "@types/node": "^22.20.5",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^6.2.1",
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
+    "electron-vite": "^6.0.0",
+    "jsdom": "^31.0.0",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  }
+}

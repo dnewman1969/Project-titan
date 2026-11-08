@@ -1,0 +1,28 @@
+# Role routing profiles (Section 2.9.2). Loaded by titan-models (M3.T2), not by TitanConfig.
+# Model tags are examples; the first-run wizard lists `ollama list` and pins the user's choices.
+# Profiles vram_8gb, vram_16gb and cpu_only are filled in by M3.T2 and the first-run wizard (M10.T4);
+# until then any profile not defined here falls back to vram_12gb.
+profile: vram_12gb            # vram_8gb | vram_12gb | vram_16gb | vram_24gb | cpu_only
+providers:
+  ollama: { kind: ollama, base_url: "http://127.0.0.1:11434" }
+  st:     { kind: sentence_transformers, device: cpu }
+profiles:
+  vram_12gb:
+    roles:
+      director:    { provider: ollama, model: "qwen3:8b",  params: { temperature: 0.3, max_tokens: 512 } }
+      planner:     { provider: ollama, model: "qwen3:8b",  params: { temperature: 0.2 } }
+      reasoning:   { provider: ollama, model: "qwen3:8b",  params: { temperature: 0.2 } }
+      agent:       { provider: ollama, model: "qwen3:8b",  params: { temperature: 0.6, max_tokens: 200 } }
+      commentary:  { provider: ollama, model: "qwen3:8b",  params: { temperature: 0.9, max_tokens: 80 } }
+      summarizer:  { provider: ollama, model: "qwen3:8b",  params: { temperature: 0.2, max_tokens: 800 } }
+      coder:       { provider: ollama, model: "qwen3:8b" }
+      embedding:   { provider: st,     model: "BAAI/bge-small-en-v1.5" }
+  vram_24gb:
+    roles:
+      director:    { provider: ollama, model: "qwen3:14b" }
+      planner:     { provider: ollama, model: "deepseek-r1:14b" }
+      commentary:  { provider: ollama, model: "llama3.1:8b" }
+      coder:       { provider: ollama, model: "deepseek-coder-v2:16b" }
+      # roles not listed inherit from vram_12gb
+fallbacks:                    # tried in order when a model is missing, OOM, or timing out
+  default: [ { provider: ollama, model: "qwen3:4b" }, { provider: ollama, model: "qwen3:1.7b", device: cpu } ]

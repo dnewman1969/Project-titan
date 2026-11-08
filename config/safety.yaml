@@ -1,0 +1,28 @@
+# Safety rails for game input (Section 6.9). Read by titan-actions from Phase 4.
+# Phase 1 has no input path: titan-actions does not start, agents.can_act is constrained to false,
+# and /safety/arm returns SAFETY_LOCKED whatever this file says.
+kill_switch:
+  hotkey: "Ctrl+Shift+F12"       # also config/titan.yaml safety.kill_hotkey (Electron globalShortcut)
+  max_release_ms: 50             # hotkey to all inputs released
+watchdog:
+  heartbeat_interval_s: 1
+  missed_heartbeats_to_kill: 2
+human_override:
+  hold_s: 3                      # control_owner="human" for this long after the last physical input
+foreground_lock: true
+rate_limits:                     # token buckets, per second unless stated
+  key_presses_per_s: 20
+  mouse_moves_per_s: 60
+  clicks_per_s: 5
+  axis_updates_per_s: 60
+  menu_macro_interval_s: 2
+  irreversible_interval_s: 10
+policy:
+  director_may_approve: [continuous, discrete]
+  director_max_risk: medium
+  user_approval_required: [irreversible]
+  user_approval_timeout_s: 10
+  user_approval_timeout_default: deny
+  menu_macros: allowlist_per_adapter
+audit:
+  retain: forever

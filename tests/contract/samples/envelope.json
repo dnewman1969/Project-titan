@@ -1,0 +1,158 @@
+{
+  "def": "Envelope",
+  "valid": [
+    {
+      "id": "0193f1a2-7c10-7000-8000-000000000002",
+      "schema": "titan.msg/1",
+      "type": "floor.request",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "ts": "2026-11-08T19:41:24.330Z",
+      "t_mono_ns": 912345678901234,
+      "sender": {
+        "kind": "agent",
+        "id": "0193f19c-1111-7000-8000-000000000e01",
+        "role": "flight_engineer",
+        "persona_slug": "ksp.flight_engineer.gene"
+      },
+      "recipients": ["system"],
+      "causation_id": "0193f1a2-7c00-7000-8000-000000000001",
+      "visibility": "internal",
+      "priority": 5,
+      "ttl_ms": 2000,
+      "payload": {
+        "urgency": 0.7,
+        "topic": "max-Q passed, structure held",
+        "event_ref": "0193f1a2-7c00-7000-8000-000000000001",
+        "est_words": 20
+      }
+    },
+    {
+      "id": "0193f1a2-7d10-7000-8000-000000000003",
+      "schema": "titan.msg/1",
+      "type": "task.assign",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "ts": "2026-11-08T19:41:24.512Z",
+      "t_mono_ns": 912345860000000,
+      "sender": { "kind": "director", "id": "director" },
+      "recipients": ["role:mission_planner"],
+      "correlation_id": "0193f1a2-7d00-7000-8000-0000000000c1",
+      "visibility": "internal",
+      "priority": 6,
+      "payload": {
+        "task_id": "0193f1a2-7d00-7000-8000-0000000000c1",
+        "kind": "compute",
+        "title": "Estimate circularization burn",
+        "input": { "target_periapsis_m": 80000 },
+        "deadline_ms": 60000,
+        "priority": 6,
+        "acceptance": "bb facts key burn.circularize with dv_ms and burn_time_s"
+      }
+    },
+    {
+      "id": "0193f1a2-8000-7000-8000-000000000004",
+      "schema": "titan.msg/1",
+      "type": "chat.say",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "mission_id": null,
+      "ts": "2026-11-08T19:41:26.002+00:00",
+      "t_mono_ns": 912347350000000,
+      "sender": {
+        "kind": "agent",
+        "id": "0193f19c-1111-7000-8000-000000000e01",
+        "persona_slug": "ksp.flight_engineer.gene"
+      },
+      "recipients": ["broadcast"],
+      "visibility": "public",
+      "priority": 5,
+      "payload": {
+        "text": "Max-Q at 28.7 kilopascals and nothing fell off. I'll take it. Throttle back up.",
+        "kind": "say",
+        "mentions": [],
+        "tokens": 21,
+        "model": "qwen3:8b",
+        "latency_ms": 1180
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "id": "0193f1a2-7c10-7000-8000-000000000002",
+      "schema": "titan.msg/2",
+      "type": "floor.request",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "ts": "2026-11-08T19:41:24.330Z",
+      "t_mono_ns": 1,
+      "sender": { "kind": "system", "id": "system" },
+      "recipients": ["system"],
+      "visibility": "internal",
+      "priority": 5,
+      "payload": {}
+    },
+    {
+      "id": "0193f1a2-7c10-7000-8000-000000000002",
+      "schema": "titan.msg/1",
+      "type": "floor.request",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "ts": "2026-11-08T19:41:24.330Z",
+      "t_mono_ns": 1,
+      "sender": { "kind": "system", "id": "system" },
+      "recipients": [],
+      "visibility": "internal",
+      "priority": 5,
+      "payload": {}
+    },
+    {
+      "id": "0193f1a2-7c10-7000-8000-000000000002",
+      "schema": "titan.msg/1",
+      "type": "floor.request",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "ts": "2026-11-08T19:41:24.330Z",
+      "t_mono_ns": 1,
+      "sender": { "kind": "system", "id": "system" },
+      "recipients": ["everyone"],
+      "visibility": "internal",
+      "priority": 5,
+      "payload": {}
+    },
+    {
+      "id": "0193f1a2-7c10-7000-8000-000000000002",
+      "schema": "titan.msg/1",
+      "type": "Floor.Request",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "ts": "2026-11-08T19:41:24.330Z",
+      "t_mono_ns": 1,
+      "sender": { "kind": "system", "id": "system" },
+      "recipients": ["system"],
+      "visibility": "internal",
+      "priority": 5,
+      "payload": {}
+    },
+    {
+      "id": "0193f1a2-7c10-7000-8000-000000000002",
+      "schema": "titan.msg/1",
+      "type": "floor.request",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "ts": "2026-11-08T19:41:24.330Z",
+      "t_mono_ns": 1,
+      "sender": { "kind": "system", "id": "system" },
+      "recipients": ["system"],
+      "visibility": "internal",
+      "priority": 10,
+      "payload": {}
+    },
+    {
+      "id": "0193f1a2-7c10-7000-8000-000000000002",
+      "schema": "titan.msg/1",
+      "type": "floor.request",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "ts": "2026-11-08T19:41:24.330Z",
+      "t_mono_ns": 1,
+      "sender": { "kind": "system", "id": "system" },
+      "recipients": ["system"],
+      "visibility": "internal",
+      "priority": 5,
+      "payload": {},
+      "unexpected": true
+    }
+  ]
+}

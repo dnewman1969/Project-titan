@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://titan.local/schemas/envelope.json",
+  "title": "Envelope",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "description": "UUIDv7",
+      "format": "uuid",
+      "type": "string"
+    },
+    "schema": {
+      "const": "titan.msg/1",
+      "type": "string"
+    },
+    "type": {
+      "pattern": "^[a-z]+(\\.[a-z_]+)+$",
+      "type": "string"
+    },
+    "session_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "mission_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "ts": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "t_mono_ns": {
+      "type": "integer"
+    },
+    "sender": {
+      "$ref": "#/$defs/Address"
+    },
+    "recipients": {
+      "items": {
+        "pattern": "^(broadcast|director|instance:[0-9a-f-]{36}|role:[a-z_]+|team:[a-z_]+|persona:[a-z0-9_.-]+|user|system)$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "correlation_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Conversation/task thread id"
+    },
+    "causation_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Envelope that caused this one"
+    },
+    "reply_to": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "visibility": {
+      "description": "public = shown in Agents panel",
+      "enum": [
+        "public",
+        "internal"
+      ],
+      "type": "string"
+    },
+    "priority": {
+      "description": "9 = highest",
+      "maximum": 9,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "ttl_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "payload": {
+      "additionalProperties": true,
+      "description": "Schema selected by `type` (Sec 6.2)",
+      "type": "object"
+    }
+  },
+  "required": [
+    "id",
+    "schema",
+    "type",
+    "session_id",
+    "ts",
+    "t_mono_ns",
+    "sender",
+    "recipients",
+    "visibility",
+    "priority",
+    "payload"
+  ],
+  "type": "object",
+  "$defs": {
+    "Address": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "agent",
+            "director",
+            "system",
+            "user",
+            "adapter",
+            "safety"
+          ],
+          "type": "string"
+        },
+        "id": {
+          "description": "instance uuid, 'director', 'system', 'user', adapter slug",
+          "type": "string"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "persona_slug": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "title": "Address",
+      "type": "object"
+    }
+  }
+}

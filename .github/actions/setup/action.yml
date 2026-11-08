@@ -1,0 +1,31 @@
+name: Set up Titan toolchains
+description: Node 22 + pnpm and/or Python 3.12 + uv with frozen lockfiles (D15)
+inputs:
+  node:
+    description: Install Node, pnpm and the pnpm workspace
+    default: "true"
+  python:
+    description: Install uv, Python 3.12 and the uv workspace
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - if: inputs.node == 'true'
+      uses: pnpm/action-setup@v6
+    - if: inputs.node == 'true'
+      uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+    - if: inputs.node == 'true'
+      shell: bash
+      run: pnpm install --frozen-lockfile
+    - if: inputs.python == 'true'
+      uses: astral-sh/setup-uv@v10.3.3 # publishes full-version tags only
+      with:
+        version: "0.13.7"
+        enable-cache: true
+        cache-dependency-glob: uv.lock
+    - if: inputs.python == 'true'
+      shell: bash
+      run: uv sync --frozen --all-packages

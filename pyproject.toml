@@ -1,0 +1,124 @@
+[project]
+name = "titan-workspace"
+version = "0.1.0"
+description = "Project Titan uv workspace root (not a distributable package)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "titan-core",
+  "titan-db",
+  "titan-memory",
+  "titan-models",
+  "titan-sdk-games",
+  "titan-testing",
+  "titan-api",
+  "titan-supervisor",
+  "titan-orchestrator",
+  "titan-telemetry",
+  "titan-capture",
+  "titan-workers",
+  "titan-actions",
+]
+
+[dependency-groups]
+dev = [
+  "asyncpg-stubs>=0.30",
+  "httpx2>=0.1",
+  "hypothesis>=6.115",
+  "import-linter>=2.1",
+  "jsonschema>=4.23",
+  "mypy>=1.13",
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "pytest-cov>=6.0",
+  "pytest-socket>=0.7",
+  "ruff>=0.8",
+  "types-jsonschema>=4.23",
+  "types-pyyaml>=6.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/py/*", "services/*"]
+
+[tool.uv.sources]
+titan-core = { workspace = true }
+titan-db = { workspace = true }
+titan-memory = { workspace = true }
+titan-models = { workspace = true }
+titan-sdk-games = { workspace = true }
+titan-testing = { workspace = true }
+titan-api = { workspace = true }
+titan-supervisor = { workspace = true }
+titan-orchestrator = { workspace = true }
+titan-telemetry = { workspace = true }
+titan-capture = { workspace = true }
+titan-workers = { workspace = true }
+titan-actions = { workspace = true }
+
+# ---------------------------------------------------------------- ruff (Section 9.1)
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = ["node_modules", "apps", "packages/ts", "*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "ASYNC", "S", "PTH", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106", "E501"]
+"tests/**" = ["S101", "S105", "S106", "E501"]
+"**/migrations/versions/*.py" = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+  "titan_core", "titan_db", "titan_memory", "titan_models", "titan_sdk_games", "titan_testing",
+  "titan_api", "titan_supervisor", "titan_orchestrator", "titan_telemetry", "titan_capture",
+  "titan_workers", "titan_actions",
+]
+
+# ---------------------------------------------------------------- mypy (Section 9.1)
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+warn_unreachable = true
+files = ["packages/py/*/titan_*", "services/*/titan_*", "tools/codegen.py", "tools/fetch-third-party.py", "tools/lint-imports/run.py"]
+# Alembic revision files are loaded by path and are not importable module names.
+exclude = ["migrations/versions/"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+# ---------------------------------------------------------------- pytest (Section 9.2)
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["packages/py", "services", "tests"]
+addopts = [
+  "--import-mode=importlib",
+  "--strict-markers",
+  # No network in tests except localhost service containers (Section 9.2).
+  "--allow-hosts=127.0.0.1,localhost,::1",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+  "postgres: needs a reachable PostgreSQL 16 (TITAN__POSTGRES__* settings); skipped when unavailable",
+]
+filterwarnings = ["error", "ignore::DeprecationWarning:alembic.*"]
+
+[tool.coverage.run]
+branch = true
+source_pkgs = [
+  "titan_core", "titan_db", "titan_memory", "titan_models", "titan_sdk_games", "titan_testing",
+  "titan_api", "titan_supervisor", "titan_orchestrator", "titan_telemetry", "titan_capture",
+  "titan_workers", "titan_actions",
+]
+omit = ["**/tests/**", "**/migrations/env.py"]
+
+[tool.coverage.report]
+skip_empty = true
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "\\.\\.\\."]

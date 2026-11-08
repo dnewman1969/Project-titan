@@ -1,17 +1,21 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Iterator
 
+import fakeredis
 import pytest
 from fastapi import APIRouter
 from fastapi.testclient import TestClient
 
 from titan_api.auth import LAUNCH_TOKEN_ENV, launch_token_from_env
 from titan_api.errors import PROBLEM_JSON
-from titan_api.main import create_app, postgres_probe
-from titan_api.routers.system import DependencyState
+from titan_api.main import create_app, dependency_checks, postgres_probe
+from titan_api.routers import system
+from titan_core.clock import utc_now
 from titan_core.config import PostgresConfig, TitanConfig
 from titan_core.errors import ErrorCode, TitanError
+from titan_core.protocol.system import DependencyState, ServiceState, SupervisorStatus
 
 TOKEN = "test-launch-token"
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
@@ -21,9 +25,19 @@ async def fake_probe() -> DependencyState:
     return DependencyState(state="up", version="16.15")
 
 
+async def no_supervisor() -> SupervisorStatus | None:
+    return None
+
+
 @pytest.fixture
 def client() -> Iterator[TestClient]:
-    app = create_app(TitanConfig(), launch_token=TOKEN, probe=fake_probe)
+    app = create_app(
+        TitanConfig(),
+        launch_token=TOKEN,
+        checks={"postgres": fake_probe},
+        supervisor=no_supervisor,
+        redis=fakeredis.FakeAsyncRedis(decode_responses=True),
+    )
 
     extra = APIRouter()
 
@@ -152,7 +166,72 @@ def test_cors_rejects_other_origins(client: TestClient) -> None:
 
 def test_cors_origins_are_configurable(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TITAN__API__CORS_ORIGINS", '["app://titan", "http://localhost:5173"]')
-    app = create_app(TitanConfig(), launch_token=TOKEN, probe=fake_probe)
+    app = create_app(
+        TitanConfig(),
+        launch_token=TOKEN,
+        checks={},
+        supervisor=no_supervisor,
+        redis=fakeredis.FakeAsyncRedis(),
+    )
     with TestClient(app) as test_client:
         response = test_client.get("/api/v1/health", headers={"Origin": "http://localhost:5173"})
     assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
+def test_status_reports_the_supervisor_process_table() -> None:
+    services = [
+        ServiceState(name="postgres", state="up", pid=10, restarts=0, since=utc_now()),
+        ServiceState(name="redis", state="up", kind="external"),
+        ServiceState(name="api", state="up", pid=12, restarts=1, since=utc_now()),
+    ]
+
+    async def supervisor() -> SupervisorStatus:
+        return SupervisorStatus(started_at=utc_now(), ready=True, services=services, events=[])
+
+    app = create_app(
+        TitanConfig(), launch_token=TOKEN, checks={}, supervisor=supervisor, redis=fakeredis.FakeAsyncRedis()
+    )
+    with TestClient(app) as test_client:
+        body = test_client.get("/api/v1/system/status", headers=AUTH).json()
+    assert [s["name"] for s in body["services"]] == ["postgres", "redis", "api"]
+    assert body["services"][1]["kind"] == "external"
+    assert body["services"][2]["restarts"] == 1
+
+
+def test_status_bounds_slow_dependency_checks(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(system, "CHECK_TIMEOUT_S", 0.1)
+
+    async def hangs() -> DependencyState:
+        await asyncio.sleep(10)
+        raise AssertionError("unreachable")
+
+    app = create_app(
+        TitanConfig(),
+        launch_token=TOKEN,
+        checks={"ollama": hangs, "postgres": fake_probe},
+        supervisor=no_supervisor,
+        redis=fakeredis.FakeAsyncRedis(),
+    )
+    with TestClient(app) as test_client:
+        body = test_client.get("/api/v1/system/status", headers=AUTH).json()
+    assert body["dependencies"]["ollama"]["state"] == "down"
+    assert body["dependencies"]["ollama"]["detail"].startswith("timeout")
+    assert body["dependencies"]["postgres"]["state"] == "up"
+
+
+def test_default_dependency_checks_cover_section_5_2() -> None:
+    assert set(dependency_checks(TitanConfig())) == {"postgres", "redis", "chroma", "ollama", "obs"}
+
+
+async def test_default_checks_report_down_when_nothing_listens() -> None:
+    cfg = TitanConfig.model_validate(
+        {
+            "postgres": {"port": 1, "password": "x"},
+            "redis": {"url": "redis://127.0.0.1:1/0", "password": "x"},
+            "chroma": {"port": 1},
+        }
+    )
+    checks = dependency_checks(cfg)
+    for name in ("postgres", "redis", "chroma"):
+        state = await checks[name]()
+        assert state.state == "down", name

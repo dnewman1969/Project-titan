@@ -123,22 +123,34 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     env:
-      TITAN__POSTGRES__PORT: "5432"
       TITAN__POSTGRES__PASSWORD: titan
       TITAN_REQUIRE_POSTGRES: "1"
     steps:
       - uses: actions/checkout@v7
-      - name: Start the runner's preinstalled PostgreSQL
+      - uses: ./.github/actions/setup
+      # The runner's preinstalled PostgreSQL is 17; D1 pins 16, so use the portable build from the
+      # manifest (the same zip M1.T1 ships), which also exercises tools/fetch-third-party.py.
+      - uses: actions/cache@v5
+        with:
+          path: third_party/cache/postgresql-16.15-1-windows-x64-binaries.zip
+          key: pgsql-${{ hashFiles('third_party/manifest.yaml') }}
+      - name: Portable PostgreSQL 16 on 127.0.0.1:54329
         shell: pwsh
         run: |
-          $svc = Get-Service -Name "postgresql*" | Select-Object -First 1
-          Set-Service -InputObject $svc -StartupType Manual
-          Start-Service -InputObject $svc
-          $env:PGPASSWORD = "root"
-          & "$env:PGBIN\psql.exe" -U postgres -h 127.0.0.1 -c "CREATE ROLE titan LOGIN SUPERUSER PASSWORD 'titan';"
-          & "$env:PGBIN\psql.exe" -U postgres -h 127.0.0.1 -c "CREATE DATABASE titan OWNER titan;"
-          & "$env:PGBIN\psql.exe" -U postgres -h 127.0.0.1 -tAc "SHOW server_version;"
-      - uses: ./.github/actions/setup
+          uv run python tools/fetch-third-party.py postgresql --extract
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $bin = Resolve-Path third_party/cache/postgresql/pgsql/bin
+          $data = Join-Path $env:RUNNER_TEMP pgdata
+          $pw = Join-Path $env:RUNNER_TEMP pgpw.txt
+          Set-Content -Path $pw -Value $env:TITAN__POSTGRES__PASSWORD -NoNewline
+          & "$bin/initdb.exe" -D $data -U titan --pwfile=$pw -A scram-sha-256 -E UTF8 --locale=C
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & "$bin/pg_ctl.exe" -D $data -l (Join-Path $env:RUNNER_TEMP pg.log) -w `
+            -o "-p 54329 -c listen_addresses=127.0.0.1" start
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $env:PGPASSWORD = $env:TITAN__POSTGRES__PASSWORD
+          & "$bin/createdb.exe" -h 127.0.0.1 -p 54329 -U titan titan
+          & "$bin/psql.exe" -h 127.0.0.1 -p 54329 -U titan -tAc "SHOW server_version;"
       # M0 acceptance: a fresh clone runs `pnpm i && uv sync && pnpm codegen && pnpm test` green.
       - name: pnpm codegen
         run: pnpm codegen

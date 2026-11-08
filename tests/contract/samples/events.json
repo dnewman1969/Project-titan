@@ -1,0 +1,82 @@
+{
+  "def": "GameEvent",
+  "valid": [
+    {
+      "id": "0193f1a2-7c00-7000-8000-000000000001",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "seq": 42,
+      "type": "ksp.max_q",
+      "category": "game",
+      "severity": "notice",
+      "salience": 0.7,
+      "source": "rule:ksp.max_q",
+      "t_mono_ns": 912345600000000,
+      "t_session_ms": 84210,
+      "occurred_at": "2026-11-08T19:41:24.200Z",
+      "frame_seq": 1684,
+      "payload": { "dynamic_pressure_pa": 28750, "altitude_m": 11240, "speed_mps": 402 },
+      "marker": { "kind": "highlight", "duration_ms": 8000 }
+    },
+    {
+      "id": "0193f1a2-9000-7000-8000-000000000010",
+      "session_id": "0193f19c-0000-7000-8000-00000000bbbb",
+      "seq": 7,
+      "type": "vehicle.fuel_low",
+      "category": "game",
+      "severity": "warning",
+      "salience": 0.6,
+      "source": "rule:vehicle.fuel_low",
+      "t_mono_ns": 912999000000000,
+      "t_session_ms": 1520000,
+      "occurred_at": "2026-11-08T20:05:00Z",
+      "frame_seq": null,
+      "payload": { "fuel_l": 61, "range_km": 148, "nav_distance_remaining_km": 212 }
+    }
+  ],
+  "invalid": [
+    {
+      "id": "0193f1a2-7c00-7000-8000-000000000001",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "seq": 42,
+      "type": "ksp.max_q",
+      "category": "game",
+      "severity": "notice",
+      "salience": 1.5,
+      "source": "rule:ksp.max_q",
+      "t_mono_ns": 1,
+      "t_session_ms": 1,
+      "occurred_at": "2026-11-08T19:41:24.200Z",
+      "frame_seq": 1,
+      "payload": {}
+    },
+    {
+      "id": "0193f1a2-7c00-7000-8000-000000000001",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "seq": 42,
+      "type": "ksp.max_q",
+      "category": "game",
+      "severity": "fatal",
+      "salience": 0.5,
+      "source": "rule:ksp.max_q",
+      "t_mono_ns": 1,
+      "t_session_ms": 1,
+      "occurred_at": "2026-11-08T19:41:24.200Z",
+      "frame_seq": 1,
+      "payload": {}
+    },
+    {
+      "id": "0193f1a2-7c00-7000-8000-000000000001",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "seq": 42,
+      "type": "ksp.max_q",
+      "category": "game",
+      "severity": "notice",
+      "salience": 0.5,
+      "source": "rule:ksp.max_q",
+      "t_mono_ns": 1,
+      "t_session_ms": 1,
+      "occurred_at": "2026-11-08T19:41:24.200Z",
+      "payload": {}
+    }
+  ]
+}

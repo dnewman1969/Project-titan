@@ -1,0 +1,23 @@
+{
+  "name": "@titan/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GENERATED TypeScript types and zod validators for the Titan protocol (do not edit src/generated)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "~5.9.3",
+    "vitest": "^5.1.0"
+  }
+}

@@ -1,0 +1,1125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://titan.local/schemas/telemetry.json",
+  "title": "TelemetryFrame",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "titan.telemetry/1",
+      "type": "string"
+    },
+    "session_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "game": {
+      "description": "'ksp' | 'ets2' | 'ats' | ...",
+      "type": "string"
+    },
+    "adapter_version": {
+      "type": "string"
+    },
+    "seq": {
+      "description": "Per session, monotonic",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "t_mono_ns": {
+      "type": "integer"
+    },
+    "t_session_ms": {
+      "type": "integer"
+    },
+    "t_game_s": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "KSP UT seconds; SCS game time in seconds"
+    },
+    "paused": {
+      "type": "boolean"
+    },
+    "scene": {
+      "description": "ksp: flight|map|vab|sph|space_center|tracking|menu ; scs: driving|menu|loading|map",
+      "type": "string"
+    },
+    "domain": {
+      "enum": [
+        "space",
+        "ground_vehicle",
+        "aircraft",
+        "naval",
+        "strategy",
+        "other"
+      ],
+      "type": "string"
+    },
+    "vehicle": {
+      "$ref": "#/$defs/Vehicle"
+    },
+    "resources": {
+      "items": {
+        "$ref": "#/$defs/Resource"
+      },
+      "type": "array"
+    },
+    "environment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Environment"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "job": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Job"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "economy": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Economy"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "game_specific": {
+      "additionalProperties": true,
+      "description": "Adapter-defined, documented in the game package README",
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema",
+    "session_id",
+    "game",
+    "adapter_version",
+    "seq",
+    "t_mono_ns",
+    "t_session_ms",
+    "t_game_s",
+    "paused",
+    "scene",
+    "domain",
+    "vehicle",
+    "resources",
+    "environment",
+    "job",
+    "economy",
+    "game_specific"
+  ],
+  "type": "object",
+  "$defs": {
+    "Attitude": {
+      "additionalProperties": false,
+      "properties": {
+        "heading_deg": {
+          "type": "number"
+        },
+        "pitch_deg": {
+          "type": "number"
+        },
+        "roll_deg": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "heading_deg",
+        "pitch_deg",
+        "roll_deg"
+      ],
+      "title": "Attitude",
+      "type": "object"
+    },
+    "Controls": {
+      "additionalProperties": false,
+      "properties": {
+        "throttle": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "brake": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "steer": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "clutch": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gear": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sas": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rcs": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parking_brake": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cruise_control_mps": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lights": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "throttle",
+        "brake",
+        "steer",
+        "clutch",
+        "gear",
+        "sas",
+        "rcs",
+        "parking_brake",
+        "cruise_control_mps",
+        "lights"
+      ],
+      "title": "Controls",
+      "type": "object"
+    },
+    "Damage": {
+      "additionalProperties": false,
+      "properties": {
+        "overall": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "0 = pristine, 1 = destroyed"
+        },
+        "parts": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "overall",
+        "parts"
+      ],
+      "title": "Damage",
+      "type": "object"
+    },
+    "Economy": {
+      "additionalProperties": false,
+      "properties": {
+        "funds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "science": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reputation": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "funds",
+        "science",
+        "reputation",
+        "currency"
+      ],
+      "title": "Economy",
+      "type": "object"
+    },
+    "Engine": {
+      "additionalProperties": false,
+      "properties": {
+        "running": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rpm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "temp_c": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max_temp_ratio": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "running",
+        "rpm",
+        "temp_c",
+        "max_temp_ratio"
+      ],
+      "title": "Engine",
+      "type": "object"
+    },
+    "Environment": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "atmosphere_density": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dynamic_pressure_pa": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "static_pressure_pa": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "speed_limit_mps": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "weather": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "local_time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "body",
+        "atmosphere_density",
+        "dynamic_pressure_pa",
+        "static_pressure_pa",
+        "speed_limit_mps",
+        "weather",
+        "local_time"
+      ],
+      "title": "Environment",
+      "type": "object"
+    },
+    "Geo": {
+      "additionalProperties": false,
+      "properties": {
+        "lat_deg": {
+          "type": "number"
+        },
+        "lon_deg": {
+          "type": "number"
+        },
+        "alt_m": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "lat_deg",
+        "lon_deg",
+        "alt_m"
+      ],
+      "title": "Geo",
+      "type": "object"
+    },
+    "Job": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "cargo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mass_kg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "destination": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "income": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deadline_game_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nav_distance_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nav_time_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trailer_attached": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cargo_damage": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "active",
+        "cargo",
+        "mass_kg",
+        "source",
+        "destination",
+        "income",
+        "currency",
+        "deadline_game_s",
+        "nav_distance_m",
+        "nav_time_s",
+        "trailer_attached",
+        "cargo_damage"
+      ],
+      "title": "Job",
+      "type": "object"
+    },
+    "Orbit": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "apoapsis_m": {
+          "type": "number"
+        },
+        "periapsis_m": {
+          "type": "number"
+        },
+        "inclination_deg": {
+          "type": "number"
+        },
+        "eccentricity": {
+          "type": "number"
+        },
+        "period_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "time_to_apoapsis_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "time_to_periapsis_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "time_to_soi_change_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "body",
+        "apoapsis_m",
+        "periapsis_m",
+        "inclination_deg",
+        "eccentricity",
+        "period_s",
+        "time_to_apoapsis_s",
+        "time_to_periapsis_s",
+        "time_to_soi_change_s"
+      ],
+      "title": "Orbit",
+      "type": "object"
+    },
+    "Position": {
+      "additionalProperties": false,
+      "properties": {
+        "frame": {
+          "description": "ksp: body-centred 'body:<name>'; scs: 'scs_world' metres",
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "frame",
+        "x",
+        "y",
+        "z"
+      ],
+      "title": "Position",
+      "type": "object"
+    },
+    "Resource": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "capacity": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "vehicle",
+            "stage",
+            "trailer"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "amount",
+        "capacity",
+        "unit",
+        "scope"
+      ],
+      "title": "Resource",
+      "type": "object"
+    },
+    "Stage": {
+      "additionalProperties": false,
+      "properties": {
+        "current": {
+          "type": "integer"
+        },
+        "total": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dv_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "current",
+        "total",
+        "dv_ms"
+      ],
+      "title": "Stage",
+      "type": "object"
+    },
+    "TelemetryFrameUI": {
+      "additionalProperties": false,
+      "description": "`TelemetryFrame` without `game_specific`: what the UI receives on the telemetry channel.",
+      "properties": {
+        "schema": {
+          "const": "titan.telemetry/1",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "game": {
+          "description": "'ksp' | 'ets2' | 'ats' | ...",
+          "type": "string"
+        },
+        "adapter_version": {
+          "type": "string"
+        },
+        "seq": {
+          "description": "Per session, monotonic",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "t_mono_ns": {
+          "type": "integer"
+        },
+        "t_session_ms": {
+          "type": "integer"
+        },
+        "t_game_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "KSP UT seconds; SCS game time in seconds"
+        },
+        "paused": {
+          "type": "boolean"
+        },
+        "scene": {
+          "description": "ksp: flight|map|vab|sph|space_center|tracking|menu ; scs: driving|menu|loading|map",
+          "type": "string"
+        },
+        "domain": {
+          "enum": [
+            "space",
+            "ground_vehicle",
+            "aircraft",
+            "naval",
+            "strategy",
+            "other"
+          ],
+          "type": "string"
+        },
+        "vehicle": {
+          "$ref": "#/$defs/Vehicle"
+        },
+        "resources": {
+          "items": {
+            "$ref": "#/$defs/Resource"
+          },
+          "type": "array"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Environment"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "job": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Job"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "economy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Economy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema",
+        "session_id",
+        "game",
+        "adapter_version",
+        "seq",
+        "t_mono_ns",
+        "t_session_ms",
+        "t_game_s",
+        "paused",
+        "scene",
+        "domain",
+        "vehicle",
+        "resources",
+        "environment",
+        "job",
+        "economy"
+      ],
+      "title": "TelemetryFrameUI",
+      "type": "object"
+    },
+    "Vehicle": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "'rocket', 'truck', ..."
+        },
+        "position": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Position"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "geo": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Geo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attitude": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Attitude"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "velocity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Velocity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "accel_g": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "controls": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Controls"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "engine": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Engine"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "damage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Damage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "situation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "ksp: pre_launch|flying|sub_orbital|orbiting|escaping|landed|splashed|docked"
+        },
+        "stage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Stage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "orbit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Orbit"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "position",
+        "geo",
+        "attitude",
+        "velocity",
+        "accel_g",
+        "controls",
+        "engine",
+        "damage",
+        "situation",
+        "stage",
+        "orbit"
+      ],
+      "title": "Vehicle",
+      "type": "object"
+    },
+    "Velocity": {
+      "additionalProperties": false,
+      "properties": {
+        "speed_mps": {
+          "type": "number"
+        },
+        "vertical_mps": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "horizontal_mps": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "speed_mps",
+        "vertical_mps",
+        "horizontal_mps"
+      ],
+      "title": "Velocity",
+      "type": "object"
+    }
+  }
+}

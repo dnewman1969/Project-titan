@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://titan.local/schemas/events.json",
+  "title": "GameEvent",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "session_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "seq": {
+      "description": "Per-session, monotonically increasing",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "type": {
+      "description": "'<game>.<name>' or 'vehicle.<name>' for shared rules",
+      "type": "string"
+    },
+    "category": {
+      "enum": [
+        "game",
+        "agent",
+        "system",
+        "user",
+        "safety",
+        "recording"
+      ],
+      "type": "string"
+    },
+    "severity": {
+      "enum": [
+        "debug",
+        "info",
+        "notice",
+        "warning",
+        "critical"
+      ],
+      "type": "string"
+    },
+    "salience": {
+      "description": "0..1, drives commentary urgency and highlight scoring",
+      "maximum": 1,
+      "minimum": 0,
+      "type": "number"
+    },
+    "source": {
+      "description": "'rule:ksp.max_q' | 'adapter:scs' | 'capture'",
+      "type": "string"
+    },
+    "t_mono_ns": {
+      "type": "integer"
+    },
+    "t_session_ms": {
+      "type": "integer"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "frame_seq": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "payload": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "marker": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EventMarker"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "id",
+    "session_id",
+    "seq",
+    "type",
+    "category",
+    "severity",
+    "salience",
+    "source",
+    "t_mono_ns",
+    "t_session_ms",
+    "occurred_at",
+    "frame_seq",
+    "payload"
+  ],
+  "type": "object",
+  "$defs": {
+    "EventMarker": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "highlight",
+            "achievement",
+            "failure",
+            "funny",
+            "tension",
+            "emotional",
+            "mission_complete",
+            "chapter",
+            "user"
+          ],
+          "type": "string"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "duration_ms"
+      ],
+      "title": "EventMarker",
+      "type": "object"
+    }
+  }
+}

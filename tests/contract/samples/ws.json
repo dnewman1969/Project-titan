@@ -1,0 +1,181 @@
+{
+  "cases": [
+    {
+      "def": "ClientFrame",
+      "valid": [
+        { "op": "auth", "token": "launch-token-value", "client": "desktop/1.0.0" },
+        {
+          "op": "subscribe",
+          "req_id": "r1",
+          "channel": "session.0193abcd.chat",
+          "since_seq": "1731090000000-0"
+        },
+        {
+          "op": "subscribe",
+          "req_id": "r4",
+          "channel": "session.0193abcd.telemetry",
+          "options": { "full": true }
+        },
+        { "op": "unsubscribe", "req_id": "r2", "channel": "session.0193abcd.telemetry" },
+        { "op": "ping", "req_id": "r3" }
+      ],
+      "invalid": [
+        { "op": "shout", "req_id": "r9" },
+        { "op": "auth", "client": "desktop/1.0.0" }
+      ]
+    },
+    {
+      "def": "ServerFrame",
+      "valid": [
+        { "op": "ack", "req_id": "r1", "ok": true },
+        {
+          "op": "ack",
+          "req_id": "r1",
+          "ok": false,
+          "error": { "code": "NOT_FOUND", "detail": "unknown session" }
+        },
+        {
+          "op": "msg",
+          "channel": "session.0193abcd.chat",
+          "seq": "1731090001234-0",
+          "ts": "2026-11-08T19:30:01.234Z",
+          "type": "chat.delta",
+          "data": { "message_id": "0193f1a2-8000-7000-8000-000000000004", "delta": "Max-Q" }
+        },
+        { "op": "pong", "req_id": "r3" },
+        {
+          "op": "gap",
+          "channel": "session.0193abcd.chat",
+          "from_seq": "1731090000000-0",
+          "reason": "trimmed"
+        }
+      ],
+      "invalid": [{ "op": "ack", "req_id": "r1" }]
+    },
+    {
+      "def": "SystemMetrics",
+      "valid": [
+        {
+          "ts": "2026-11-08T19:30:01Z",
+          "game_fps": 71.8,
+          "game_frametime_p99_ms": 21.4,
+          "cpu_pct": 38.1,
+          "ram_used_mb": 21450,
+          "ram_total_mb": 65456,
+          "gpu": [
+            {
+              "index": 0,
+              "name": "RTX 4070",
+              "util_pct": 81,
+              "vram_used_mb": 9850,
+              "vram_total_mb": 12282,
+              "temp_c": 67,
+              "encoder_util_pct": 12
+            }
+          ],
+          "tokens_per_min": 4120,
+          "llm_queue_depth": 2,
+          "goals_active": 2,
+          "tasks_open": 5,
+          "resource_guard_level": "L0"
+        },
+        {
+          "ts": "2026-11-08T19:30:02Z",
+          "game_fps": null,
+          "game_frametime_p99_ms": null,
+          "cpu_pct": 4.2,
+          "ram_used_mb": 9000,
+          "ram_total_mb": 32000,
+          "gpu": [],
+          "tokens_per_min": 0,
+          "llm_queue_depth": 0,
+          "goals_active": 0,
+          "tasks_open": 0,
+          "resource_guard_level": "L0"
+        }
+      ],
+      "invalid": [
+        {
+          "ts": "2026-11-08T19:30:02Z",
+          "game_fps": null,
+          "game_frametime_p99_ms": null,
+          "cpu_pct": 4.2,
+          "ram_used_mb": 9000,
+          "ram_total_mb": 32000,
+          "gpu": [],
+          "tokens_per_min": 0,
+          "llm_queue_depth": 0,
+          "goals_active": 0,
+          "tasks_open": 0,
+          "resource_guard_level": "L9"
+        }
+      ]
+    },
+    {
+      "def": "RecordingStatus",
+      "valid": [
+        {
+          "recording_id": "0193f1a2-a000-7000-8000-000000000020",
+          "state": "recording",
+          "elapsed_ms": 742113,
+          "obs_connected": true,
+          "disk_free_bytes": 412000000000,
+          "est_remaining_min": 610,
+          "tracks": [
+            {
+              "kind": "gameplay_video",
+              "state": "recording",
+              "bytes": 5123456789,
+              "bitrate_kbps": 48000,
+              "dropped_frames": 3,
+              "fps": 60.0
+            },
+            {
+              "kind": "webcam_video",
+              "state": "recording",
+              "bytes": 812345678,
+              "bitrate_kbps": 9000,
+              "dropped_frames": 0,
+              "fps": 30.0
+            },
+            { "kind": "mic_audio", "state": "recording", "level_dbfs": -18.2 }
+          ]
+        }
+      ],
+      "invalid": [
+        {
+          "recording_id": "0193f1a2-a000-7000-8000-000000000020",
+          "state": "recording",
+          "elapsed_ms": -1,
+          "obs_connected": true,
+          "disk_free_bytes": 1,
+          "est_remaining_min": null,
+          "tracks": []
+        }
+      ]
+    },
+    {
+      "def": "SafetyState",
+      "valid": [
+        {
+          "killed": true,
+          "armed": false,
+          "control_owner": "none",
+          "last_kill_at": "2026-11-08T19:30:02Z",
+          "last_kill_source": "hotkey",
+          "policy_version": 1
+        }
+      ],
+      "invalid": [
+        {
+          "killed": true,
+          "armed": false,
+          "control_owner": "robot",
+          "last_kill_at": null,
+          "last_kill_source": null,
+          "policy_version": 1
+        }
+      ]
+    }
+  ]
+}

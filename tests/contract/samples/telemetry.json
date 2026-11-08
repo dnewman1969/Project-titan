@@ -1,0 +1,210 @@
+{
+  "def": "TelemetryFrame",
+  "valid": [
+    {
+      "schema": "titan.telemetry/1",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "game": "ksp",
+      "adapter_version": "1.0.0",
+      "seq": 1684,
+      "t_mono_ns": 912345600000000,
+      "t_session_ms": 84210,
+      "t_game_s": 13245.5,
+      "paused": false,
+      "scene": "flight",
+      "domain": "space",
+      "vehicle": {
+        "name": "Kerbal X",
+        "kind": "rocket",
+        "position": { "frame": "body:Kerbin", "x": 12.5, "y": 600123.0, "z": -4.2 },
+        "geo": { "lat_deg": -0.0972, "lon_deg": -74.5577, "alt_m": 11240 },
+        "attitude": { "heading_deg": 90, "pitch_deg": 62.5, "roll_deg": 0 },
+        "velocity": { "speed_mps": 402, "vertical_mps": 310.2, "horizontal_mps": 255.8 },
+        "accel_g": 2.1,
+        "controls": {
+          "throttle": 0.66,
+          "brake": null,
+          "steer": null,
+          "clutch": null,
+          "gear": null,
+          "sas": true,
+          "rcs": false,
+          "parking_brake": null,
+          "cruise_control_mps": null,
+          "lights": null
+        },
+        "engine": { "running": true, "rpm": null, "temp_c": null, "max_temp_ratio": 0.41 },
+        "damage": null,
+        "situation": "flying",
+        "stage": { "current": 3, "total": 4, "dv_ms": 2810 },
+        "orbit": {
+          "body": "Kerbin",
+          "apoapsis_m": 41250,
+          "periapsis_m": -580000,
+          "inclination_deg": 0.1,
+          "eccentricity": 0.92,
+          "period_s": null,
+          "time_to_apoapsis_s": 61,
+          "time_to_periapsis_s": null,
+          "time_to_soi_change_s": null
+        }
+      },
+      "resources": [
+        {
+          "id": "LiquidFuel",
+          "name": "Liquid Fuel",
+          "amount": 1440,
+          "capacity": 2880,
+          "unit": "u",
+          "scope": "vehicle"
+        },
+        {
+          "id": "Oxidizer",
+          "name": "Oxidizer",
+          "amount": 1760,
+          "capacity": 3520,
+          "unit": "u",
+          "scope": "stage"
+        }
+      ],
+      "environment": {
+        "body": "Kerbin",
+        "atmosphere_density": 0.31,
+        "dynamic_pressure_pa": 28750,
+        "static_pressure_pa": 22000,
+        "speed_limit_mps": null,
+        "weather": null,
+        "local_time": null
+      },
+      "job": null,
+      "economy": { "funds": 125000, "science": 42.5, "reputation": 12, "currency": null },
+      "game_specific": {
+        "met_s": 84.2,
+        "ut_s": 13245.5,
+        "vessel_type": "Ship",
+        "part_count": 42,
+        "crew_count": 3
+      }
+    },
+    {
+      "schema": "titan.telemetry/1",
+      "session_id": "0193f19c-0000-7000-8000-00000000bbbb",
+      "game": "ets2",
+      "adapter_version": "1.0.0",
+      "seq": 30400,
+      "t_mono_ns": 912999000000000,
+      "t_session_ms": 1520000,
+      "t_game_s": 486000,
+      "paused": false,
+      "scene": "driving",
+      "domain": "ground_vehicle",
+      "vehicle": {
+        "name": "Scania S",
+        "kind": "truck",
+        "position": { "frame": "scs_world", "x": -31250.4, "y": 52.1, "z": 18210.9 },
+        "geo": null,
+        "attitude": { "heading_deg": 182.5, "pitch_deg": 0.4, "roll_deg": 0.1 },
+        "velocity": { "speed_mps": 23.6, "vertical_mps": null, "horizontal_mps": null },
+        "accel_g": null,
+        "controls": {
+          "throttle": 0.4,
+          "brake": 0,
+          "steer": -0.02,
+          "clutch": 0,
+          "gear": 12,
+          "sas": null,
+          "rcs": null,
+          "parking_brake": false,
+          "cruise_control_mps": 23.6,
+          "lights": "low_beam"
+        },
+        "engine": { "running": true, "rpm": 1240, "temp_c": 88, "max_temp_ratio": null },
+        "damage": { "overall": 0.04, "parts": { "engine": 0.02, "transmission": 0.01, "chassis": 0.04 } },
+        "situation": null,
+        "stage": null,
+        "orbit": null
+      },
+      "resources": [
+        { "id": "fuel", "name": "Diesel", "amount": 61, "capacity": 800, "unit": "L", "scope": "vehicle" }
+      ],
+      "environment": {
+        "body": null,
+        "atmosphere_density": null,
+        "dynamic_pressure_pa": null,
+        "static_pressure_pa": null,
+        "speed_limit_mps": 25,
+        "weather": null,
+        "local_time": "13:40"
+      },
+      "job": {
+        "active": true,
+        "cargo": "Tractors",
+        "mass_kg": 17200,
+        "source": "Berlin",
+        "destination": "Krakow",
+        "income": 6420,
+        "currency": "EUR",
+        "deadline_game_s": 512000,
+        "nav_distance_m": 212000,
+        "nav_time_s": 9600,
+        "trailer_attached": true,
+        "cargo_damage": 0.01
+      },
+      "economy": { "funds": 210000, "science": null, "reputation": null, "currency": "EUR" },
+      "game_specific": { "fuel_avg_l_per_km": 0.41 }
+    }
+  ],
+  "invalid": [
+    {
+      "schema": "titan.telemetry/1",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "game": "ksp",
+      "adapter_version": "1.0.0",
+      "seq": 1,
+      "t_mono_ns": 1,
+      "t_session_ms": 0,
+      "t_game_s": null,
+      "paused": false,
+      "scene": "menu",
+      "domain": "space",
+      "resources": [],
+      "environment": null,
+      "job": null,
+      "economy": null,
+      "game_specific": {}
+    },
+    {
+      "schema": "titan.telemetry/1",
+      "session_id": "0193f19c-0000-7000-8000-00000000aaaa",
+      "game": "ksp",
+      "adapter_version": "1.0.0",
+      "seq": 1,
+      "t_mono_ns": 1,
+      "t_session_ms": 0,
+      "t_game_s": null,
+      "paused": false,
+      "scene": "menu",
+      "domain": "underwater",
+      "vehicle": {
+        "name": null,
+        "kind": null,
+        "position": null,
+        "geo": null,
+        "attitude": null,
+        "velocity": null,
+        "accel_g": null,
+        "controls": null,
+        "engine": null,
+        "damage": null,
+        "situation": null,
+        "stage": null,
+        "orbit": null
+      },
+      "resources": [],
+      "environment": null,
+      "job": null,
+      "economy": null,
+      "game_specific": {}
+    }
+  ]
+}

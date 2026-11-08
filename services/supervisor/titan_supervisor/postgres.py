@@ -222,6 +222,10 @@ class PostgresUnit(Unit):
         if code == 0:
             log.warning("postgres_adopted", pid=read_postmaster_pid(self.data_dir))
         else:
+            # A hard-killed postmaster leaves a lock file that still says "ready". On Windows
+            # `pg_ctl -w` cannot match PIDs and accepts any lock file started within 2 s of
+            # itself, so a quick restart would return before the new server is up.
+            (self.data_dir / "postmaster.pid").unlink(missing_ok=True)
             self.log_file.parent.mkdir(parents=True, exist_ok=True)
             code, out = await self._run(
                 self._tool("pg_ctl"), "start",
@@ -235,6 +239,7 @@ class PostgresUnit(Unit):
                 raise UnitError(f"pg_ctl start failed: {last_fatal(self.log_file) or out[-300:]}")
         self._pid = read_postmaster_pid(self.data_dir)
         await self._ensure_database(password)
+        self._pid = read_postmaster_pid(self.data_dir)
 
     async def _connect_admin(self, password: str, *, ready_timeout_s: float = 30) -> asyncpg.Connection:
         """Connect to the `postgres` database, waiting out crash recovery after an unclean stop

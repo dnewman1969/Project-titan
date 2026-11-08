@@ -1,0 +1,99 @@
+; Import boundaries (Sections 6.9, 9.7 and 10). Run through tools/lint-imports/run.py.
+[importlinter]
+root_packages =
+    titan_core
+    titan_db
+    titan_memory
+    titan_models
+    titan_sdk_games
+    titan_testing
+    titan_api
+    titan_supervisor
+    titan_orchestrator
+    titan_telemetry
+    titan_capture
+    titan_workers
+    titan_actions
+include_external_packages = True
+exclude_type_checking_imports = True
+
+[importlinter:contract:services-independent]
+name = Services talk over REST, bus or Celery and never import each other
+type = independence
+modules =
+    titan_api
+    titan_supervisor
+    titan_orchestrator
+    titan_telemetry
+    titan_capture
+    titan_workers
+    titan_actions
+
+[importlinter:contract:packages-below-services]
+name = Shared packages never import services
+type = forbidden
+source_modules =
+    titan_core
+    titan_db
+    titan_memory
+    titan_models
+    titan_sdk_games
+    titan_testing
+forbidden_modules =
+    titan_api
+    titan_supervisor
+    titan_orchestrator
+    titan_telemetry
+    titan_capture
+    titan_workers
+    titan_actions
+
+[importlinter:contract:input-choke-point]
+name = Only titan-actions may import input libraries (Section 6.9)
+type = forbidden
+source_modules =
+    titan_core
+    titan_db
+    titan_memory
+    titan_models
+    titan_sdk_games
+    titan_testing
+    titan_api
+    titan_supervisor
+    titan_orchestrator
+    titan_telemetry
+    titan_capture
+    titan_workers
+forbidden_modules =
+    pyautogui
+    vgamepad
+    pydirectinput
+allow_indirect_imports = True
+
+[importlinter:contract:http-client-factory]
+name = HTTP only through titan_core.http, which enforces offline mode (Section 9.7)
+type = forbidden
+source_modules =
+    titan_core
+    titan_db
+    titan_memory
+    titan_models
+    titan_sdk_games
+    titan_testing
+    titan_api
+    titan_supervisor
+    titan_orchestrator
+    titan_telemetry
+    titan_capture
+    titan_workers
+    titan_actions
+forbidden_modules =
+    httpx
+    requests
+    aiohttp
+    urllib3
+ignore_imports =
+    titan_core.http -> httpx
+    titan_core.http.** -> httpx
+unmatched_ignore_imports_alerting = none
+allow_indirect_imports = True

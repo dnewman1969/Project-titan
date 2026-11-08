@@ -1,0 +1,52 @@
+# Developer and CI service containers only (ADR 0020). The shipped app never uses Docker:
+# it manages portable PostgreSQL (D1), uses Memurai for Redis (D5) and runs Chroma itself (D2).
+# Ports match config/titan.yaml, and everything binds 127.0.0.1. The credentials are throwaway
+# dev values; real installs generate random secrets into Windows Credential Manager (Section 9.6).
+#
+#   docker compose up -d        then: uv run titan-db upgrade
+#   docker compose down -v      to wipe the dev data
+name: titan-dev
+
+services:
+  postgres:
+    image: postgres:16.15
+    environment:
+      POSTGRES_USER: titan
+      POSTGRES_PASSWORD: titan
+      POSTGRES_DB: titan
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U titan -d titan"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7.4.12
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:63790:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  chroma:
+    image: chromadb/chroma:1.5.9
+    environment:
+      ANONYMIZED_TELEMETRY: "FALSE"
+    ports:
+      - "127.0.0.1:8766:8000"
+    volumes:
+      - chromadata:/data
+
+volumes:
+  pgdata:
+  redisdata:
+  chromadata:

@@ -1,0 +1,82 @@
+# Pinned third-party binaries (M0.T6). These are never committed: tools/fetch-third-party.py
+# downloads them into third_party/cache/ and refuses any file whose SHA-256 or size differs.
+# To bump a version: update url, version, sha256 and size together in one PR and note it in the
+# PR description. Hashes below were computed from the downloaded artifacts on 2026-11-08.
+#
+# `redistribute` says whether the installer may ship the artifact (risk R9). Artifacts with
+# `install: user_consent` are copied into a user's game folder only after explicit consent
+# (Section 2.10 install_integration), never bundled.
+schema_version: 1
+artifacts:
+  - id: postgresql
+    name: PostgreSQL portable binaries (EDB)
+    version: "16.15-1"
+    platform: windows-x64
+    url: https://get.enterprisedb.com/postgresql/postgresql-16.15-1-windows-x64-binaries.zip
+    sha256: 25e6fcdfb8caec38691bf461125e7564508760666f7b8e5dc6a5f0818f58f81e
+    size: 332441502
+    archive: zip
+    license: PostgreSQL
+    homepage: https://www.postgresql.org/
+    redistribute: true
+    used_by: [M1.T1 portable Postgres, installer/build-pgsql.ps1]
+
+  - id: ffmpeg
+    name: FFmpeg essentials build (gyan.dev)
+    version: "7.1.1"
+    platform: windows-x64
+    url: https://github.com/GyanD/codexffmpeg/releases/download/7.1.1/ffmpeg-7.1.1-essentials_build.zip
+    sha256: 04861d3339c5ebe38b56c19a15cf2c0cc97f5de4fa8910e4d47e5e6404e4a2d4
+    size: 92234348
+    archive: zip
+    license: GPL-3.0-or-later
+    homepage: https://www.gyan.dev/ffmpeg/builds/
+    redistribute: true
+    notes: GPL build (libx264 and others). Ship its LICENSE and offer source per GPL; revisit in the M10 licence review.
+    used_by: [M8.T2 webcam pipeline, M8.T4 remux and track split]
+
+  - id: presentmon
+    name: PresentMon console
+    version: "2.6.0"
+    platform: windows-x64
+    url: https://github.com/GameTechDev/PresentMon/releases/download/v2.6.0/PresentMon-2.6.0-x64.exe
+    sha256: b2a706bc6ad475749e3b7e3409263aa1e6906d45bdcf993f6dbc0f660188f1af
+    size: 980320
+    archive: none
+    license: MIT
+    homepage: https://github.com/GameTechDev/PresentMon
+    redistribute: true
+    used_by: [M1.T6 game FPS metrics]
+
+  - id: krpc
+    name: kRPC server mod for KSP 1.12.x
+    version: "0.5.4"
+    platform: any
+    url: https://github.com/krpc/krpc/releases/download/v0.5.4/krpc-0.5.4.zip
+    sha256: b09dddf5f3b921b65ea666e6710183af0f8ba33d8238b8c9c89548f6999a983e
+    size: 703528
+    archive: zip
+    license: LGPL-3.0-only AND GPL-3.0-only
+    homepage: https://krpc.github.io/krpc/
+    redistribute: false
+    install: user_consent
+    notes: KRPC.SpaceCenter.* is GPL-3.0; the rest LGPL-3.0. Copied into <KSP>/GameData after consent (Section 7.3).
+    used_by: [M4.T3 KSP integration install, M5.T2 kRPC adapter]
+
+  - id: scs-sdk-plugin
+    name: scs-sdk-plugin (RenCloud) telemetry DLL for ETS2/ATS
+    version: "1.12.1"
+    platform: windows-x64
+    url: https://github.com/RenCloud/scs-sdk-plugin/releases/download/V.1.12.1/release_v_1_12_1.zip
+    sha256: 3679ec81407de0ebfb45241e496e2ad31e30a6e409ef0246fc86195bfee9c9a5
+    size: 355294
+    archive: zip
+    license: MIT
+    homepage: https://github.com/RenCloud/scs-sdk-plugin
+    redistribute: false
+    install: user_consent
+    files:
+      - path: release_v_1_12_1/Win64/scs-telemetry.dll
+        sha256: 1d03dbc7a975e72203c60a7b9998021ceb8800b836bf28a131279979ad386cd4
+        install_to: bin/win_x64/plugins/scs-telemetry.dll
+    used_by: [M4.T3 SCS integration install, M5.T3 SCS shared-memory adapter]

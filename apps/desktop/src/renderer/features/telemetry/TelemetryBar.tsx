@@ -104,7 +104,7 @@ export function TelemetryBar() {
         </Box>
       ) : (
         <Typography variant="caption" color="text.disabled" sx={{ px: 1, whiteSpace: "nowrap" }}>
-          Live metrics arrive in M1.T6
+          Waiting for live metrics
         </Typography>
       )}
     </Paper>

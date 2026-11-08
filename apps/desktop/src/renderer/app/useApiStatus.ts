@@ -2,6 +2,7 @@ import type { Status } from "@titan/ui-kit";
 import { useEffect, useRef } from "react";
 
 import { logEvent } from "../features/events/eventsSlice";
+import { SERVICE_STATUS } from "../features/system/supervisorSlice";
 import { useGetHealthQuery, useGetSystemStatusQuery, type SystemStatus } from "./api";
 import { useAppDispatch } from "./hooks";
 
@@ -13,15 +14,24 @@ export interface ApiStatus {
   apiDetail: string;
   postgres: Status;
   postgresDetail: string;
+  services: Status;
+  servicesDetail: string;
 }
 
-const DEPENDENCY_STATUS: Record<SystemStatus["services"][number]["state"], Status> = {
-  up: "ok",
-  degraded: "degraded",
-  starting: "degraded",
-  down: "down",
-  unknown: "unknown",
-};
+const RANK: Status[] = ["ok", "unknown", "degraded", "down"];
+
+/** One pill for every supervised process: the worst state wins. */
+export function summarizeServices(services: SystemStatus["services"] | undefined): [Status, string] {
+  if (!services?.length) return ["unknown", "no status yet"];
+  let worst: Status = "ok";
+  const problems: string[] = [];
+  for (const service of services) {
+    const status = SERVICE_STATUS[service.state];
+    if (RANK.indexOf(status) > RANK.indexOf(worst)) worst = status;
+    if (status !== "ok") problems.push(`${service.name} ${service.state}`);
+  }
+  return [worst, problems.length ? problems.join(", ") : `${services.length} running`];
+}
 
 export function useApiStatus(): ApiStatus {
   const dispatch = useAppDispatch();
@@ -43,7 +53,10 @@ export function useApiStatus(): ApiStatus {
   }
 
   const pg = status.data?.dependencies.postgres;
-  const postgres: Status = healthy && pg ? DEPENDENCY_STATUS[pg.state] : "unknown";
+  const postgres: Status = healthy && pg ? SERVICE_STATUS[pg.state] : "unknown";
+  const [services, servicesDetail]: [Status, string] = healthy
+    ? summarizeServices(status.data?.services)
+    : ["unknown", "API offline"];
   const postgresDetail = pg?.detail ?? pg?.version ?? (healthy ? "checking" : "API offline");
 
   const previous = useRef<Status>("unknown");
@@ -80,5 +93,5 @@ export function useApiStatus(): ApiStatus {
     }
   }, [api, apiDetail, dispatch]);
 
-  return { api, apiDetail, postgres, postgresDetail };
+  return { api, apiDetail, postgres, postgresDetail, services, servicesDetail };
 }

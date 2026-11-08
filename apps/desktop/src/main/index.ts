@@ -1,6 +1,6 @@
 /**
- * Electron main process: window, menu, kill-switch hotkey, launch token and backend lifecycle
- * (Sections 2.13 and 9.6).
+ * Electron main process: window, menu, kill-switch hotkey, launch token and the titan-supervisor
+ * lifecycle (Sections 2.2, 2.13 and 9.6, M1.T5).
  */
 import type { ChildProcess } from "node:child_process";
 import { join } from "node:path";
@@ -8,13 +8,19 @@ import { pathToFileURL } from "node:url";
 
 import { app, BrowserWindow, globalShortcut, ipcMain, Menu, net, protocol, session, shell } from "electron";
 
-import { IPC, type KillSwitchEvent, type TitanRuntime } from "../shared/ipc";
+import { IPC, type KillSwitchEvent, type SupervisorUpdate, type TitanRuntime } from "../shared/ipc";
 import { DOCS_URL } from "../shared/menu";
 import { resolveMainConfig } from "./config";
-import { registerKillSwitch } from "./killSwitch";
+import { postKill, registerKillSwitch } from "./killSwitch";
 import { buildMenuTemplate } from "./menu";
 import { APP_INDEX_URL, APP_ORIGIN, APP_SCHEME, isAppUrl, resolveAppFile } from "./navigation";
-import { startManagedApi, stopProcessTree } from "./supervisor";
+import {
+  CrashBudget,
+  startSupervisor,
+  stopSupervisor,
+  SupervisorClient,
+  SupervisorMonitor,
+} from "./supervisor";
 
 const devServerUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL;
 const config = resolveMainConfig(process.env, { isPackaged: app.isPackaged, appPath: app.getAppPath() });
@@ -25,8 +31,16 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let mainWindow: BrowserWindow | null = null;
-let apiProcess: ChildProcess | null = null;
+let supervisorProcess: ChildProcess | null = null;
+let supervisorStopped = false;
+let quitting = false;
 let disposeKillSwitch: () => void = () => undefined;
+
+const supervisorClient = new SupervisorClient(config.supervisorBase, config.token);
+const monitor = new SupervisorMonitor(supervisorClient, (update: SupervisorUpdate) => {
+  sendToRenderer(IPC.supervisor, update);
+});
+const crashBudget = new CrashBudget();
 
 function runtime(): TitanRuntime {
   return {
@@ -106,6 +120,31 @@ ipcMain.on(IPC.runtime, (event) => {
   event.returnValue = isAppUrl(event.senderFrame?.url, devServerUrl) ? runtime() : null;
 });
 
+ipcMain.handle(IPC.supervisorSnapshot, (event) =>
+  isAppUrl(event.senderFrame?.url, devServerUrl) && config.backend === "managed" ? monitor.snapshot() : null,
+);
+
+function launchSupervisor(): void {
+  const child = startSupervisor({
+    repoRoot: config.repoRoot,
+    token: config.token,
+    apiPort: config.apiPort,
+    supervisorPort: config.supervisorPort,
+    corsOrigins: devServerUrl ? [APP_ORIGIN, new URL(devServerUrl).origin] : [APP_ORIGIN],
+  });
+  supervisorProcess = child;
+  child.on("exit", (code, signal) => {
+    console.log(`[supervisor] exited code=${String(code)} signal=${String(signal)}`);
+    if (quitting) return;
+    if (crashBudget.allowRestart()) {
+      monitor.setProcess("restarting", `exited (code ${String(code)}); restarting`);
+      setTimeout(launchSupervisor, 2000);
+    } else {
+      monitor.setProcess("exited", `exited (code ${String(code)}) repeatedly; restart Titan`);
+    }
+  });
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
@@ -135,17 +174,18 @@ if (!app.requestSingleInstanceLock()) {
     const killSwitch = registerKillSwitch(globalShortcut, config.killHotkey, (event: KillSwitchEvent) => {
       console.log(`[kill-switch] ${event.source} at ${event.at}`);
       sendToRenderer(IPC.killSwitch, event);
+      if (config.backend !== "none") {
+        void postKill(config.apiBase, config.token, event.source).then((result) => {
+          if (result !== 200) console.warn(`[kill-switch] /safety/kill: ${String(result)}`);
+        });
+      }
     });
     if (!killSwitch.registered) console.warn(`[kill-switch] could not register ${config.killHotkey}`);
     disposeKillSwitch = killSwitch.dispose;
 
     if (config.backend === "managed") {
-      apiProcess = startManagedApi({
-        repoRoot: config.repoRoot,
-        token: config.token,
-        apiPort: config.apiPort,
-        corsOrigins: devServerUrl ? [APP_ORIGIN, new URL(devServerUrl).origin] : [APP_ORIGIN],
-      });
+      launchSupervisor();
+      monitor.start();
     }
 
     mainWindow = createWindow();
@@ -158,9 +198,25 @@ if (!app.requestSingleInstanceLock()) {
     app.quit();
   });
 
+  // Quitting waits for the supervisor to stop every service in order (M1 acceptance: no Titan
+  // process survives the app), with a tree kill as the fallback.
+  app.on("before-quit", (event) => {
+    const child = supervisorProcess;
+    if (!child || supervisorStopped) return;
+    event.preventDefault();
+    if (quitting) return;
+    quitting = true;
+    monitor.setProcess("stopping");
+    monitor.stop();
+    void stopSupervisor(child, supervisorClient).then((result) => {
+      console.log(`[supervisor] stop: ${result}`);
+      supervisorStopped = true;
+      app.quit();
+    });
+  });
+
   app.on("will-quit", () => {
     disposeKillSwitch();
     globalShortcut.unregisterAll();
-    if (apiProcess) stopProcessTree(apiProcess);
   });
 }

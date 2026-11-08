@@ -1,6 +1,6 @@
 /**
- * REST access through RTK Query only (Section 9.1). Responses are validated with zod; these
- * schemas mirror the API's OpenAPI models until a generated REST client replaces them.
+ * REST access through RTK Query only (Section 9.1). Responses are validated with the zod schemas
+ * generated from the Python protocol models (`@titan/protocol`).
  */
 import {
   createApi,
@@ -9,33 +9,17 @@ import {
   type FetchArgs,
   type FetchBaseQueryError,
 } from "@reduxjs/toolkit/query/react";
+import { SafetyStateSchema, SystemStatusSchema, type SafetyState, type SystemStatus } from "@titan/protocol";
 import { z } from "zod";
 
+import type { KillSwitchEvent } from "../../shared/ipc";
 import { getTitan } from "./runtime";
 
 export const API_PREFIX = "/api/v1";
 
-const ServiceStateName = z.enum(["up", "down", "starting", "degraded", "unknown"]);
-
 export const HealthSchema = z.object({ status: z.literal("ok") });
 export type Health = z.infer<typeof HealthSchema>;
-
-export const SystemStatusSchema = z.object({
-  services: z.array(
-    z.object({
-      name: z.string(),
-      state: ServiceStateName,
-      pid: z.number().int().nullable(),
-      restarts: z.number().int(),
-      since: z.string().nullable(),
-    }),
-  ),
-  dependencies: z.record(
-    z.object({ state: ServiceStateName, version: z.string().nullable(), detail: z.string().nullable() }),
-  ),
-  resource_guard_level: z.enum(["L0", "L1", "L2", "L3", "L4"]),
-});
-export type SystemStatus = z.infer<typeof SystemStatusSchema>;
+export type { SystemStatus };
 
 const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (args, api, extra) => {
   const { apiBase, token } = getTitan();
@@ -61,7 +45,15 @@ export const titanApi = createApi({
       query: () => "/system/status",
       transformResponse: (raw: unknown) => SystemStatusSchema.parse(raw),
     }),
+    kill: build.mutation<SafetyState, KillSwitchEvent["source"]>({
+      query: (source) => ({ url: "/safety/kill", method: "POST", body: { source } }),
+      transformResponse: (raw: unknown) => SafetyStateSchema.parse(raw),
+    }),
+    resume: build.mutation<SafetyState, undefined>({
+      query: () => ({ url: "/safety/resume", method: "POST", body: { confirm: "RESUME" } }),
+      transformResponse: (raw: unknown) => SafetyStateSchema.parse(raw),
+    }),
   }),
 });
 
-export const { useGetHealthQuery, useGetSystemStatusQuery } = titanApi;
+export const { useGetHealthQuery, useGetSystemStatusQuery, useKillMutation, useResumeMutation } = titanApi;

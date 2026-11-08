@@ -1,6 +1,8 @@
 /**
- * Kill-switch hotkey (Section 6.9 rail 3). Phase 1 has no input path, so a kill only notifies the
- * renderer; M1.T5 also POSTs `/safety/kill`, and Phase 4 adds the titan-actions keyboard hook.
+ * Kill-switch hotkey (Section 6.9 rail 3). The hotkey works even when Titan is not focused. Each
+ * kill is POSTed to `/safety/kill` (the API persists it and publishes `titan:safety:kill`) and
+ * shown in the renderer at once. Phase 1 has no input path, so there is nothing to stop yet;
+ * Phase 4 adds the titan-actions named pipe as the second, API-independent path.
  */
 import type { GlobalShortcut } from "electron";
 
@@ -26,4 +28,26 @@ export function registerKillSwitch(
       if (registered) shortcuts.unregister(accelerator);
     },
   };
+}
+
+type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
+
+/** POST `/api/v1/safety/kill`. Resolves to the HTTP status, or an error message when unreachable. */
+export async function postKill(
+  apiBase: string,
+  token: string,
+  source: KillSwitchEvent["source"],
+  fetchFn: FetchFn = fetch,
+): Promise<number | string> {
+  try {
+    const response = await fetchFn(`${apiBase}/api/v1/safety/kill`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ source }),
+      signal: AbortSignal.timeout(1000),
+    });
+    return response.status;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
 }

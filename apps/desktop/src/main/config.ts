@@ -6,14 +6,18 @@ import type { BackendMode } from "../shared/ipc";
 
 export const LAUNCH_TOKEN_ENV = "TITAN_LAUNCH_TOKEN";
 export const DEFAULT_KILL_HOTKEY = "Ctrl+Shift+F12";
+export const DEFAULT_SUPERVISOR_PORT = 8769;
 
 export interface MainConfig {
   apiBase: string;
   apiPort: number;
+  /** titan-supervisor's internal API (Section 2.3). */
+  supervisorBase: string;
+  supervisorPort: number;
   token: string;
   backend: BackendMode;
   killHotkey: string;
-  /** Monorepo root, used to run the API with `uv` in development. */
+  /** Monorepo root, used to run the supervisor with `uv` in development. */
   repoRoot: string;
 }
 
@@ -38,12 +42,13 @@ function port(value: string | undefined, fallback: number): number {
  * The API always binds 127.0.0.1 (Section 9.6), so only the port is configurable here.
  *
  * Backend modes:
- * - `external`: `TITAN_LAUNCH_TOKEN` is set, so an API started by hand with that token is used.
- * - `managed`: development; the shell runs `uv run titan-api` with a fresh launch token.
+ * - `external`: `TITAN_LAUNCH_TOKEN` is set, so a supervisor or API started by hand with that token is used.
+ * - `managed`: development; the shell runs `uv run titan-supervisor` with a fresh launch token.
  * - `none`: packaged builds (no bundled Python until M10) or `TITAN_BACKEND=none`.
  */
 export function resolveMainConfig(env: NodeJS.ProcessEnv, options: ResolveOptions): MainConfig {
   const apiPort = port(env.TITAN__API__PORT, DEFAULT_API_PORT);
+  const supervisorPort = port(env.TITAN__SUPERVISOR__PORT, DEFAULT_SUPERVISOR_PORT);
   const externalToken = env[LAUNCH_TOKEN_ENV];
   let backend: BackendMode;
   if (externalToken) backend = "external";
@@ -52,6 +57,8 @@ export function resolveMainConfig(env: NodeJS.ProcessEnv, options: ResolveOption
   return {
     apiBase: `http://127.0.0.1:${apiPort}`,
     apiPort,
+    supervisorBase: `http://127.0.0.1:${supervisorPort}`,
+    supervisorPort,
     token: externalToken || (options.randomToken ?? newLaunchToken)(),
     backend,
     killHotkey: env.TITAN__SAFETY__KILL_HOTKEY || DEFAULT_KILL_HOTKEY,

@@ -58,7 +58,12 @@ def sync_redis(server: fakeredis.FakeServer) -> fakeredis.FakeRedis:
 def client(server: fakeredis.FakeServer) -> Iterator[TestClient]:
     redis = fakeredis.FakeAsyncRedis(server=server, decode_responses=True)
     app = create_app(
-        TitanConfig(), launch_token=TOKEN, checks={}, supervisor=no_supervisor, redis=redis, start_persister=False
+        TitanConfig(),
+        launch_token=TOKEN,
+        checks={},
+        supervisor=no_supervisor,
+        redis=redis,
+        start_persister=False,
     )
     with TestClient(app) as test_client:
         yield test_client
@@ -178,7 +183,12 @@ def test_metrics_rest_endpoint_without_redis() -> None:
 
     redis = aioredis.Redis.from_url("redis://127.0.0.1:1/0", socket_connect_timeout=0.2)
     app = create_app(
-        TitanConfig(), launch_token=TOKEN, checks={}, supervisor=no_supervisor, redis=redis, start_persister=False
+        TitanConfig(),
+        launch_token=TOKEN,
+        checks={},
+        supervisor=no_supervisor,
+        redis=redis,
+        start_persister=False,
     )
     with TestClient(app) as test_client:
         response = test_client.get("/api/v1/system/metrics", headers=AUTH)

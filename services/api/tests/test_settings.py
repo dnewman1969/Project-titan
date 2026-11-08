@@ -24,6 +24,7 @@ AUTH = {"Authorization": f"Bearer {TOKEN}"}
 async def no_supervisor() -> SupervisorStatus | None:
     return None
 
+
 pytestmark = pytest.mark.postgres
 
 

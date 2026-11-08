@@ -43,11 +43,7 @@ class MessagesRepository:
             "t_session_ms": ms,
             "created_at": envelope.ts,
         }
-        stmt = (
-            insert(AgentMessage)
-            .values(**row)
-            .on_conflict_do_nothing(index_elements=["id"])
-        )
+        stmt = insert(AgentMessage).values(**row).on_conflict_do_nothing(index_elements=["id"])
         result = await self._session.execute(stmt)
         return (result.rowcount or 0) == 1  # type: ignore[attr-defined]
 

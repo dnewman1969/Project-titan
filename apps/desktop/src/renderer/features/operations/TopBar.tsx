@@ -7,6 +7,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { MONO_FONT, StatusPill } from "@titan/ui-kit";
 
+import { useKillMutation } from "../../app/api";
 import { useAppDispatch } from "../../app/hooks";
 import { getTitan } from "../../app/runtime";
 import type { ApiStatus } from "../../app/useApiStatus";
@@ -14,7 +15,8 @@ import { triggerKill } from "../../app/useShellBridge";
 
 export function TopBar({ status }: { status: ApiStatus }) {
   const dispatch = useAppDispatch();
-  const { killHotkey } = getTitan();
+  const [kill] = useKillMutation();
+  const { killHotkey, backend } = getTitan();
   return (
     <Box
       component="header"
@@ -57,6 +59,7 @@ export function TopBar({ status }: { status: ApiStatus }) {
         pulse={status.api === "unknown"}
       />
       <StatusPill status={status.postgres} label="Database" detail={status.postgresDetail} />
+      <StatusPill status={status.services} label="Services" detail={status.servicesDetail} />
       <Tooltip title="Recording arrives in M8">
         <Box
           role="status"
@@ -77,6 +80,7 @@ export function TopBar({ status }: { status: ApiStatus }) {
           startIcon={<PowerSettingsNewIcon />}
           onClick={() => {
             triggerKill(dispatch, { source: "button", at: new Date().toISOString() });
+            if (backend !== "none") void kill("button");
           }}
           sx={{ fontWeight: 800, letterSpacing: 1.5, px: 2 }}
         >

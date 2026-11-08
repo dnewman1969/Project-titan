@@ -16,6 +16,8 @@ const BROWSER_FALLBACK: TitanBridge = {
   versions: { app: "dev", electron: "n/a", chrome: "n/a", node: "n/a" },
   onKillSwitch: () => () => undefined,
   onMenuCommand: () => () => undefined,
+  onSupervisorUpdate: () => () => undefined,
+  getSupervisorStatus: () => Promise.resolve(null),
 };
 
 export function getTitan(): TitanBridge {

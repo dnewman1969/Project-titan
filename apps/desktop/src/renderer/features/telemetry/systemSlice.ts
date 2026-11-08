@@ -11,7 +11,7 @@ interface SystemState {
 
 const initialState: SystemState = { latest: null, history: [] };
 
-/** Fed by the WS `system.metrics` channel once the gateway (M1.T4) and metrics (M1.T6) exist. */
+/** Fed by the WS `system.metrics` channel: 1 Hz samples from the supervisor (M1.T6). */
 export const systemSlice = createSlice({
   name: "system",
   initialState,

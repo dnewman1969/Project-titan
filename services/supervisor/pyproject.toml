@@ -4,7 +4,16 @@ version = "0.1.0"
 description = "Project Titan process supervisor"
 requires-python = ">=3.12,<3.13"
 license = "Apache-2.0"
-dependencies = ["titan-core"]
+dependencies = [
+  "titan-core",
+  "fastapi>=0.115",
+  "nvidia-ml-py>=12.560",
+  "psutil>=6.1",
+  "uvicorn>=0.32",
+]
+
+[project.scripts]
+titan-supervisor = "titan_supervisor.__main__:main"
 
 [build-system]
 requires = ["hatchling>=1.25"]

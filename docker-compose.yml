@@ -1,9 +1,10 @@
 # Developer and CI service containers only (ADR 0020). The shipped app never uses Docker:
 # it manages portable PostgreSQL (D1), uses Memurai for Redis (D5) and runs Chroma itself (D2).
 # Ports match config/titan.yaml, and everything binds 127.0.0.1. The credentials are throwaway
-# dev values; real installs generate random secrets into Windows Credential Manager (Section 9.6).
+# dev values (TITAN__POSTGRES__PASSWORD=titan, TITAN__REDIS__PASSWORD=titan-dev); real installs
+# generate random secrets into Windows Credential Manager (Section 9.6).
 #
-#   docker compose up -d        then: uv run titan-db upgrade
+#   docker compose up -d        then: tools/dev-up.sh --no-compose (or .ps1 -NoCompose)
 #   docker compose down -v      to wipe the dev data
 name: titan-dev
 
@@ -26,13 +27,14 @@ services:
 
   redis:
     image: redis:7.4.12
-    command: ["redis-server", "--appendonly", "yes"]
+    # Titan requires requirepass (M1.T2); without it the Redis check reports degraded.
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "titan-dev"]
     ports:
       - "127.0.0.1:63790:6379"
     volumes:
       - redisdata:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "titan-dev", "ping"]
       interval: 2s
       timeout: 3s
       retries: 30

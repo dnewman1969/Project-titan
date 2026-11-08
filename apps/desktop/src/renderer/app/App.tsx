@@ -11,13 +11,17 @@ import TableCell from "@mui/material/TableCell";
 import TableRow from "@mui/material/TableRow";
 import { MONO_FONT } from "@titan/ui-kit";
 
-import { dismissNotice, setAboutOpen } from "../features/operations/layoutSlice";
+import { BootSplash } from "../features/operations/BootSplash";
+import { dismissNotice, setAboutOpen, showNotice } from "../features/operations/layoutSlice";
 import { OperationsCenter } from "../features/operations/OperationsCenter";
-import { killAcknowledged } from "../features/safety/safetySlice";
+import { killAcknowledged, safetyStateReceived } from "../features/safety/safetySlice";
+import { useResumeMutation } from "./api";
 import { useAppDispatch, useAppSelector } from "./hooks";
 import { getTitan } from "./runtime";
 import { useApiStatus } from "./useApiStatus";
+import { useLiveChannels } from "./useLiveChannels";
 import { useShellBridge } from "./useShellBridge";
+import { useSupervisor } from "./useSupervisor";
 
 function AboutDialog() {
   const dispatch = useAppDispatch();
@@ -58,7 +62,17 @@ function AboutDialog() {
 function KillBanner() {
   const dispatch = useAppDispatch();
   const safety = useAppSelector((s) => s.safety);
+  const [resume, { isLoading }] = useResumeMutation();
   if (!safety.killed) return null;
+  const onResume = async () => {
+    if (getTitan().backend === "none") {
+      dispatch(killAcknowledged());
+      return;
+    }
+    const result = await resume(undefined);
+    if ("data" in result && result.data) dispatch(safetyStateReceived(result.data));
+    else dispatch(showNotice("Could not resume: the API did not confirm. The kill stays engaged."));
+  };
   const at = safety.last_kill_at ? new Date(safety.last_kill_at).toLocaleTimeString() : "";
   return (
     <Alert
@@ -74,8 +88,8 @@ function KillBanner() {
         minWidth: 460,
       }}
       action={
-        <Button color="inherit" size="small" onClick={() => dispatch(killAcknowledged())}>
-          Dismiss
+        <Button color="inherit" size="small" disabled={isLoading} onClick={() => void onResume()}>
+          Resume
         </Button>
       }
     >
@@ -86,6 +100,8 @@ function KillBanner() {
 
 export function App() {
   useShellBridge();
+  useSupervisor();
+  useLiveChannels();
   const status = useApiStatus();
   const dispatch = useAppDispatch();
   const notice = useAppSelector((s) => s.layout.notice);
@@ -93,6 +109,7 @@ export function App() {
     <>
       <OperationsCenter status={status} />
       <KillBanner />
+      <BootSplash />
       <AboutDialog />
       <Snackbar
         key={notice?.id}

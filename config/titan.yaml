@@ -3,9 +3,9 @@
 # environment variables, or with CLI flags. Unknown keys fail at startup.
 # Secrets (passwords, tokens) never go in this file.
 api:        { host: 127.0.0.1, port: 8765, cors_origins: ["app://titan"] }
-postgres:   { host: 127.0.0.1, port: 54329, database: titan, user: titan, data_dir: "%LOCALAPPDATA%/Titan/data/pg" }
+postgres:   { host: 127.0.0.1, port: 54329, database: titan, user: titan, mode: managed, data_dir: "%LOCALAPPDATA%/Titan/data/pg" }
 redis:      { url: "redis://127.0.0.1:63790/0" }        # password from keyring 'titan/redis'
-chroma:     { port: 8766, data_dir: "%LOCALAPPDATA%/Titan/data/chroma" }
+chroma:     { host: 127.0.0.1, port: 8766, mode: managed, data_dir: "%LOCALAPPDATA%/Titan/data/chroma" }   # no auth in Chroma >= 1.0: loopback only
 paths:      { recordings_root: "%USERPROFILE%/Videos/Titan" }
 telemetry:  { publish_hz: 10, sample_hz: 1, chunk_minutes: 5 }
 agents:     { tick_interval_ms: 10000, max_open_tasks_per_agent: 2, context_token_budget: 3000 }
@@ -16,5 +16,7 @@ recording:  { default_preset: "1080p60", min_free_gb: 20 }
 safety:     { kill_hotkey: "Ctrl+Shift+F12" }        # actions disabled in P1 regardless
 logging:    { level: INFO, llm_prompts: false }
 network:    { offline_mode: false, allowlist_file: "config/egress.yaml" }
+supervisor: { host: 127.0.0.1, port: 8769, processes: [postgres, redis, chroma, migrate, api], start_timeout_s: 20 }
+metrics:    { sample_hz: 1, presentmon_path: null, nvml: true }
 otel:       { enabled: false }
 features:   { research: false, factory: false, actions: false, tts: false, video: false, publish: false }

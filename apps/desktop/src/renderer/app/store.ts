@@ -3,6 +3,7 @@ import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import { eventsSlice } from "../features/events/eventsSlice";
 import { layoutSlice } from "../features/operations/layoutSlice";
 import { safetySlice } from "../features/safety/safetySlice";
+import { supervisorSlice } from "../features/system/supervisorSlice";
 import { systemSlice } from "../features/telemetry/systemSlice";
 import { titanApi } from "./api";
 
@@ -12,6 +13,7 @@ const rootReducer = combineReducers({
   safety: safetySlice.reducer,
   events: eventsSlice.reducer,
   system: systemSlice.reducer,
+  supervisor: supervisorSlice.reducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;

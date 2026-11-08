@@ -18,6 +18,11 @@ env:
   FORCE_COLOR: "1"
   GITLEAKS_VERSION: "8.30.1"
   GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+  # Throwaway CI value: Titan's Redis always runs with requirepass (M1.T2).
+  TITAN__REDIS__PASSWORD: titan-ci
+  # Redis 5 for Windows (tporadowski), a CI stand-in for Memurai (D5): streams and requirepass.
+  REDIS_WIN_VERSION: "5.0.14.1"
+  REDIS_WIN_SHA256: 018ea18a35876383cbb5f4cd0258adfc87747cf9d619bce1cf73a2e36f720ccf
 
 jobs:
   lint:
@@ -66,17 +71,26 @@ jobs:
         ports: ["54329:5432"]
         options: >-
           --health-cmd "pg_isready -U titan -d titan" --health-interval 2s --health-timeout 3s --health-retries 30
-      redis:
-        image: redis:7.4.12
-        ports: ["63790:6379"]
-        options: >-
-          --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 3s --health-retries 30
     env:
       TITAN__POSTGRES__PASSWORD: titan
       TITAN_REQUIRE_POSTGRES: "1"
       TITAN_REQUIRE_SERVICES: "1"
+      # M1 acceptance (tests/integration/test_supervisor_e2e.py) with the runner's PostgreSQL 16.
+      TITAN_REQUIRE_SUPERVISOR_E2E: "1"
+      TITAN__POSTGRES__BIN_DIR: /usr/lib/postgresql/16/bin
     steps:
       - uses: actions/checkout@v7
+      # Service containers cannot take a command, and Titan's Redis needs --requirepass.
+      - name: Start Redis with requirepass
+        run: |
+          docker run -d --name redis -p 127.0.0.1:63790:6379 redis:7.4.12 \
+            redis-server --requirepass "$TITAN__REDIS__PASSWORD"
+          for i in $(seq 1 30); do
+            docker exec redis redis-cli --no-auth-warning -a "$TITAN__REDIS__PASSWORD" ping && exit 0
+            sleep 1
+          done
+          docker logs redis
+          exit 1
       - name: Start Chroma
         run: |
           docker run -d --name chroma -p 127.0.0.1:8766:8000 -e ANONYMIZED_TELEMETRY=FALSE chromadb/chroma:1.5.9
@@ -91,6 +105,18 @@ jobs:
           node: "false"
       - name: Migrate the service database (smoke test of the titan-db CLI)
         run: uv run titan-db upgrade
+      - name: PostgreSQL 16 binaries for the managed-Postgres tests
+        run: |
+          # ubuntu-latest no longer packages PostgreSQL 16, so take it from the PGDG apt repository.
+          if [ ! -x "$TITAN__POSTGRES__BIN_DIR/pg_ctl" ]; then
+            sudo apt-get update -q
+            sudo apt-get install -y -q --no-install-recommends postgresql-common
+            sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+            sudo apt-get install -y -q --no-install-recommends postgresql-16
+          fi
+          "$TITAN__POSTGRES__BIN_DIR/postgres" --version
+      - name: Prefetch Chroma for the supervisor (keeps the cold-start measurement honest)
+        run: uvx --from chromadb==1.5.9 chroma --help > /dev/null
       - name: pytest (unit, contract, migrations, integration)
         run: uv run pytest --cov --cov-report=term --cov-report=xml
       - name: Coverage gates (Section 9.2)
@@ -125,6 +151,10 @@ jobs:
     env:
       TITAN__POSTGRES__PASSWORD: titan
       TITAN_REQUIRE_POSTGRES: "1"
+      # M1 acceptance on Windows: managed portable Postgres, real Credential Manager and the job object.
+      # Hosted runners are slower than the reference PC, so cold start gets a looser budget here.
+      TITAN_REQUIRE_SUPERVISOR_E2E: "1"
+      TITAN_E2E_START_BUDGET_S: "60"
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
@@ -151,6 +181,25 @@ jobs:
           $env:PGPASSWORD = $env:TITAN__POSTGRES__PASSWORD
           & "$bin/createdb.exe" -h 127.0.0.1 -p 54329 -U titan titan
           & "$bin/psql.exe" -h 127.0.0.1 -p 54329 -U titan -tAc "SHOW server_version;"
+          "TITAN__POSTGRES__BIN_DIR=$bin" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Redis for Windows on 127.0.0.1:63790 with requirepass
+        shell: pwsh
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP redis.zip
+          $dir = Join-Path $env:RUNNER_TEMP redis
+          Invoke-WebRequest -Uri "https://github.com/tporadowski/redis/releases/download/v$env:REDIS_WIN_VERSION/Redis-x64-$env:REDIS_WIN_VERSION.zip" -OutFile $zip
+          if ((Get-FileHash $zip -Algorithm SHA256).Hash -ne $env:REDIS_WIN_SHA256) { throw "redis zip hash mismatch" }
+          Expand-Archive $zip -DestinationPath $dir
+          Start-Process -FilePath (Join-Path $dir redis-server.exe) -WindowStyle Hidden -ArgumentList `
+            "--port", "63790", "--bind", "127.0.0.1", "--requirepass", $env:TITAN__REDIS__PASSWORD
+          for ($i = 0; $i -lt 30; $i++) {
+            $pong = & (Join-Path $dir redis-cli.exe) -p 63790 -a $env:TITAN__REDIS__PASSWORD --no-auth-warning ping
+            if ($pong -eq "PONG") { exit 0 }
+            Start-Sleep -Seconds 1
+          }
+          throw "redis did not start"
+      - name: Prefetch Chroma for the supervisor
+        run: uvx --from chromadb==1.5.9 chroma --help > $null
       # M0 acceptance: a fresh clone runs `pnpm i && uv sync && pnpm codegen && pnpm test` green.
       - name: pnpm codegen
         run: pnpm codegen

@@ -3,7 +3,10 @@ import type { SafetyState } from "@titan/protocol";
 
 import type { KillSwitchEvent } from "../../../shared/ipc";
 
-/** Mirrors the protocol `SafetyState`. Phase 1 never arms, so a kill is acknowledged locally. */
+/**
+ * Mirrors the protocol `SafetyState`. A kill shows at once (optimistic); the API's state then
+ * arrives over WS `system.safety` and wins. Phase 1 never arms.
+ */
 const initialState: SafetyState = {
   killed: false,
   armed: false,
@@ -24,10 +27,14 @@ export const safetySlice = createSlice({
       state.last_kill_at = action.payload.at;
       state.last_kill_source = action.payload.source;
     },
+    safetyStateReceived(_state, action: PayloadAction<SafetyState>) {
+      return action.payload;
+    },
+    /** Without a backend there is no server state to resume, so the banner clears locally. */
     killAcknowledged(state) {
       state.killed = false;
     },
   },
 });
 
-export const { killSwitchTriggered, killAcknowledged } = safetySlice.actions;
+export const { killSwitchTriggered, safetyStateReceived, killAcknowledged } = safetySlice.actions;

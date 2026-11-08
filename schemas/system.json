@@ -1,0 +1,315 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://titan.local/schemas/system.json",
+  "title": "System status and safety",
+  "$defs": {
+    "DependencyState": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "up",
+            "down",
+            "starting",
+            "degraded",
+            "failed",
+            "stopped",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "title": "DependencyState",
+      "type": "object"
+    },
+    "GameTarget": {
+      "additionalProperties": false,
+      "description": "`PUT /metrics/game` on the supervisor: the process PresentMon tracks (null stops tracking).",
+      "properties": {
+        "pid": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "pid"
+      ],
+      "title": "GameTarget",
+      "type": "object"
+    },
+    "SafetyArmRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "session_id": {
+          "type": "string"
+        },
+        "confirm": {
+          "const": "ARM",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "confirm"
+      ],
+      "title": "SafetyArmRequest",
+      "type": "object"
+    },
+    "SafetyKillRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "description": "hotkey, button, voice, api, ...",
+          "maxLength": 32,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "title": "SafetyKillRequest",
+      "type": "object"
+    },
+    "SafetyResumeRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "confirm": {
+          "const": "RESUME",
+          "type": "string"
+        }
+      },
+      "required": [
+        "confirm"
+      ],
+      "title": "SafetyResumeRequest",
+      "type": "object"
+    },
+    "ServiceState": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "up",
+            "down",
+            "starting",
+            "degraded",
+            "failed",
+            "stopped",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "pid": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "restarts": {
+          "default": 0,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "since": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When the current state began"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "default": "managed",
+          "enum": [
+            "managed",
+            "external",
+            "oneshot"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "state"
+      ],
+      "title": "ServiceState",
+      "type": "object"
+    },
+    "SupervisorEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "description": "Increases by one per event; use it to fetch only new events",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "ts": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "process": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "starting",
+            "healthy",
+            "unhealthy",
+            "exited",
+            "restarting",
+            "circuit_open",
+            "stopped",
+            "adopted"
+          ],
+          "type": "string"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "seq",
+        "ts",
+        "process",
+        "kind"
+      ],
+      "title": "SupervisorEvent",
+      "type": "object"
+    },
+    "SupervisorStatus": {
+      "additionalProperties": false,
+      "description": "`GET /status` on the supervisor's internal endpoint (127.0.0.1:8769).",
+      "properties": {
+        "started_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "ready": {
+          "description": "Every process in the start order has been healthy at least once",
+          "type": "boolean"
+        },
+        "services": {
+          "items": {
+            "$ref": "#/$defs/ServiceState"
+          },
+          "type": "array"
+        },
+        "events": {
+          "description": "Most recent events, oldest first",
+          "items": {
+            "$ref": "#/$defs/SupervisorEvent"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "started_at",
+        "ready",
+        "services",
+        "events"
+      ],
+      "title": "SupervisorStatus",
+      "type": "object"
+    },
+    "SystemStatus": {
+      "additionalProperties": false,
+      "description": "`GET /system/status`.",
+      "properties": {
+        "services": {
+          "items": {
+            "$ref": "#/$defs/ServiceState"
+          },
+          "type": "array"
+        },
+        "dependencies": {
+          "additionalProperties": {
+            "$ref": "#/$defs/DependencyState"
+          },
+          "type": "object"
+        },
+        "resource_guard_level": {
+          "default": "L0",
+          "enum": [
+            "L0",
+            "L1",
+            "L2",
+            "L3",
+            "L4"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "services",
+        "dependencies"
+      ],
+      "title": "SystemStatus",
+      "type": "object"
+    }
+  }
+}

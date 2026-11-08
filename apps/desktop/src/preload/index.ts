@@ -4,7 +4,13 @@
  */
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 
-import { IPC, type KillSwitchEvent, type TitanBridge, type TitanRuntime } from "../shared/ipc";
+import {
+  IPC,
+  type KillSwitchEvent,
+  type SupervisorUpdate,
+  type TitanBridge,
+  type TitanRuntime,
+} from "../shared/ipc";
 
 const runtime = ipcRenderer.sendSync(IPC.runtime) as TitanRuntime | null;
 if (!runtime) throw new Error("Titan runtime unavailable: renderer origin rejected by the main process");
@@ -29,6 +35,11 @@ const bridge: TitanBridge = {
     subscribe(IPC.menu, (payload) => {
       if (typeof payload === "string") listener(payload);
     }),
+  onSupervisorUpdate: (listener) =>
+    subscribe(IPC.supervisor, (payload) => {
+      listener(payload as SupervisorUpdate);
+    }),
+  getSupervisorStatus: () => ipcRenderer.invoke(IPC.supervisorSnapshot) as Promise<SupervisorUpdate | null>,
 };
 
 contextBridge.exposeInMainWorld("titan", bridge);

@@ -35,9 +35,7 @@ def test_update_titan_bat_invokes_powershell_once() -> None:
     for line in raw.splitlines():
         if "ExecutionPolicy" in line or "powershell" in line.lower():
             assert "\r" not in line.strip()[:-1]  # no embedded CR mid-line
-            assert "-ExecutionPolicy Bypass" in raw or (
-                "TITAN_PS" in raw and "ExecutionPolicy Bypass" in raw
-            )
+            assert "-ExecutionPolicy Bypass" in raw or ("TITAN_PS" in raw and "ExecutionPolicy Bypass" in raw)
     assert "TITAN_PS" in raw
     assert "System32\\WindowsPowerShell" in raw
 

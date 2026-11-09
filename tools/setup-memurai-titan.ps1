@@ -264,7 +264,7 @@ if ($listeners.Count -gt 0) {
     Write-Host "Port $Port is already in use:" -ForegroundColor Yellow
     Get-PortProcessSummary -Port $Port | ForEach-Object { Write-Host "  $_" }
     if (Test-RedisPing -Cli $cliEarly -Bind $Bind -Port $Port -Password $Password) {
-        Write-Host "Redis already responds PONG with Titan password on $Bind`:$Port — Memurai may already be configured." -ForegroundColor Green
+        Write-Host "Redis already responds PONG with Titan password on $Bind`:$Port - Memurai may already be configured." -ForegroundColor Green
         Write-Host "Updating memurai.conf anyway for consistency; service restart may be optional." -ForegroundColor DarkGray
     } else {
         Write-Host "Another process holds port $Port without the expected Titan password. Stop it or choose a different Redis before Memurai can bind here." -ForegroundColor Red
@@ -291,7 +291,7 @@ if (-not $restarted) {
     Write-Host @"
 Memurai did not start with Titan settings; memurai.conf was reverted to the pre-edit backup.
 
-Use Start-Titan.bat (portable Redis on $Port) — Memurai is optional.
+Use Start-Titan.bat (portable Redis on $Port) - Memurai is optional.
 To retry Memurai later: fix the service in services.msc, then run this script again as Administrator.
 If port $Port is owned by another process, stop it first.
 "@ -ForegroundColor Yellow

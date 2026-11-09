@@ -1,5 +1,6 @@
 # Double-click or:  powershell -ExecutionPolicy Bypass -File Start-Titan.ps1
 # Starts portable Postgres + Chroma (managed), requires Redis on 63790, then opens the Operations Center.
+# ASCII-only source file (no em dash or smart quotes) so Windows PowerShell parses reliably.
 $ErrorActionPreference = "Stop"
 $RepoRoot = $PSScriptRoot
 Set-Location $RepoRoot

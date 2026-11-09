@@ -38,7 +38,10 @@ export function MemoryBrowserDialog() {
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState("");
   const [searchItems, setSearchItems] = useState<MemoryItem[] | null>(null);
-  const { data: status } = useMemoryStatusQuery(undefined, { skip: !open, pollingInterval: open ? 12000 : 0 });
+  const { data: status } = useMemoryStatusQuery(undefined, {
+    skip: !open,
+    pollingInterval: open ? 12000 : 0,
+  });
   const {
     data: browseData,
     isFetching: browsing,
@@ -119,8 +122,8 @@ export function MemoryBrowserDialog() {
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 0.5 }}>
           <Typography variant="body2" color="text.secondary">
-            Persisted learnings from ended sessions live in Chroma ({chromaState}). Prior hits are seeded into new
-            sessions on start so agents can reuse play lessons.
+            Persisted learnings from ended sessions live in Chroma ({chromaState}). Prior hits are seeded into
+            new sessions on start so agents can reuse play lessons.
           </Typography>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <TextField
@@ -164,8 +167,8 @@ export function MemoryBrowserDialog() {
           <Stack spacing={1}>
             {items.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
-                No memories yet. Stop a learn-and-play session to persist blackboard discoveries and lessons, or add
-                one manually below.
+                No memories yet. Stop a learn-and-play session to persist blackboard discoveries and lessons,
+                or add one manually below.
               </Typography>
             ) : (
               items.map((item) => {

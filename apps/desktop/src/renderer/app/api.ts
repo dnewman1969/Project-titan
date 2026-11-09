@@ -364,7 +364,10 @@ export const titanApi = createApi({
       query: () => "/memory/status",
     }),
     browseMemory: build.query<
-      { items: Array<{ id: string; document?: string; metadata?: Record<string, unknown> }>; degraded: boolean },
+      {
+        items: Array<{ id: string; document?: string; metadata?: Record<string, unknown> }>;
+        degraded: boolean;
+      },
       { gameSlug?: string; limit?: number }
     >({
       query: ({ gameSlug, limit }) => {
@@ -376,7 +379,14 @@ export const titanApi = createApi({
       },
     }),
     searchMemory: build.query<
-      { items: Array<{ id: string; document?: string; metadata?: Record<string, unknown>; distance?: number }> },
+      {
+        items: Array<{
+          id: string;
+          document?: string;
+          metadata?: Record<string, unknown>;
+          distance?: number;
+        }>;
+      },
       { query: string; gameSlug?: string; n_results?: number }
     >({
       query: (body) => ({

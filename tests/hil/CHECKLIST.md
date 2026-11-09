@@ -41,5 +41,5 @@ Later milestones (game discovery, telemetry, recording clap test, soak tests) ad
 
 ### Learn-and-play beta (software HIL vs this checklist)
 
-- **Software HIL (CI / no game):** `TITAN_PLAY_BACKEND=hil` and `tests/integration/test_play_hil_loop.py` — see [docs/learn-and-play-beta.md](../docs/learn-and-play-beta.md).
-- **Reference PC (KSP kRPC or ETS2/ATS + ViGEm):** when validating on the gaming machine, record install paths, kRPC port reachability, and whether throttle/brake changed in-game after salient events. Sign off here; do not treat software HIL as substitute for these rows.
+- **Software HIL (CI / no game):** `uv run pytest tests/integration/test_learn_play_smoke.py` — New session → learn → play closed loop with mocked HIL (fixture attach). See [docs/learn-and-play-beta.md](../docs/learn-and-play-beta.md).
+- **Reference PC happy path (after cloud smoke is green):** File → New session → agent play on → fixture/HIL or registered install → watch learn strip + Agent play attach → confirm throttle/brake changes in-game for live attach. Record install paths and kRPC/SCS readiness; do not treat software HIL as a substitute for these rows.

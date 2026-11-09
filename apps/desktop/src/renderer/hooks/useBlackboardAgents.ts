@@ -59,6 +59,27 @@ export function useBlackboardAgents(): void {
   useEffect(() => {
     if (!data?.entries.length) return;
     for (const row of data.entries) {
+      if (
+        row.section === "notes" &&
+        typeof row.value === "object" &&
+        row.value !== null &&
+        Reflect.get(row.value, "prior_memory") === true
+      ) {
+        const priorKey = `prior:${row.key}:${String(row.bb_version)}`;
+        if (seen.current.has(priorKey)) continue;
+        seen.current.add(priorKey);
+        const priorText = valueText(row.value);
+        if (!priorText.trim()) continue;
+        dispatch(
+          learnItemReceived({
+            key: priorKey,
+            kind: "lesson",
+            text: `Prior memory: ${priorText}`,
+          }),
+        );
+        continue;
+      }
+
       const agentSection =
         row.section === "notes" ||
         row.section === "goals" ||
@@ -73,21 +94,6 @@ export function useBlackboardAgents(): void {
       const text = valueText(row.value);
       if (!text.trim()) continue;
 
-      if (
-        row.section === "notes" &&
-        typeof row.value === "object" &&
-        row.value !== null &&
-        Reflect.get(row.value, "prior_memory") === true
-      ) {
-        const text = typeof row.value.text === "string" ? row.value.text : JSON.stringify(row.value);
-        dispatch(
-          learnItemReceived({
-            key: `prior:${row.key}`,
-            kind: "lesson",
-            text: `Prior memory: ${text}`,
-          }),
-        );
-      }
       const learnKind = classify(row.section, row.key, row.value);
       if (learnKind) {
         dispatch(

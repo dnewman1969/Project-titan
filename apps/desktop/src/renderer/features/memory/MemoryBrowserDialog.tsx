@@ -9,11 +9,11 @@ import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import {
+  useBrowseMemoryQuery,
   useDeleteMemoryItemsMutation,
-  useLazyBrowseMemoryQuery,
   useLazySearchMemoryQuery,
   useMemoryStatusQuery,
   useWriteMemoryItemMutation,
@@ -37,43 +37,34 @@ export function MemoryBrowserDialog() {
   const [gameSlug, setGameSlug] = useState("ksp");
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState("");
-  const [items, setItems] = useState<MemoryItem[]>([]);
+  const [searchItems, setSearchItems] = useState<MemoryItem[] | null>(null);
   const { data: status } = useMemoryStatusQuery(undefined, { skip: !open, pollingInterval: open ? 12000 : 0 });
-  const [browse, { isFetching: browsing }] = useLazyBrowseMemoryQuery();
+  const {
+    data: browseData,
+    isFetching: browsing,
+    refetch,
+  } = useBrowseMemoryQuery({ gameSlug, limit: 40 }, { skip: !open, refetchOnMountOrArgChange: true });
   const [search, { isFetching: searching }] = useLazySearchMemoryQuery();
   const [writeItem, { isLoading: writing }] = useWriteMemoryItemMutation();
   const [deleteItems, { isLoading: deleting }] = useDeleteMemoryItemsMutation();
 
-  const chromaState = status?.chroma?.state ?? "unknown";
-
-  const loadBrowse = async () => {
-    const result = await browse({ gameSlug, limit: 40 });
-    if ("data" in result && result.data) {
-      setItems(result.data.items as MemoryItem[]);
-      return;
-    }
-    dispatch(showNotice(`Memory browse failed: ${formatApiError(result.error)}`));
-  };
+  const chromaState = status?.chroma.state ?? "unknown";
+  const items = searchItems ?? (browseData?.items as MemoryItem[] | undefined) ?? [];
 
   const runSearch = async () => {
     const trimmed = query.trim();
     if (!trimmed) {
-      void loadBrowse();
+      setSearchItems(null);
+      void refetch();
       return;
     }
     const result = await search({ query: trimmed, gameSlug, n_results: 20 });
     if ("data" in result && result.data) {
-      setItems(result.data.items as MemoryItem[]);
+      setSearchItems(result.data.items as MemoryItem[]);
       return;
     }
     dispatch(showNotice(`Memory search failed: ${formatApiError(result.error)}`));
   };
-
-  useEffect(() => {
-    if (!open) return;
-    void loadBrowse();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- load when dialog opens
-  }, [open]);
 
   const onClose = () => dispatch(setMemoryBrowserOpen(false));
 
@@ -89,7 +80,8 @@ export function MemoryBrowserDialog() {
     if ("data" in result && result.data?.written) {
       dispatch(showNotice("Memory saved for future sessions."));
       setDraft("");
-      void loadBrowse();
+      setSearchItems(null);
+      void refetch();
       return;
     }
     dispatch(showNotice(`Could not save memory: ${formatApiError(result.error)}`));
@@ -98,7 +90,8 @@ export function MemoryBrowserDialog() {
   const onDelete = async (id: string) => {
     const result = await deleteItems({ ids: [id] });
     if ("data" in result && result.data) {
-      setItems((prev) => prev.filter((row) => row.id !== id));
+      setSearchItems((prev) => (prev ? prev.filter((row) => row.id !== id) : null));
+      void refetch();
       return;
     }
     dispatch(showNotice(`Delete failed: ${formatApiError(result.error)}`));
@@ -107,7 +100,21 @@ export function MemoryBrowserDialog() {
   const busy = browsing || searching || writing || deleting;
 
   return (
-    <Dialog open={open} onClose={onClose} aria-labelledby="memory-browser-title" maxWidth="md" fullWidth>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      aria-labelledby="memory-browser-title"
+      maxWidth="md"
+      fullWidth
+      slotProps={{
+        transition: {
+          onEntered: () => {
+            setSearchItems(null);
+            void refetch();
+          },
+        },
+      }}
+    >
       <DialogTitle id="memory-browser-title">Memory Browser</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 0.5 }}>
@@ -120,23 +127,37 @@ export function MemoryBrowserDialog() {
               size="small"
               label="Game slug"
               value={gameSlug}
-              onChange={(e) => setGameSlug(e.target.value)}
+              onChange={(e) => {
+                setGameSlug(e.target.value);
+                setSearchItems(null);
+              }}
               sx={{ width: { sm: 140 } }}
             />
             <TextField
               size="small"
               label="Search memories"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+              }}
               fullWidth
               onKeyDown={(e) => {
-                if (e.key === "Enter") void runSearch();
+                if (e.key === "Enter") {
+                  void runSearch();
+                }
               }}
             />
             <Button variant="outlined" disabled={busy} onClick={() => void runSearch()}>
               Search
             </Button>
-            <Button variant="text" disabled={busy} onClick={() => void loadBrowse()}>
+            <Button
+              variant="text"
+              disabled={busy}
+              onClick={() => {
+                setSearchItems(null);
+                void refetch();
+              }}
+            >
               Refresh
             </Button>
           </Stack>
@@ -177,7 +198,14 @@ export function MemoryBrowserDialog() {
                         {item.id}
                       </Typography>
                     </Stack>
-                    <IconButton aria-label="Delete memory" size="small" disabled={busy} onClick={() => void onDelete(item.id)}>
+                    <IconButton
+                      aria-label="Delete memory"
+                      size="small"
+                      disabled={busy}
+                      onClick={() => {
+                        void onDelete(item.id);
+                      }}
+                    >
                       <DeleteOutlineIcon fontSize="small" />
                     </IconButton>
                   </Stack>
@@ -191,7 +219,9 @@ export function MemoryBrowserDialog() {
             multiline
             minRows={2}
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+            }}
             fullWidth
           />
         </Stack>

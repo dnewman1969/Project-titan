@@ -403,9 +403,7 @@ def test_create_autonomous_without_play_rejected(api_client: TestClient, game_sl
     assert created.status_code == 501
 
 
-def test_session_play_toggle(
-    api_client: TestClient, game_slug: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_session_play_toggle(api_client: TestClient, game_slug: str, monkeypatch: pytest.MonkeyPatch) -> None:
     import titan_api.routers.sessions as sessions_routes
 
     flags: dict[str, object] = {"actions": 0, "orch_restart": 0, "stop_actions": 0}

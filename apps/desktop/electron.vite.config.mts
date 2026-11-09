@@ -1,6 +1,11 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "electron-vite";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
+import { loadEnv } from "vite";
+
+const rendererRoot = path.dirname(fileURLToPath(import.meta.url));
 
 import { buildCsp, DEFAULT_API_PORT } from "./src/shared/csp";
 
@@ -20,14 +25,22 @@ function titanCsp(): Plugin {
   };
 }
 
-export default defineConfig({
-  main: {
-    build: { externalizeDeps: true },
-  },
-  preload: {
-    build: { externalizeDeps: true },
-  },
-  renderer: {
-    plugins: [react(), titanCsp()],
-  },
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, rendererRoot, "");
+  const autoDemo = env.VITE_TITAN_AUTO_DEMO?.trim() || "false";
+
+  return {
+    main: {
+      build: { externalizeDeps: true },
+    },
+    preload: {
+      build: { externalizeDeps: true },
+    },
+    renderer: {
+      plugins: [react(), titanCsp()],
+      define: {
+        "import.meta.env.VITE_TITAN_AUTO_DEMO": JSON.stringify(autoDemo),
+      },
+    },
+  };
 });

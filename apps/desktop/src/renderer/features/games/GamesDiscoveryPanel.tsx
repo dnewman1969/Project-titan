@@ -27,7 +27,7 @@ const MANUAL_SLUGS = [
 /** Game discovery: scan installs, then pick a profile when creating a session. */
 export function GamesDiscoveryPanel() {
   const dispatch = useAppDispatch();
-  const { data, isError, refetch } = useListGamesQuery(undefined);
+  const { data, error: listError, isError, refetch } = useListGamesQuery(undefined);
   const [scan, { isLoading: scanning }] = useScanGamesMutation();
   const [createProfile, { isLoading: registering }] = useCreateGameProfileMutation();
   const [lastDetected, setLastDetected] = useState<
@@ -36,6 +36,7 @@ export function GamesDiscoveryPanel() {
   const [manualSlug, setManualSlug] = useState<string>("ksp");
   const [manualExe, setManualExe] = useState("");
   const [extraPath, setExtraPath] = useState("");
+  const [panelError, setPanelError] = useState<string | null>(null);
 
   const profileCount = (data?.items ?? []).reduce((n, g) => n + (g.profiles?.length ?? 0), 0);
 
@@ -44,6 +45,7 @@ export function GamesDiscoveryPanel() {
   }, [refetch]);
 
   const onScan = async () => {
+    setPanelError(null);
     const extra = extraPath.trim() ? [extraPath.trim()] : [];
     const result = await scan({ extra_paths: extra });
     if ("data" in result && result.data) {
@@ -60,6 +62,7 @@ export function GamesDiscoveryPanel() {
       return;
     }
     const msg = formatApiError(result.error);
+    setPanelError(`Game scan failed: ${msg}`);
     dispatch(showNotice(`Game scan failed: ${msg}`));
     dispatch(logEvent({ type: "games.scan_failed", category: "system", severity: "critical", text: msg }));
   };
@@ -72,6 +75,7 @@ export function GamesDiscoveryPanel() {
   };
 
   const onRegisterPath = async () => {
+    setPanelError(null);
     const exe = manualExe.trim();
     if (!exe) {
       dispatch(showNotice("Paste the full path to the game .exe first."));
@@ -85,6 +89,7 @@ export function GamesDiscoveryPanel() {
       return;
     }
     const msg = formatApiError(result.error);
+    setPanelError(`Register install failed: ${msg}`);
     dispatch(showNotice(`Register install failed: ${msg}`));
     dispatch(
       logEvent({ type: "games.register_failed", category: "system", severity: "critical", text: msg }),
@@ -100,8 +105,16 @@ export function GamesDiscoveryPanel() {
           Supported slugs: KSP, ETS2, ATS. Then use <strong>File - New session</strong>, pick an installation,
           enable <strong>agent play</strong>, and start.
         </Typography>
+        {panelError ? (
+          <Alert severity="error" onClose={() => setPanelError(null)}>
+            {panelError}
+          </Alert>
+        ) : null}
         {isError ? (
-          <Alert severity="warning">API unreachable; discovery needs a live backend.</Alert>
+          <Alert severity="error">
+            Could not reach the games API: {formatApiError(listError)}. Start the supervisor API, then retry Scan
+            or Register.
+          </Alert>
         ) : profileCount === 0 ? (
           <Alert severity="warning" variant="outlined">
             Scan did not find installs? Use <strong>Register install path</strong> below with the full path to

@@ -1,5 +1,7 @@
+import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
 import Checkbox from "@mui/material/Checkbox";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
@@ -13,6 +15,7 @@ import Typography from "@mui/material/Typography";
 import { useEffect, useState } from "react";
 
 import {
+  useCreateGameProfileMutation,
   useCreateSessionMutation,
   useGetPlayReadinessQuery,
   useListGamesQuery,
@@ -20,6 +23,7 @@ import {
 } from "../../app/api";
 import { formatApiError } from "../../app/formatApiError";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
+import { getTitan } from "../../app/runtime";
 import { logEvent } from "../events/eventsSlice";
 import { showNotice, showPanel } from "../operations/layoutSlice";
 import { closeSessionDialog, setActiveSession, type PlayBackendKind } from "./sessionsSlice";
@@ -29,6 +33,12 @@ const FALLBACK_GAMES = [
   { slug: "ets2", label: "Euro Truck Simulator 2" },
   { slug: "ats", label: "American Truck Simulator" },
 ] as const;
+
+const GAME_EXE_HINT: Record<string, string> = {
+  ksp: "KSP_x64.exe",
+  ets2: "eurotrucks2.exe",
+  ats: "amtrucks.exe",
+};
 
 function rtkMutationStatus(error: unknown): number | null {
   if (typeof error !== "object" || error === null || !("status" in error)) return null;
@@ -51,16 +61,24 @@ export function NewSessionDialog() {
   const [launchGame, setLaunchGame] = useState(false);
   const [agentPlay, setAgentPlay] = useState(true);
   const [recordOnStart, setRecordOnStart] = useState(true);
-  const { data: gamesList, refetch: refetchGames } = useListGamesQuery(undefined, {
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const {
+    data: gamesList,
+    error: gamesListError,
+    isError: gamesListFailed,
+    refetch: refetchGames,
+  } = useListGamesQuery(undefined, {
     refetchOnMountOrArgChange: true,
   });
   useEffect(() => {
     if (open) {
+      setDialogError(null);
       void refetchGames();
     }
   }, [open, refetchGames]);
   const [createSession, { isLoading: creating }] = useCreateSessionMutation();
   const [startSession, { isLoading: starting }] = useStartSessionMutation();
+  const [createProfile, { isLoading: registering }] = useCreateGameProfileMutation();
 
   const games: Array<{ slug: string; label: string; profiles?: Array<{ id: string; label: string }> }> =
     gamesList?.items.map((g) => ({
@@ -75,13 +93,18 @@ export function NewSessionDialog() {
   const profiles = game?.profiles ?? [];
   const effectiveProfileId = profiles.some((p) => p.id === profileId) ? profileId : (profiles[0]?.id ?? "");
   const sessionSource: "live" | "fixture" = effectiveProfileId ? "live" : "fixture";
-  const { data: readiness } = useGetPlayReadinessQuery(
+  const {
+    data: readiness,
+    error: readinessError,
+    isError: readinessFailed,
+  } = useGetPlayReadinessQuery(
     { gameSlug: gameSlug, source: sessionSource },
     { skip: !open || !agentPlay, refetchOnMountOrArgChange: true },
   );
   const playAttach = readiness?.play_attach;
+  const exeHint = GAME_EXE_HINT[gameSlug] ?? "game .exe";
 
-  const isLoading = creating || starting;
+  const isLoading = creating || starting || registering;
   const onClose = () => {
     dispatch(closeSessionDialog());
   };
@@ -99,6 +122,31 @@ export function NewSessionDialog() {
       showNotice(
         "Game discovery: Scan, or Browse… for KSP_x64.exe, then Register install path. Reopen File → New session.",
       ),
+    );
+  };
+
+  const onBrowseAndRegister = async () => {
+    setDialogError(null);
+    const picked = await getTitan().pickExecutable();
+    if (!picked?.trim()) {
+      return;
+    }
+    const result = await createProfile({ game_slug: gameSlug, executable_path: picked.trim() });
+    if ("data" in result && result.data) {
+      setProfileId(result.data.id);
+      dispatch(showNotice(`Registered ${game?.label ?? gameSlug}: ${result.data.install_path}`));
+      await refetchGames();
+      return;
+    }
+    const msg = formatApiError(result.error);
+    setDialogError(`Register install failed: ${msg}`);
+    dispatch(
+      logEvent({
+        type: "games.register_failed",
+        category: "system",
+        severity: "critical",
+        text: msg,
+      }),
     );
   };
 
@@ -176,6 +224,7 @@ export function NewSessionDialog() {
         return;
       }
       const startMsg = formatApiError(started.error);
+      setDialogError(`Session start failed: ${startMsg}`);
       dispatch(showNotice(`Session start failed: ${startMsg}`));
       dispatch(
         logEvent({
@@ -198,6 +247,7 @@ export function NewSessionDialog() {
       return;
     }
     const createMsg = formatApiError(result.error);
+    setDialogError(`Could not create session: ${createMsg}`);
     dispatch(showNotice(`Could not create session: ${createMsg}`));
     dispatch(
       logEvent({
@@ -213,14 +263,36 @@ export function NewSessionDialog() {
     <Dialog open={open} onClose={onClose} aria-labelledby="new-session-title" maxWidth="sm" fullWidth>
       <DialogTitle id="new-session-title">New session</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+        {dialogError ? (
+          <Alert severity="error" onClose={() => setDialogError(null)}>
+            {dialogError}
+          </Alert>
+        ) : null}
+        {gamesListFailed ? (
+          <Alert severity="error">
+            Could not load installs from the API: {formatApiError(gamesListError)}. You can still start a
+            fixture session, or fix the API and click Retry below.
+          </Alert>
+        ) : null}
+        {readinessFailed && agentPlay ? (
+          <Alert severity="warning">
+            Play readiness check failed: {formatApiError(readinessError)}
+          </Alert>
+        ) : null}
         <Typography variant="body2" color="text.secondary">
           Agents watch telemetry, write lessons, and (when play is on) propose controls that{" "}
           <code>titan-actions</code> executes via kRPC, SCS, or HIL.
         </Typography>
-        <Alert severity={sessionSource === "live" ? "success" : "info"} sx={{ width: "100%" }}>
-          {sessionSource === "live"
-            ? "Live install selected — telemetry targets this profile; play attaches kRPC (KSP) or SCS (ETS2/ATS)."
-            : "No install attached — fixture/demo telemetry only. Agent play uses software HIL (no game input)."}
+        <Alert severity={sessionSource === "live" ? "success" : "warning"} sx={{ width: "100%" }}>
+          {sessionSource === "live" ? (
+            "Live install selected — telemetry targets this profile; play attaches kRPC (KSP) or SCS (ETS2/ATS)."
+          ) : (
+            <>
+              <strong>No game install on this PC yet.</strong> Sessions use fixture telemetry; agent play runs in
+              software HIL only (no kRPC/SCS). Browse to your <code>{exeHint}</code> below to register an install
+              for live telemetry and play.
+            </>
+          )}
         </Alert>
         {agentPlay && playAttach ? (
           <Alert
@@ -280,19 +352,36 @@ export function NewSessionDialog() {
             ))}
           </TextField>
         ) : (
-          <Alert
-            severity="warning"
-            variant="outlined"
-            sx={{ width: "100%" }}
-            action={
-              <Button color="inherit" size="small" onClick={onOpenGameDiscovery}>
+          <Alert severity="warning" variant="outlined" sx={{ width: "100%" }}>
+            <Typography variant="subtitle2" gutterBottom>
+              No install for {game?.label ?? gameSlug}
+            </Typography>
+            <Typography variant="body2" component="div">
+              1. Click <strong>Browse &amp; register</strong> and pick <code>{exeHint}</code>.
+              <br />
+              2. Or open <strong>Game discovery</strong> to Scan + register multiple games.
+              <br />
+              Launch game and live kRPC/SCS play stay disabled until a profile exists.
+            </Typography>
+            <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} flexWrap="wrap" useFlexGap>
+              <Button
+                variant="contained"
+                size="small"
+                disabled={registering || gamesListFailed}
+                startIcon={<FolderOpenIcon />}
+                onClick={() => void onBrowseAndRegister()}
+              >
+                Browse &amp; register
+              </Button>
+              <Button variant="outlined" size="small" onClick={onOpenGameDiscovery}>
                 Open Game discovery
               </Button>
-            }
-          >
-            No install for <strong>{game?.label ?? gameSlug}</strong>. View → Games → Browse… for{" "}
-            <code>KSP_x64.exe</code> (or Scan), Register install path, then reopen New session. Without a
-            profile, Launch and live play stay off (fixture/demo telemetry only).
+              {gamesListFailed ? (
+                <Button variant="text" size="small" onClick={() => void refetchGames()}>
+                  Retry API
+                </Button>
+              ) : null}
+            </Stack>
           </Alert>
         )}
         <FormControlLabel

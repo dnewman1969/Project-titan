@@ -1909,7 +1909,6 @@ version = "0.1.0"
 source = { editable = "services/api" }
 dependencies = [
     { name = "fastapi" },
-    { name = "titan-capture" },
     { name = "titan-core" },
     { name = "titan-db" },
     { name = "titan-game-ats" },
@@ -1924,7 +1923,6 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "titan-capture", editable = "services/capture" },
     { name = "titan-core", editable = "packages/py/titan-core" },
     { name = "titan-db", editable = "packages/py/titan-db" },
     { name = "titan-game-ats", editable = "games/ats" },
@@ -1942,14 +1940,10 @@ version = "0.1.0"
 source = { editable = "services/capture" }
 dependencies = [
     { name = "titan-core" },
-    { name = "websockets" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "titan-core", editable = "packages/py/titan-core" },
-    { name = "websockets", specifier = ">=14.0,<16" },
-]
+requires-dist = [{ name = "titan-core", editable = "packages/py/titan-core" }]
 
 [[package]]
 name = "titan-core"
@@ -1964,6 +1958,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "redis" },
     { name = "structlog" },
+    { name = "websockets" },
 ]
 
 [package.metadata]
@@ -1976,6 +1971,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "redis", specifier = ">=5.2" },
     { name = "structlog", specifier = ">=24.4" },
+    { name = "websockets", specifier = ">=14.0,<16" },
 ]
 
 [[package]]

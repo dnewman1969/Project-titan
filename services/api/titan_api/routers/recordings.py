@@ -1,4 +1,4 @@
-"""Session recording control (M8.T1–T3 MVP)."""
+"""Session recording control (M8.T1-T3 MVP)."""
 
 from __future__ import annotations
 
@@ -13,11 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from titan_api.auth import Authenticated
 from titan_api.deps import db_session
-from titan_capture.manifest import build_manifest, default_preset, write_manifest
-from titan_capture.obs import ObsClient
 from titan_core.clock import utc_now
 from titan_core.errors import ErrorCode, TitanError
 from titan_core.ids import uuid7
+from titan_core.obs_ws import ObsClient
+from titan_core.recording_manifest import build_manifest, default_preset, write_manifest
 from titan_db.models.recording import Recording
 from titan_db.models.sessions import Session
 
@@ -127,9 +127,7 @@ async def start_recording(session_id: UUID, db: AsyncSession = SessionDep) -> di
 async def stop_recording(session_id: UUID, db: AsyncSession = SessionDep) -> dict[str, Any]:
     await _session_or_404(db, session_id)
     row = await db.scalar(
-        select(Recording)
-        .where(Recording.session_id == session_id)
-        .where(Recording.state == "recording")
+        select(Recording).where(Recording.session_id == session_id).where(Recording.state == "recording")
     )
     if row is None:
         raise TitanError(ErrorCode.NOT_FOUND, "no active recording")

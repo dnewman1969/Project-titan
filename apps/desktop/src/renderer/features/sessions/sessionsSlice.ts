@@ -42,5 +42,10 @@ export const sessionsSlice = createSlice({
   },
 });
 
-export const { openSessionDialog, closeSessionDialog, setActiveSession, setRecordingActive, clearActiveSession } =
-  sessionsSlice.actions;
+export const {
+  openSessionDialog,
+  closeSessionDialog,
+  setActiveSession,
+  setRecordingActive,
+  clearActiveSession,
+} = sessionsSlice.actions;

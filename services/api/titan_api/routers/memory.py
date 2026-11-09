@@ -8,8 +8,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
 
 from titan_api.auth import Authenticated
-from titan_core.health import check_chroma
 from titan_core.config import load_config
+from titan_core.health import check_chroma
 from titan_memory.chroma_store import ChromaVectorStore
 from titan_models.embedder import FakeEmbedder
 

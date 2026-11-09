@@ -194,19 +194,19 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/v1/games" -Headers $headers
 
 ### E3 — Sessions (M6 + M7)
 
-| #   | Action                             | Pass if                                            |
-| --- | ---------------------------------- | -------------------------------------------------- |
-| 8   | **File → New Session** (or Ctrl+N) | Dialog opens                                       |
-| 9   | Create session with KSP            | “Live session” notice; top bar chip shows title    |
-| 10  | Top bar after create               | Session chip filled (not “No session”)               |
+| #   | Action                             | Pass if                                         |
+| --- | ---------------------------------- | ----------------------------------------------- |
+| 8   | **File → New Session** (or Ctrl+N) | Dialog opens                                    |
+| 9   | Create session with KSP            | “Live session” notice; top bar chip shows title |
+| 10  | Top bar after create               | Session chip filled (not “No session”)          |
 
 ### E3b — Recording (M8)
 
-| #   | Action                    | Pass if                                                                 |
-| --- | ------------------------- | ----------------------------------------------------------------------- |
-| 11  | Click **REC** (red dot)  | “Recording started” notice; label shows **REC ON**                      |
-| 12  | Click **REC** again       | Stops; notice says stopped                                              |
-| 13  | Optional: OBS on 4455     | No error in API log; manifest still written if OBS offline (degraded OK) |
+| #   | Action                  | Pass if                                                                  |
+| --- | ----------------------- | ------------------------------------------------------------------------ |
+| 11  | Click **REC** (red dot) | “Recording started” notice; label shows **REC ON**                       |
+| 12  | Click **REC** again     | Stops; notice says stopped                                               |
+| 13  | Optional: OBS on 4455   | No error in API log; manifest still written if OBS offline (degraded OK) |
 
 Manifest path is returned by the API under the session `data_dir/recording/manifest.json`.
 
@@ -218,9 +218,9 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/v1/memory/status" -Headers $h
 Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/v1/memory/search" -Method POST -Headers $h -ContentType "application/json" -Body '{"query":"ksp launch"}'
 ```
 
-| #   | Pass if                                      |
-| --- | -------------------------------------------- |
-| 14  | `/memory/status` returns chroma state JSON   |
+| #   | Pass if                                                                     |
+| --- | --------------------------------------------------------------------------- |
+| 14  | `/memory/status` returns chroma state JSON                                  |
 | 15  | `/memory/search` returns `items` array (may be empty if Chroma has no data) |
 
 ### E4 — Agents voice demo

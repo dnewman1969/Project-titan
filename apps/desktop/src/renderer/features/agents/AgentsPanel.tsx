@@ -8,7 +8,7 @@ import IconButton from "@mui/material/IconButton";
 import InputBase from "@mui/material/InputBase";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { AgentAvatar, roleColor } from "@titan/ui-kit";
+import { roleColor } from "@titan/ui-kit";
 import { useCallback, useState, type FormEvent } from "react";
 
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
@@ -17,6 +17,7 @@ import { speakAgentLine } from "../../services/voice/speak";
 import { LearnFeedbackStrip } from "../learn/LearnFeedbackStrip";
 import { Panel } from "../operations/Panel";
 import { RecTimelineStrip } from "../recording/RecTimelineStrip";
+import { AgentPortrait } from "./AgentPortrait";
 import { agentSaid, setSpeaking } from "./agentsChatSlice";
 import {
   DEMO_ROSTER,
@@ -43,6 +44,7 @@ export function AgentsPanel() {
           display_name: agent.display_name,
           role: agent.role,
           text,
+          portrait_url: portraitUrl(agent.persona_slug),
         }),
       );
       dispatch(setSpeaking(agent.persona_slug));
@@ -101,37 +103,19 @@ export function AgentsPanel() {
         >
           {PREVIEW_ROSTER.map((agent) => {
             const speaking = speakingSlug === agent.persona_slug;
-            const src = portraitUrl(agent.persona_slug);
             return (
               <Chip
                 role="listitem"
                 key={agent.persona_slug}
                 avatar={
-                  src ? (
-                    <Box
-                      component="img"
-                      src={src}
-                      alt=""
-                      onError={(ev) => {
-                        (ev.target as HTMLImageElement).style.display = "none";
-                      }}
-                      sx={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: "50%",
-                        objectFit: "cover",
-                        boxShadow: speaking ? `0 0 0 2px ${roleColor(agent.role)}` : "none",
-                      }}
-                    />
-                  ) : (
-                    <AgentAvatar
-                      name={agent.display_name}
-                      role={agent.role}
-                      size={22}
-                      speaking={speaking}
-                      muted={!speaking && Boolean(speakingSlug)}
-                    />
-                  )
+                  <AgentPortrait
+                    personaSlug={agent.persona_slug}
+                    displayName={agent.display_name}
+                    role={agent.role}
+                    size={22}
+                    speaking={speaking}
+                    muted={!speaking && Boolean(speakingSlug)}
+                  />
                 }
                 label={agent.display_name}
                 variant="outlined"
@@ -182,17 +166,19 @@ export function AgentsPanel() {
         >
           {lines.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", mt: 4 }}>
-              Live play outcomes speak through Owlbox when VITE_OWL_TTS_URL is set. Tap an agent or Brag /
-              Roast me for a demo; set VITE_COMFYUI_VIEW_URL for ComfyUI portraits.
+              Live sessions load ComfyUI portraits when VITE_COMFYUI_VIEW_URL is set (Owlbox for voice). Tap
+              an agent or Brag / Roast me for a demo.
             </Typography>
           ) : (
             lines.map((line) => (
               <Box key={line.id} sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
-                <AgentAvatar
-                  name={line.display_name}
+                <AgentPortrait
+                  personaSlug={line.persona_slug}
+                  displayName={line.display_name}
                   role={line.role}
                   size={28}
                   speaking={speakingSlug === line.persona_slug}
+                  overrideUrl={line.portrait_url}
                 />
                 <Box>
                   <Typography variant="caption" color="text.secondary">

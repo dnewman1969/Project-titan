@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { agentSaid } from "../features/agents/agentsChatSlice";
 import { DEMO_ROSTER } from "../features/agents/arrogantLines";
 import { clearLearnItems, learnItemReceived, type LearnKind } from "../features/learn/learnSlice";
+import { portraitUrl } from "../services/avatar/portrait";
 
 function valueText(value: unknown): string {
   if (typeof value === "object" && value !== null && "text" in value) {
@@ -107,6 +108,7 @@ export function useBlackboardAgents(): void {
           display_name: roster.display_name,
           role: roster.role,
           text: `${prefix}${text}`,
+          portrait_url: portraitUrl(roster.persona_slug),
         }),
       );
     }

@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_KILL_HOTKEY, resolveMainConfig } from "../../src/main/config";
 import { postKill, registerKillSwitch } from "../../src/main/killSwitch";
+import { allowCapturePermission } from "../../src/main/permissions";
 import { buildMenuTemplate } from "../../src/main/menu";
 import { APP_ORIGIN, isAppUrl, resolveAppFile } from "../../src/main/navigation";
 import {
@@ -449,6 +450,14 @@ describe("app:// file resolution", () => {
     expect(resolveAppFile(root, "app://other/index.html")).toBeNull();
     expect(resolveAppFile(root, "https://titan/index.html")).toBeNull();
     expect(resolveAppFile(root, "app://titan/%E0%A4%A")).toBeNull();
+  });
+});
+
+describe("capture permissions", () => {
+  it("allows the webcam and microphone and denies everything else", () => {
+    expect(allowCapturePermission("media")).toBe(true);
+    expect(allowCapturePermission("display-capture")).toBe(false);
+    expect(allowCapturePermission("geolocation")).toBe(false);
   });
 });
 

@@ -15,6 +15,8 @@ export interface MeterProps {
   warnAt?: number;
   dangerAt?: number;
   format?: (value: number) => string;
+  /** Shown in place of a number when `value` is null. */
+  emptyLabel?: string;
 }
 
 export function meterFraction(value: number, min: number, max: number): number {
@@ -31,6 +33,7 @@ export function Meter({
   warnAt = 0.75,
   dangerAt = 0.9,
   format = (v) => v.toFixed(0),
+  emptyLabel = "n/a",
 }: MeterProps) {
   const fraction = value === null ? 0 : meterFraction(value, min, max);
   const color =
@@ -41,7 +44,7 @@ export function Meter({
         : fraction >= warnAt
           ? STATUS_COLORS.degraded
           : STATUS_COLORS.ok;
-  const text = value === null ? "n/a" : `${format(value)}${unit}`;
+  const text = value === null ? emptyLabel : `${format(value)}${unit}`;
   return (
     <Box sx={{ minWidth: 0 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 1 }}>

@@ -89,5 +89,5 @@ async def test_obs_probe_http_with_respx() -> None:
 
 @pytest.mark.asyncio
 async def test_obs_provision_profile_requires_connection() -> None:
-    with pytest.raises(RuntimeError, match="not connected"):
+    with pytest.raises(RuntimeError, match="OBS not running"):
         await ObsClient().provision_titan_profile()

@@ -90,7 +90,7 @@ export function useApiStatus(): ApiStatus {
       obsDetail = live.detail ?? `WS handshake failed (${hostPort})`;
     } else if (live.state === "down") {
       obs = "down";
-      obsDetail = live.detail ?? `obs-websocket ${hostPort} unreachable`;
+      obsDetail = live.detail && live.detail.length > 0 ? live.detail : `OBS not running (${hostPort})`;
     } else if (live.state === "up") {
       obs = "degraded";
       obsDetail = `port up, handshake pending (${hostPort})`;

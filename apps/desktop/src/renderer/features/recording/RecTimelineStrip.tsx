@@ -6,7 +6,7 @@ import Typography from "@mui/material/Typography";
 import { useGetRecordingTimelineQuery } from "../../app/api";
 import { useAppSelector } from "../../app/hooks";
 
-function eventLabel(kind: unknown): string {
+export function timelineEventLabel(kind: unknown): string {
   if (typeof kind !== "string" || !kind) return "event";
   if (kind === "recording.start") return "REC start";
   if (kind === "recording.stop") return "REC stop";
@@ -14,11 +14,13 @@ function eventLabel(kind: unknown): string {
   if (kind === "lesson.proposed") return "Lesson";
   if (kind === "lesson.feedback") return "Outcome";
   if (kind === "agent.commentary") return "Banter";
-  if (kind === "video.stub") return "Video stub";
+  if (kind === "video.stub") return "OBS not running";
   return kind;
 }
 
-function eventText(ev: Record<string, unknown>): string {
+export function timelineEventText(ev: Record<string, unknown>): string {
+  const kind = typeof ev.kind === "string" ? ev.kind : "event";
+  if (kind === "video.stub") return "OBS not running";
   const text = typeof ev.text === "string" ? ev.text.trim() : "";
   const display = typeof ev.display_name === "string" ? ev.display_name : "";
   if (text && display) return `${display}: ${text}`;
@@ -28,7 +30,8 @@ function eventText(ev: Record<string, unknown>): string {
     const ok = ev.ok;
     return typeof ok === "boolean" ? `${actionId} (${ok ? "ok" : "fail"})` : actionId;
   }
-  const kind = typeof ev.kind === "string" ? ev.kind : "event";
+  const message = typeof ev.message === "string" ? ev.message.trim() : "";
+  if (message) return message;
   return kind;
 }
 
@@ -86,9 +89,14 @@ export function RecTimelineStrip() {
             const key = `${t}:${kindKey}:${idx}`;
             return (
               <Stack key={key} direction="row" spacing={1} alignItems="flex-start">
-                <Chip size="small" label={eventLabel(kind)} variant="outlined" sx={{ minWidth: 72 }} />
+                <Chip
+                  size="small"
+                  label={timelineEventLabel(kind)}
+                  variant="outlined"
+                  sx={{ minWidth: 72 }}
+                />
                 <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }}>
-                  {eventText(ev)}
+                  {timelineEventText(ev)}
                 </Typography>
               </Stack>
             );

@@ -180,9 +180,9 @@ async def start_session(
                 data_dir=row.data_dir,
             )
         if play_enabled:
-            fixture_play = bool(row.settings.get("demo_telemetry")) or row.settings.get(
-                "session_source"
-            ) == "fixture"
+            fixture_play = (
+                bool(row.settings.get("demo_telemetry")) or row.settings.get("session_source") == "fixture"
+            )
             controller.start_actions(
                 session_id,
                 game_slug=game_slug,

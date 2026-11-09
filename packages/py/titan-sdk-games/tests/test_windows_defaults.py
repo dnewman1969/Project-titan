@@ -139,6 +139,44 @@ def test_steam_registry_candidates_dedupes(monkeypatch) -> None:
     assert _steam_registry_candidates() == [r"C:\Games\Steam"]
 
 
+def test_infer_steam_library_root_from_common_layout(tmp_path: Path) -> None:
+    from titan_sdk_games.discovery.windows_defaults import _steam_library_root_from_layout
+
+    common = tmp_path / "SteamLibrary" / "steamapps" / "common"
+    common.mkdir(parents=True)
+    assert _steam_library_root_from_layout(common) == tmp_path / "SteamLibrary"
+    assert _steam_library_root_from_layout(tmp_path / "SteamLibrary") == tmp_path / "SteamLibrary"
+
+
+def test_ksp_secondary_library_forward_slash_vdf_path(tmp_path: Path) -> None:
+    from titan_game_ksp.adapter import KspAdapter
+
+    primary = tmp_path / "Steam"
+    secondary = tmp_path / "SteamLibrary"
+    primary_steamapps = primary / "steamapps"
+    primary_steamapps.mkdir(parents=True)
+    secondary_steamapps = secondary / "steamapps"
+    secondary_steamapps.mkdir(parents=True)
+    forward = str(secondary).replace("\\", "/")
+    (primary_steamapps / "libraryfolders.vdf").write_text(
+        f'"libraryfolders"\n{{\n\t"1"\n\t{{\n\t\t"path"\t\t"{forward}"\n\t}}\n}}\n',
+        encoding="utf-8",
+    )
+    ksp = secondary / "common" / "Kerbal Space Program"
+    ksp.mkdir(parents=True)
+    (ksp / "KSP_x64.exe").write_bytes(b"MZ")
+    manifest = (
+        '"AppState"\n{\n\t"appid"\t\t"220200"\n\t"buildid"\t\t"99"\n\t"installdir"\t\t"'
+        'Kerbal Space Program"\n}\n'
+    )
+    (secondary_steamapps / "appmanifest_220200.acf").write_text(manifest, encoding="utf-8")
+    ctx = enrich_discovery_context(platform="windows", env={"STEAM_PATH": str(primary)})
+    assert any(str(secondary) == str(p) for p in ctx.steam_libraries)
+    hits = KspAdapter.detect(ctx, stores=["steam"])
+    assert len(hits) == 1
+    assert hits[0].executable_path.endswith("KSP_x64.exe")
+
+
 def test_steam_libraryfolders_ignores_missing_vdf(tmp_path: Path) -> None:
     steam = tmp_path / "Steam"
     steam.mkdir()

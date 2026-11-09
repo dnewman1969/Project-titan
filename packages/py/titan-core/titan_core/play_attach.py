@@ -146,7 +146,7 @@ def _scs_telemetry_shm_open() -> bool:
     if os.name != "nt":
         return False
     try:
-        mapping = mmap.mmap(
+        mapping = mmap.mmap(  # type: ignore[call-arg]
             -1,
             SCS_TELEMETRY_MMAP_BYTES,
             tagname=SCS_TELEMETRY_TAG,

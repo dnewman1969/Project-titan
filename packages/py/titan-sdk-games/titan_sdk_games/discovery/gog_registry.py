@@ -23,7 +23,7 @@ class GogRegistryInstall:
     build_id: str | None
 
 
-def _query_gog_value(key, name: str) -> str | None:
+def _query_gog_value(key: object, name: str) -> str | None:
     try:
         import winreg
 

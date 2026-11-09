@@ -51,11 +51,20 @@ class SessionController:
         self._children[session_id] = child
         return child
 
-    def start_actions(self, session_id: UUID) -> ActionsProcess:
+    def start_actions(self, session_id: UUID, *, game_slug: str = "ksp") -> ActionsProcess:
         if session_id in self._actions:
             return self._actions[session_id]
-        cmd = [sys.executable, "-m", "titan_actions", "--session-id", str(session_id)]
-        proc = self.spawn(cmd)
+        cmd = [
+            sys.executable,
+            "-m",
+            "titan_actions",
+            "--session-id",
+            str(session_id),
+            "--game-slug",
+            game_slug,
+        ]
+        env = {**os.environ, "TITAN_GAME_SLUG": game_slug}
+        proc = self.spawn(cmd, env=env)
         child = ActionsProcess(session_id=session_id, popen=proc)
         self._actions[session_id] = child
         return child

@@ -42,7 +42,7 @@ def test_unrelated_event_returns_none() -> None:
 def test_staging_proposal() -> None:
     proposal = play_proposal_for_event(_event("ksp.staging"))
     assert proposal is not None
-    assert proposal["action_id"] == "ksp.throttle"
+    assert proposal["action_id"] == "ksp.stage"
 
 
 def test_max_q_throttle_cut() -> None:

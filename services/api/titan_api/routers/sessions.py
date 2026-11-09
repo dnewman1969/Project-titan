@@ -162,7 +162,7 @@ async def start_session(
     if row.settings.get("agents_enabled", True):
         controller.start_orchestrator(session_id, game_slug=game_slug, play_enabled=play_enabled)
     if play_enabled:
-        controller.start_actions(session_id)
+        controller.start_actions(session_id, game_slug=game_slug)
     row.state = "live"
     await db.flush()
     profile: GameProfile | None = None

@@ -126,6 +126,14 @@ ignore_missing_imports = true
 module = ["websockets", "websockets.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["vgamepad", "vgamepad.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["titan_actions.drivers.scs_driver", "titan_actions.win_input"]
+warn_unreachable = false
+
 [tool.pydantic-mypy]
 init_forbid_extra = true
 init_typed = true

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import sys
 from uuid import UUID
 
 from titan_actions.executor import PlayExecutor
+from titan_actions.play_env import PlaySettings
 from titan_core.bus import SessionBus
 from titan_core.config import load_config
 from titan_core.logging import configure_logging, get_logger
@@ -23,15 +25,19 @@ ACTIONS_CONSUMER = "actions-1"
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="titan-actions")
     parser.add_argument("--session-id", type=UUID, required=True)
+    parser.add_argument("--game-slug", default=None, help="ksp | ets2 | ats (also TITAN_GAME_SLUG)")
     return parser.parse_args(argv)
 
 
-async def _run(session_id: UUID) -> int:
+async def _run(session_id: UUID, game_slug: str | None) -> int:
     cfg = load_config()
+    if game_slug:
+        os.environ["TITAN_GAME_SLUG"] = game_slug
     redis = redis_client(cfg.redis)
     bus = SessionBus(redis, session_id)
     await bus.ensure_group(ACTIONS_GROUP)
-    executor = PlayExecutor(session_id=session_id)
+    play_settings = PlaySettings.from_environ()
+    executor = PlayExecutor(session_id=session_id, settings=play_settings)
     try:
         while True:
             batch = await bus.read_group(ACTIONS_GROUP, ACTIONS_CONSUMER, block_ms=2000)
@@ -82,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     configure_logging("titan-actions")
     args = parse_args(argv)
     try:
-        return asyncio.run(_run(args.session_id))
+        return asyncio.run(_run(args.session_id, args.game_slug))
     except KeyboardInterrupt:
         return 0
 

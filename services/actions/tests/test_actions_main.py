@@ -73,6 +73,6 @@ async def test_run_executes_low_risk_proposal(monkeypatch: pytest.MonkeyPatch) -
     bus = _Bus()
     monkeypatch.setattr(actions_main, "SessionBus", lambda _r, _s: bus)
 
-    assert await actions_main._run(sid) == 0
+    assert await actions_main._run(sid, "ksp") == 0
     assert acked == ["1-0"]
     assert bus.published

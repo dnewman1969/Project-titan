@@ -19,11 +19,11 @@ def play_proposal_for_event(event: GameEvent) -> dict[str, Any] | None:
         }
     if event.type == "ksp.staging":
         return {
-            "action_id": "ksp.throttle",
-            "params": {"throttle": 0.55},
-            "rationale": "Hold steady thrust after staging.",
-            "risk": "low",
-            "expected_effect": "Smooth acceleration through the next ascent phase.",
+            "action_id": "ksp.stage",
+            "params": {},
+            "rationale": "Stage when the booster is empty.",
+            "risk": "medium",
+            "expected_effect": "Next stage ignites for continued ascent.",
         }
     if event.type == "ksp.max_q":
         return {

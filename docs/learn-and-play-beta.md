@@ -59,12 +59,12 @@ Linux dev hosts cannot drive SCS; use HIL or a Windows machine.
 
 ## Session artifacts
 
-| Path                                  | Contents                                               |
-| ------------------------------------- | ------------------------------------------------------ |
-| `<session>/play.ndjson`               | Every play attempt (when `TITAN_SESSION_DATA_DIR` set) |
-| `<session>/recording/manifest.json`   | REC metadata                                           |
+| Path                                  | Contents                                                           |
+| ------------------------------------- | ------------------------------------------------------------------ |
+| `<session>/play.ndjson`               | Every play attempt (when `TITAN_SESSION_DATA_DIR` set)             |
+| `<session>/recording/manifest.json`   | REC metadata                                                       |
 | `<session>/recording/timeline.ndjson` | `recording.*`, `play.action`, `lesson.proposed`, `lesson.feedback` |
-| Blackboard `lessons` / `discoveries`  | Crew learnings (UI agents panel / WS)                  |
+| Blackboard `lessons` / `discoveries`  | Crew learnings (UI agents panel / WS)                              |
 
 ## Hardware checklist vs software HIL
 

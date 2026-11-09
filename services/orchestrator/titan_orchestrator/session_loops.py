@@ -14,6 +14,7 @@ from titan_core.protocol.events import GameEvent
 from titan_core.protocol.payloads import ActionExecuted, ActionPropose
 from titan_core.protocol.telemetry import TelemetryFrameUI
 from titan_core.streams import entry_data, session_events_stream, session_telemetry_stream
+from titan_orchestrator.play_commentary import pick_play_commentary
 from titan_orchestrator.play_policy import play_memory_for, play_proposal_for_event
 from titan_orchestrator.rec_timeline import append_rec_timeline
 from titan_orchestrator.runtime import SessionRuntime
@@ -189,6 +190,32 @@ async def _play_feedback_loop(runtime: SessionRuntime) -> None:
                         "proposal_id": str(payload.proposal_id),
                         "action_id": action_id,
                         "ok": payload.ok,
+                    },
+                )
+                banter = pick_play_commentary(ok=payload.ok)
+                await bb.put(
+                    section="notes",
+                    key=f"commentary.{envelope.id}",
+                    value={
+                        "text": banter["text"],
+                        "kind": banter["kind"],
+                        "ok": payload.ok,
+                        "action_id": action_id,
+                        "commentary": True,
+                    },
+                    author=Address(kind="agent", id=banter["persona_slug"]),
+                    expected_version=-1,
+                    confidence=0.7,
+                )
+                append_rec_timeline(
+                    kind="agent.commentary",
+                    payload={
+                        "persona_slug": banter["persona_slug"],
+                        "display_name": banter["display_name"],
+                        "role": banter["role"],
+                        "text": banter["text"],
+                        "ok": payload.ok,
+                        "action_id": action_id,
                     },
                 )
                 await runtime.bus.ack(ORCH_GROUP, entry_id)

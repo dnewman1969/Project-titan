@@ -178,8 +178,20 @@ export function NewSessionDialog() {
       });
       if ("data" in started && started.data) {
         const dataDir = Reflect.get(started.data, "data_dir");
+        const recordingRaw = Reflect.get(started.data, "recording");
+        const recording =
+          typeof recordingRaw === "object" && recordingRaw !== null
+            ? (recordingRaw as { state?: string; root_dir?: string })
+            : null;
+        const recordingActive =
+          recording?.state === "recording" ||
+          recording?.state === "starting" ||
+          (recordOnStart && recording !== null);
         const recordingRoot =
-          recordOnStart && typeof dataDir === "string" && dataDir.length > 0 ? `${dataDir}/recording` : null;
+          (typeof recording?.root_dir === "string" && recording.root_dir) ||
+          (recordingActive && typeof dataDir === "string" && dataDir.length > 0
+            ? `${dataDir}/recording`
+            : null);
         const liveTitle = started.data.title?.trim() || sessionTitle;
         const attachRaw = Reflect.get(started.data, "play_attach");
         const attach =
@@ -201,7 +213,7 @@ export function NewSessionDialog() {
           setActiveSession({
             id: started.data.id,
             title: liveTitle,
-            recordingActive: recordOnStart,
+            recordingActive,
             recordingRootDir: recordingRoot,
             sessionSource: resolvedSource,
             playEnabled: agentPlay,

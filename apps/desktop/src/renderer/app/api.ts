@@ -51,9 +51,23 @@ export const RecordingSchema = z
     manifest_path: z.string().nullable().optional(),
     root_dir: z.string().optional(),
     duration_ms: z.number().nullable().optional(),
+    error: z.string().nullable().optional(),
   })
   .passthrough();
 export type Recording = z.infer<typeof RecordingSchema>;
+
+export const TimelineEventSchema = z.record(z.string(), z.unknown());
+export type TimelineEvent = z.infer<typeof TimelineEventSchema>;
+
+export const RecordingTimelineSchema = z
+  .object({
+    session_id: z.string().uuid(),
+    recording: RecordingSchema.nullable(),
+    root_dir: z.string(),
+    events: z.array(TimelineEventSchema),
+  })
+  .passthrough();
+export type RecordingTimeline = z.infer<typeof RecordingTimelineSchema>;
 
 export const GameProfileListSchema = z
   .object({
@@ -179,6 +193,11 @@ export const titanApi = createApi({
       }),
       transformResponse: (raw: unknown) => RecordingSchema.parse(raw),
     }),
+    getRecordingTimeline: build.query<RecordingTimeline, { sessionId: string; limit?: number }>({
+      query: ({ sessionId, limit }) =>
+        `/sessions/${sessionId}/recordings/timeline${limit != null ? `?limit=${limit}` : ""}`,
+      transformResponse: (raw: unknown) => RecordingTimelineSchema.parse(raw),
+    }),
     listGames: build.query<{ items: GameListItem[] }, undefined>({
       query: () => "/games?include_profiles=true",
       transformResponse: (raw: unknown) => z.object({ items: z.array(GameListItemSchema) }).parse(raw),
@@ -250,6 +269,7 @@ export const {
   useStopSessionMutation,
   useSetSessionPlayMutation,
   useGetActiveRecordingQuery,
+  useGetRecordingTimelineQuery,
   useStartRecordingMutation,
   useStopRecordingMutation,
   useListGamesQuery,

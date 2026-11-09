@@ -35,6 +35,11 @@ function valueActionId(value: unknown): string | null {
   return typeof actionId === "string" && actionId.length > 0 ? actionId : null;
 }
 
+function isCommentary(value: unknown): boolean {
+  if (typeof value !== "object" || value === null || !("commentary" in value)) return false;
+  return Reflect.get(value, "commentary") === true;
+}
+
 /** Poll session blackboard: crew chat + Ops Center learn-loop strip. */
 export function useBlackboardAgents(): void {
   const dispatch = useAppDispatch();
@@ -84,8 +89,10 @@ export function useBlackboardAgents(): void {
       const slug = author.includes(":") ? (author.split(":").pop() ?? "wernher") : "wernher";
       const roster = DEMO_ROSTER.find((a) => a.persona_slug === slug) ?? DEMO_ROSTER[0];
       if (!roster) continue;
-      const prefix =
-        learnKind === "outcome"
+      const commentary = isCommentary(row.value) || row.key.startsWith("commentary.");
+      const prefix = commentary
+        ? "[banter] "
+        : learnKind === "outcome"
           ? valueOk(row.value) === false
             ? "[outcome fail] "
             : "[outcome] "

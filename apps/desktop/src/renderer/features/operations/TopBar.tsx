@@ -61,7 +61,7 @@ export function TopBar({ status }: { status: ApiStatus }) {
         dispatch(setRecordingActive(false));
         dispatch(showNotice("Recording stopped."));
       } else {
-        dispatch(showNotice("Could not stop recording — see API logs."));
+        dispatch(showNotice(`Could not stop recording: ${formatApiError(result.error)}`));
       }
       return;
     }
@@ -69,9 +69,13 @@ export function TopBar({ status }: { status: ApiStatus }) {
     if ("data" in result && result.data) {
       dispatch(setRecordingActive(true));
       dispatch(setRecordingRootDir(result.data.root_dir ?? null));
-      dispatch(showNotice("Recording started (OBS optional — manifest still written)."));
+      const degraded =
+        typeof result.data.error === "string" && result.data.error.length > 0
+          ? ` (OBS degraded: ${result.data.error})`
+          : "";
+      dispatch(showNotice(`Recording started — manifest + timeline ready${degraded}.`));
     } else {
-      dispatch(showNotice("Could not start recording — need a live session."));
+      dispatch(showNotice(`Could not start recording: ${formatApiError(result.error)}`));
     }
   }, [activeSessionId, dispatch, recordingActive, startRec, stopRec]);
 

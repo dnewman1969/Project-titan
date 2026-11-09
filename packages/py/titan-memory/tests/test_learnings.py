@@ -40,7 +40,10 @@ def test_should_persist_row_filters_sections() -> None:
 def test_memory_kind_and_id() -> None:
     assert memory_kind(LearningRow("discoveries", "a", {"text": "x"}, 0.8, None)) == "discovery"
     assert memory_kind(LearningRow("lessons", "a", {"text": "x", "ok": True}, 0.8, None)) == "lesson.feedback"
-    assert memory_kind(LearningRow("lessons", "a", {"text": "x", "action_id": "ksp"}, 0.8, None)) == "lesson.proposal"
+    assert (
+        memory_kind(LearningRow("lessons", "a", {"text": "x", "action_id": "ksp"}, 0.8, None))
+        == "lesson.proposal"
+    )
     assert memory_kind(LearningRow("lessons", "a", {"text": "x"}, 0.8, None)) == "lesson"
     assert memory_kind(LearningRow("notes", "prior.0", {"text": "p"}, 0.8, None)) == "prior"
     assert memory_kind(LearningRow("notes", "n", {"text": "c"}, 0.8, None)) == "commentary"
@@ -79,7 +82,9 @@ def test_build_rows_includes_summary() -> None:
         confidence=0.7,
         created_at=None,
     )
-    _, _, meta_failed = build_rows([failed], session_id=sid, game_slug="ksp", outcome="failure", session_title="T")
+    _, _, meta_failed = build_rows(
+        [failed], session_id=sid, game_slug="ksp", outcome="failure", session_title="T"
+    )
     assert meta_failed[0]["importance"] == 0.85
 
 

@@ -9,7 +9,7 @@ export interface LayoutState {
 }
 
 const initialState: LayoutState = {
-  panels: { agents: true, webcam: true, telemetry: true, events: true },
+  panels: { agents: true, webcam: true, telemetry: true, events: true, games: false },
   notice: null,
   aboutOpen: false,
 };

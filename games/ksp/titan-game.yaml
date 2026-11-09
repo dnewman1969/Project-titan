@@ -27,7 +27,10 @@ capabilities:
   control: none
   anti_cheat: false
   multiplayer_modes: []
-config_files: []
+config_files:
+  - path: settings.cfg
+    kind: controls
+    parser: ksp_settings
 save_files: []
 event_rules: events.yaml
 teams: teams/

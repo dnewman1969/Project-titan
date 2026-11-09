@@ -1,0 +1,9 @@
+SiiNunit
+{
+#include "controls/def/keyboard.sii"
+}
+
+controls : _nameless.1 {
+ config_lines[0]: "shift_up" "keyboard" "period"
+ config_lines[1]: "cruise_control" "keyboard" "c"
+}

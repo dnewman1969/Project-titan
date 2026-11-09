@@ -2,7 +2,7 @@
  * Menu definition (Section 2.13), shared by the main process (builds the native menu) and the
  * renderer (handles commands and explains which milestone delivers each feature).
  */
-export type PanelId = "agents" | "webcam" | "telemetry" | "events";
+export type PanelId = "agents" | "webcam" | "telemetry" | "events" | "games";
 
 export interface MenuCommand {
   kind: "command";
@@ -91,6 +91,7 @@ export const MENU: readonly MenuSection[] = [
       toggle("webcam", "Webcam Panel"),
       toggle("telemetry", "Telemetry Bar"),
       toggle("events", "Event Log"),
+      toggle("games", "Game Discovery"),
       sep,
       cmd("view.blackboardInspector", "Blackboard Inspector", "M7.T5"),
       cmd("view.messageInspector", "Message Inspector", "M7.T5"),
@@ -122,8 +123,8 @@ export const MENU: readonly MenuSection[] = [
   {
     label: "TOOLS",
     items: [
-      cmd("tools.gameDiscovery", "Game Discovery", "M4.T5"),
-      cmd("tools.integrationInstaller", "Integration Installer", "M4.T5"),
+      cmd("tools.gameDiscovery", "Game Discovery"),
+      cmd("tools.integrationInstaller", "Integration Installer", "M7.T1"),
       sep,
       cmd("tools.logs", "Logs", "M10.T4"),
       cmd("tools.diagnostics", "Diagnostics Bundle", "M10.T4"),

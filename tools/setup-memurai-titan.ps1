@@ -88,10 +88,24 @@ function Set-RedisConfDirectives {
     if (-not (Test-Path $parent)) {
         throw "Config directory does not exist: $parent"
     }
+    $backup = "$Path.titan.bak"
     if (Test-Path $Path) {
-        Copy-Item $Path "$Path.titan.bak" -Force
+        Copy-Item $Path $backup -Force
     }
     Set-Content -Path $Path -Value $out -Encoding UTF8
+    return $backup
+}
+
+function Restore-MemuraiConfigBackup {
+    param([string]$Path)
+    $backup = "$Path.titan.bak"
+    if (-not (Test-Path $backup)) {
+        Write-Host "No backup to restore at $backup" -ForegroundColor DarkYellow
+        return $false
+    }
+    Copy-Item $backup $Path -Force
+    Write-Host "Restored previous memurai.conf from $backup." -ForegroundColor Yellow
+    return $true
 }
 
 function Find-MemuraiCli {
@@ -258,12 +272,12 @@ if ($listeners.Count -gt 0) {
 }
 
 Write-Host "Using config: $config" -ForegroundColor Cyan
-Set-RedisConfDirectives -Path $config -Directives @{
+$configBackup = Set-RedisConfDirectives -Path $config -Directives @{
     port        = $Port
     bind        = $Bind
     requirepass = $Password
 }
-Write-Host "Config saved: $config (backup: $config.titan.bak)" -ForegroundColor Green
+Write-Host "Trial config written (backup: $configBackup)." -ForegroundColor Cyan
 
 $service = Find-MemuraiService -Override $ServiceName
 Write-Host "Restarting service: $($service.Name)..." -ForegroundColor Yellow
@@ -272,12 +286,14 @@ $restarted = Restart-MemuraiServiceWithRetry -Service $service
 if (-not $restarted) {
     Write-Host ""
     Write-ServiceDiagnostics -ServiceName $service.Name
+    Restore-MemuraiConfigBackup -Path $config | Out-Null
     Write-Host ""
     Write-Host @"
-Config is saved for Titan (port $Port, bind $Bind, requirepass $Password).
+Memurai did not start with Titan settings; memurai.conf was reverted to the pre-edit backup.
 
-Automatic service restart failed. In services.msc, restart '$($service.Name)' manually (or reboot), then run Start-Titan.bat again.
-If port $Port is still owned by another Redis, stop that process first.
+Use Start-Titan.bat (portable Redis on $Port) — Memurai is optional.
+To retry Memurai later: fix the service in services.msc, then run this script again as Administrator.
+If port $Port is owned by another process, stop it first.
 "@ -ForegroundColor Yellow
     exit 0
 }
@@ -299,7 +315,8 @@ $cli = Find-MemuraiCli -ConfigFile $config
 if (-not $ready) {
     Write-Host "Memurai service is running but $Bind`:$Port did not accept TCP within 30s." -ForegroundColor Yellow
     Write-ServiceDiagnostics -ServiceName $service.Name
-    Write-Host "Config is saved — restart '$($service.Name)' in services.msc if Redis still does not listen." -ForegroundColor Yellow
+    Restore-MemuraiConfigBackup -Path $config | Out-Null
+    Write-Host "Config reverted. Use Start-Titan.bat for portable Redis, or repair Memurai in services.msc and re-run this script." -ForegroundColor Yellow
     exit 0
 }
 

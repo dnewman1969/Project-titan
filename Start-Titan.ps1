@@ -331,16 +331,31 @@ function Start-RedisViaDocker {
     return (Wait-RedisUp)
 }
 
+function Get-MemuraiServiceState {
+    $svc = Get-Service -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "Memurai*" -or $_.DisplayName -like "Memurai*" } |
+        Select-Object -First 1
+    if (-not $svc) { return $null }
+    return $svc.Status.ToString()
+}
+
 function Ensure-Redis {
     if (Test-RedisUp) { return }
-    Write-Host "Redis not listening on 127.0.0.1:63790; starting automatically..." -ForegroundColor Cyan
+    $memuraiState = Get-MemuraiServiceState
+    Write-Host "Redis not on 127.0.0.1:63790 — starting portable Redis (Titan default; Memurai is optional)." -ForegroundColor Cyan
+    if ($memuraiState -eq "Stopped") {
+        Write-Host "Memurai service is stopped; using portable Redis instead of Memurai." -ForegroundColor DarkGray
+    } elseif ($memuraiState -eq "Running") {
+        Write-Host "Memurai is running but not on 63790 with Titan password — portable Redis will be tried first." -ForegroundColor DarkGray
+    }
     if (Start-PortableRedis) { return }
+    Write-Host "Portable Redis unavailable; trying Docker redis..." -ForegroundColor DarkYellow
     if (Start-RedisViaDocker) { return }
     Show-Error @"
 Could not start Redis on 127.0.0.1:63790 (password: $($env:TITAN__REDIS__PASSWORD)).
 
-Start-Titan tried portable Redis and Docker. Check firewall/proxy or install Docker Desktop.
-If you use Memurai: run tools\setup-memurai-titan.bat as Administrator (sets port 63790, bind 127.0.0.1, requirepass $($env:TITAN__REDIS__PASSWORD)).
+Start-Titan tried portable Redis first, then Docker. Check firewall/proxy or install Docker Desktop.
+Optional Memurai: tools\setup-memurai-titan.bat (reverts config if the service will not start).
 Postgres/Chroma are still managed by Titan without Docker.
 "@
 }

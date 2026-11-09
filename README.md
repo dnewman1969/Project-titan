@@ -12,7 +12,7 @@ That script checks Node/pnpm/uv, fetches portable PostgreSQL on first run, ensur
 
 Prerequisites once: [Node 22](https://nodejs.org/), [uv](https://docs.astral.sh/uv/), and either **Memurai Developer** (Redis, port **63790**, password **titan-dev**) or Docker Desktop (only for Redis if Memurai is absent). Postgres and Chroma are started by Titan — not by Docker.
 
-For contributor setup and architecture, see [docs/dev-setup.md](docs/dev-setup.md).
+For contributor setup and architecture, see [docs/dev-setup.md](docs/dev-setup.md). For the learn-and-play beta (HIL + real KSP/truck installs), see [docs/learn-and-play-beta.md](docs/learn-and-play-beta.md).
 
 ## Repository map
 

@@ -35,6 +35,7 @@ export function NewSessionDialog() {
   const [profileId, setProfileId] = useState<string>("");
   const [launchGame, setLaunchGame] = useState(false);
   const [agentPlay, setAgentPlay] = useState(false);
+  const [recordOnStart, setRecordOnStart] = useState(true);
   const { data: gamesList } = useListGamesQuery(undefined);
   const [createSession, { isLoading: creating }] = useCreateSessionMutation();
   const [startSession, { isLoading: starting }] = useStartSessionMutation();
@@ -68,6 +69,7 @@ export function NewSessionDialog() {
       settings: {
         agents_enabled: true,
         ...(agentPlay ? { play_enabled: true } : {}),
+        ...(recordOnStart ? { record_on_start: true } : {}),
       },
     });
     if ("data" in result && result.data) {
@@ -168,6 +170,17 @@ export function NewSessionDialog() {
             />
           }
           label="Enable agent play (beta)"
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={recordOnStart}
+              onChange={(e) => {
+                setRecordOnStart(e.target.checked);
+              }}
+            />
+          }
+          label="Record session (manifest + timeline; OBS optional)"
         />
         <FormControlLabel
           control={

@@ -12,7 +12,7 @@ import { useState } from "react";
 import { useCreateSessionMutation, useListGamesQuery, useStartSessionMutation } from "../../app/api";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { showNotice } from "../operations/layoutSlice";
-import { closeSessionDialog, setActiveSession } from "./sessionsSlice";
+import { closeSessionDialog, setActiveSession, setRecordingActive, setRecordingRootDir } from "./sessionsSlice";
 
 const FALLBACK_GAMES = [
   { slug: "ksp", label: "Kerbal Space Program" },
@@ -84,6 +84,13 @@ export function NewSessionDialog() {
             title: started.data.title,
           }),
         );
+        if (recordOnStart) {
+          dispatch(setRecordingActive(true));
+          const dataDir = Reflect.get(started.data, "data_dir");
+          if (typeof dataDir === "string" && dataDir.length > 0) {
+            dispatch(setRecordingRootDir(`${dataDir}/recording`));
+          }
+        }
         dispatch(showNotice(`Live session: ${started.data.title}`));
         dispatch(closeSessionDialog());
         return;

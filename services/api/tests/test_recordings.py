@@ -76,6 +76,27 @@ def _live_session(client: TestClient, game_slug: str) -> str:
     return sid
 
 
+def test_record_on_start_setting(api_client: TestClient, game_slug: str) -> None:
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={
+            "game_slug": game_slug,
+            "title": "auto rec",
+            "settings": {"agents_enabled": False, "record_on_start": True},
+        },
+    )
+    assert created.status_code == 201
+    sid = created.json()["id"]
+    started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False})
+    assert started.status_code == 202
+    active = api_client.get(f"/api/v1/sessions/{sid}/recordings/active", headers=AUTH)
+    assert active.status_code == 200
+    item = active.json()["item"]
+    assert item is not None
+    assert item["state"] == "recording"
+
+
 def test_recording_start_stop_without_obs(api_client: TestClient, game_slug: str) -> None:
     sid = _live_session(api_client, game_slug)
     empty = api_client.get(f"/api/v1/sessions/{sid}/recordings/active", headers=AUTH)

@@ -339,8 +339,8 @@ function Ensure-Redis {
     Show-Error @"
 Could not start Redis on 127.0.0.1:63790 (password: $($env:TITAN__REDIS__PASSWORD)).
 
-Start-Titan tried portable Redis and Docker. Check firewall/proxy, install Docker Desktop, or run your own Redis on port 63790 with that password.
-Optional always-on service: Memurai Developer — https://www.memurai.com/get-memurai (bind 127.0.0.1:63790, requirepass $($env:TITAN__REDIS__PASSWORD)).
+Start-Titan tried portable Redis and Docker. Check firewall/proxy or install Docker Desktop.
+If you use Memurai: run tools\setup-memurai-titan.bat as Administrator (sets port 63790, bind 127.0.0.1, requirepass $($env:TITAN__REDIS__PASSWORD)).
 Postgres/Chroma are still managed by Titan without Docker.
 "@
 }

@@ -1,46 +1,56 @@
-"""Continuous KSP setpoints: throttle, SAS, and a heading hold.
+"""Continuous KSP setpoints: fly the vessel, not a one-shot heading poke.
 
-kRPC (the control mod we already require) ships an autopilot that holds pitch and
-heading until the next call — the same idea as kOS ``lock steering to heading()``
-and the kRPC "launch into orbit" tutorial (pitch 90° until 250 m, then a linear
-gravity turn, heading 90° east, throttle cut once apoapsis is high enough).
-MechJeb and kOS are not required; this repo has no hooks for them.
+kRPC's autopilot holds a pitch and heading until the next call
+(``target_pitch_and_heading`` in the surface frame — the launch-into-orbit
+tutorial). It will not run at the same time as SAS. kOS does the same split:
+``lock steering to srfprograde`` (or ``heading()``) while the direction is
+still changing, then ``SAS on`` once the nose is already there. A short
+``stopping_time`` hunts and tumbles a tall rocket, so the driver eases the
+autopilot; this policy stops retargeting once the vessel is aligned.
 
-``ksp.fly`` is re-sent about once a second so the hold is a loop, not a one-shot
-poke of ``control.pitch``. SAS is released while the autopilot is engaged because
-kRPC will not run both. On the ground, in orbit, or when there is no flight
-scene, the decision is explicit and does not command a heading.
+While flying, the early phase follows surface prograde when that direction is
+a climb, and a shallow pitch on heading 90° east when prograde is still noise.
+After that it holds one heading. Throttle goes to zero if a part is
+overheating or the craft is too fast in thick air. A high angular rate cuts
+throttle and asks SAS to damp rotation before any new steering. Staging is
+only the single pre-launch light-the-engine pulse.
+
+MechJeb and kOS are not required. The inputs are the telemetry frame the kRPC
+sampler already publishes (situation, altitude, speed, throttle, attitude,
+angular rate, prograde, part temperature).
 """
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
-from dataclasses import dataclass
 from typing import Any
 
 LAUNCH_HEADING_DEG = 90.0
 TURN_START_M = 250.0
 TURN_END_M = 45_000.0
+EARLY_ALT_M = 10_000.0
+SHALLOW_CLIMB_PITCH_DEG = 60.0
 APOAPSIS_COAST_M = 80_000.0
 COAST_ALT_M = 30_000.0
 RECOVER_ALT_M = 800.0
 RECOVER_VS_MPS = -15.0
 MAX_Q_PA = 25_000.0
 MAX_Q_THROTTLE = 0.65
+# ~20 deg/s. A gravity turn is a few degrees per second; this is a tumble.
+TUMBLE_RATE_RAD_S = 0.35
+OVERHEAT_RATIO = 0.85
+# Thick air. Faster than this low down cooks fairings and fins.
+THICK_AIR_ALT_M = 12_000.0
+SENSIBLE_SPEED_MPS = 280.0
+PROGRADE_MIN_MPS = 30.0
+PROGRADE_MIN_PITCH_DEG = 8.0
+HEADING_TOL_DEG = 12.0
+PITCH_TOL_DEG = 8.0
+ROLL_TOL_DEG = 20.0
 
 _EFFECT_HOLD = "Autopilot holds pitch and heading; throttle follows the ascent."
-_EFFECT_SAS = "Throttle and SAS only — autopilot released."
-
-
-@dataclass(frozen=True)
-class FlightDecision:
-    """One control tick. ``proposal`` is an ActionPropose-shaped dict, or None."""
-
-    status: str
-    message: str
-    proposal: dict[str, Any] | None = None
-    stage_once: bool = False
-    situation: str | None = None
+_EFFECT_SAS = "SAS holds the current attitude; autopilot released."
 
 
 def decide_flight(frame: Mapping[str, Any]) -> FlightDecision:
@@ -75,6 +85,14 @@ def decide_flight(frame: Mapping[str, Any]) -> FlightDecision:
     apo = _apoapsis(vehicle)
     dyn = _dynamic_pressure(frame)
     alt_m = 0.0 if alt is None else alt
+    speed = _speed(vehicle)
+    ang = _angular_rate(vehicle)
+    heading = _axis(vehicle, "heading_deg")
+    pitch = _axis(vehicle, "pitch_deg")
+    roll = _axis(vehicle, "roll_deg")
+    temp = _temp_ratio(vehicle)
+    throttle_now = _throttle(vehicle)
+    prograde_pitch, prograde_heading = _prograde(vehicle)
 
     if situation in {"landed", "splashed"}:
         return FlightDecision(
@@ -104,6 +122,24 @@ def decide_flight(frame: Mapping[str, Any]) -> FlightDecision:
             situation=situation or "pre_launch",
         )
 
+    if ang is not None and ang >= TUMBLE_RATE_RAD_S:
+        roll_bit = f", roll {roll:.0f}°" if roll is not None else ""
+        message = (
+            f"Tumbling at {ang:.2f} rad/s{roll_bit} — throttle idle and SAS damping rotation "
+            "before steering again."
+        )
+        return FlightDecision(
+            status="damp",
+            message=message,
+            proposal=_sas_only(0.0, message),
+            situation=situation,
+        )
+
+    overheating = temp is not None and temp >= OVERHEAT_RATIO
+    too_fast = (
+        speed is not None and alt_m < THICK_AIR_ALT_M and speed >= SENSIBLE_SPEED_MPS and not overheating
+    )
+
     recovering = (
         situation not in {"pre_launch", "landed", "splashed"}
         and alt_m < RECOVER_ALT_M
@@ -111,53 +147,99 @@ def decide_flight(frame: Mapping[str, Any]) -> FlightDecision:
         and vspeed < RECOVER_VS_MPS
     )
     if recovering:
-        message = (
-            "Low and descending — full throttle and pitch 75° on heading 90° "
-            "so the vessel does not hit the ground."
-        )
+        throttle = 0.0 if overheating else 1.0
+        if overheating:
+            message = (
+                "Low and descending, but a part is overheating — throttle cut, "
+                f"pitch 75° on heading {LAUNCH_HEADING_DEG:.0f}°."
+            )
+        else:
+            message = (
+                "Low and descending — full throttle and pitch 75° on heading 90° "
+                "so the vessel does not hit the ground."
+            )
         return FlightDecision(
             status="recover",
             message=message,
-            proposal=_guided(1.0, 75.0, LAUNCH_HEADING_DEG, message, _EFFECT_HOLD),
+            proposal=_guided(throttle, 75.0, LAUNCH_HEADING_DEG, message, _EFFECT_HOLD),
             situation=situation,
         )
 
-    pitch = _ascent_pitch(alt_m)
+    target_pitch, target_heading, mode = _attitude_target(
+        alt_m,
+        prograde_pitch=prograde_pitch,
+        prograde_heading=prograde_heading,
+    )
     coasting = apo is not None and apo >= APOAPSIS_COAST_M and alt_m >= COAST_ALT_M and (vspeed or 0.0) >= 0.0
     if coasting:
         message = (
             f"Apoapsis is above {APOAPSIS_COAST_M / 1000:.0f} km — coast, throttle idle, "
-            f"holding heading {LAUNCH_HEADING_DEG:.0f}°."
+            f"holding heading {target_heading:.0f}°."
         )
-        return FlightDecision(
-            status="coast",
+        return _hold_or_sas(
+            mode="coast",
             message=message,
-            proposal=_guided(0.0, pitch, LAUNCH_HEADING_DEG, message, _EFFECT_HOLD),
+            throttle=0.0,
+            target_pitch=target_pitch,
+            target_heading=target_heading,
+            heading=heading,
+            pitch=pitch,
+            roll=roll,
             situation=situation,
         )
 
-    throttle = MAX_Q_THROTTLE if dyn is not None and dyn >= MAX_Q_PA else 1.0
+    throttle, limit = _powered_throttle(
+        dyn=dyn,
+        overheating=overheating,
+        too_fast=too_fast,
+        speed=speed,
+        temp=temp,
+        throttle_now=throttle_now,
+    )
     if alt is None:
-        message = "Vessel is flying but altitude is missing — gentle climb on heading 90°."
+        message = _with_limit(
+            "Vessel is flying but altitude is missing — shallow climb on heading 90°.",
+            limit,
+        )
         return FlightDecision(
-            status="ascent",
+            status="climb",
             message=message,
-            proposal=_guided(0.8, 80.0, LAUNCH_HEADING_DEG, message, _EFFECT_HOLD),
+            proposal=_guided(
+                min(throttle, 0.8),
+                SHALLOW_CLIMB_PITCH_DEG,
+                LAUNCH_HEADING_DEG,
+                message,
+                _EFFECT_HOLD,
+            ),
             situation=situation,
         )
-    if throttle < 1.0:
-        message = (
-            f"Dynamic pressure is high — throttle {throttle:.0%}, pitch {pitch:.0f}° "
-            f"toward heading {LAUNCH_HEADING_DEG:.0f}°."
+
+    if mode == "prograde":
+        base = (
+            f"Early ascent: holding surface prograde, pitch {target_pitch:.0f}° "
+            f"heading {target_heading:.0f}°."
+        )
+    elif mode == "climb":
+        base = (
+            f"Early ascent: shallow climb pitch {target_pitch:.0f}° on heading {target_heading:.0f}° "
+            "until prograde is a real climb."
         )
     else:
-        message = (
-            f"Ascent hold: throttle full, pitch {pitch:.0f}° toward heading {LAUNCH_HEADING_DEG:.0f}° east."
-        )
-    return FlightDecision(
-        status="ascent",
+        base = f"Stable heading {target_heading:.0f}° east, pitch {target_pitch:.0f}°."
+    if throttle >= 1.0:
+        base = f"{base} Throttle full."
+    elif limit is None and throttle < 1.0:
+        base = f"{base} Dynamic pressure is high — throttle {throttle:.0%}."
+    message = _with_limit(base, limit)
+    return _hold_or_sas(
+        mode=mode,
         message=message,
-        proposal=_guided(throttle, pitch, LAUNCH_HEADING_DEG, message, _EFFECT_HOLD),
+        throttle=throttle,
+        target_pitch=target_pitch,
+        target_heading=target_heading,
+        heading=heading,
+        pitch=pitch,
+        roll=roll,
         situation=situation,
     )
 
@@ -185,14 +267,128 @@ def command_signature(decision: FlightDecision, *, staging: bool = False) -> tup
     )
 
 
+class FlightDecision:
+    """One control tick. ``proposal`` is an ActionPropose-shaped dict, or None."""
+
+    def __init__(
+        self,
+        *,
+        status: str,
+        message: str,
+        proposal: dict[str, Any] | None = None,
+        stage_once: bool = False,
+        situation: str | None = None,
+    ) -> None:
+        self.status = status
+        self.message = message
+        self.proposal = proposal
+        self.stage_once = stage_once
+        self.situation = situation
+
+
+def _hold_or_sas(
+    *,
+    mode: str,
+    message: str,
+    throttle: float,
+    target_pitch: float,
+    target_heading: float,
+    heading: float | None,
+    pitch: float | None,
+    roll: float | None,
+    situation: str | None,
+) -> FlightDecision:
+    """Steer until the nose is on the target, then leave SAS holding it."""
+    if _aligned(heading, pitch, roll, target_heading, target_pitch):
+        held = f"{message} Nose is there — SAS on, autopilot released so it does not hunt."
+        return FlightDecision(
+            status=mode,
+            message=held,
+            proposal=_sas_only(throttle, held),
+            situation=situation,
+        )
+    return FlightDecision(
+        status=mode,
+        message=message,
+        proposal=_guided(throttle, target_pitch, target_heading, message, _EFFECT_HOLD),
+        situation=situation,
+    )
+
+
+def _attitude_target(
+    alt_m: float,
+    *,
+    prograde_pitch: float | None,
+    prograde_heading: float | None,
+) -> tuple[float, float, str]:
+    if alt_m < EARLY_ALT_M:
+        if prograde_pitch is not None and prograde_pitch >= PROGRADE_MIN_PITCH_DEG:
+            heading = LAUNCH_HEADING_DEG if prograde_heading is None else _bucket_deg(prograde_heading)
+            return _bucket_deg(prograde_pitch), heading, "prograde"
+        return SHALLOW_CLIMB_PITCH_DEG, LAUNCH_HEADING_DEG, "climb"
+    return _ascent_pitch(alt_m), LAUNCH_HEADING_DEG, "heading"
+
+
+def _powered_throttle(
+    *,
+    dyn: float | None,
+    overheating: bool,
+    too_fast: bool,
+    speed: float | None,
+    temp: float | None,
+    throttle_now: float | None,
+) -> tuple[float, str | None]:
+    if overheating:
+        hot = f"{temp:.0%} of max" if temp is not None else "hot"
+        was = f" from {throttle_now:.0%}" if throttle_now is not None and throttle_now > 0.05 else ""
+        return 0.0, f"Overheating ({hot}) — throttle cut{was}."
+    if too_fast:
+        shown = f"{speed:.0f} m/s" if speed is not None else "fast"
+        return 0.0, f"Past a sensible speed ({shown} below {THICK_AIR_ALT_M / 1000:.0f} km) — throttle cut."
+    if dyn is not None and dyn >= MAX_Q_PA:
+        return MAX_Q_THROTTLE, None
+    return 1.0, None
+
+
+def _with_limit(message: str, limit: str | None) -> str:
+    if limit is None:
+        return message
+    return f"{limit} {message}"
+
+
 def _ascent_pitch(alt_m: float) -> float:
-    """Gravity turn: vertical until ``TURN_START_M``, near-horizon by ``TURN_END_M``."""
+    """Gravity turn, quantized to 5° so the autopilot is not retargeted every metre."""
     if alt_m < TURN_START_M:
         return 90.0
     if alt_m >= TURN_END_M:
         return 5.0
     frac = (alt_m - TURN_START_M) / (TURN_END_M - TURN_START_M)
-    return max(5.0, 90.0 * (1.0 - frac))
+    raw = max(5.0, 90.0 * (1.0 - frac))
+    return _bucket_deg(raw)
+
+
+def _bucket_deg(value: float) -> float:
+    return round(value / 5.0) * 5.0
+
+
+def _aligned(
+    heading: float | None,
+    pitch: float | None,
+    roll: float | None,
+    target_heading: float,
+    target_pitch: float,
+) -> bool:
+    if heading is None or pitch is None:
+        return False
+    if roll is not None and abs(_wrap180(roll)) > ROLL_TOL_DEG:
+        return False
+    if abs(_wrap180(heading - target_heading)) > HEADING_TOL_DEG:
+        return False
+    return abs(pitch - target_pitch) <= PITCH_TOL_DEG
+
+
+def _wrap180(deg: float) -> float:
+    return (deg + 180.0) % 360.0 - 180.0
 
 
 def _guided(throttle: float, pitch: float, heading: float, message: str, effect: str) -> dict[str, Any]:
@@ -213,7 +409,11 @@ def _guided(throttle: float, pitch: float, heading: float, message: str, effect:
 def _sas_only(throttle: float, message: str) -> dict[str, Any]:
     return {
         "action_id": "ksp.fly",
-        "params": {"throttle": round(max(0.0, min(1.0, throttle)), 3), "sas": True},
+        "params": {
+            "throttle": round(max(0.0, min(1.0, throttle)), 3),
+            "sas": True,
+            "sas_mode": "stability",
+        },
         "rationale": message,
         "risk": "low",
         "expected_effect": _EFFECT_SAS,
@@ -241,6 +441,20 @@ def _vspeed(vehicle: Mapping[str, Any]) -> float | None:
     return _as_float(velocity.get("vertical_mps"))
 
 
+def _speed(vehicle: Mapping[str, Any]) -> float | None:
+    velocity = vehicle.get("velocity")
+    if not isinstance(velocity, dict):
+        return None
+    speed = _as_float(velocity.get("speed_mps"))
+    if speed is not None:
+        return abs(speed)
+    vertical = _as_float(velocity.get("vertical_mps"))
+    horizontal = _as_float(velocity.get("horizontal_mps"))
+    if vertical is None and horizontal is None:
+        return None
+    return math.hypot(vertical or 0.0, horizontal or 0.0)
+
+
 def _apoapsis(vehicle: Mapping[str, Any]) -> float | None:
     orbit = vehicle.get("orbit")
     if not isinstance(orbit, dict):
@@ -253,6 +467,50 @@ def _dynamic_pressure(frame: Mapping[str, Any]) -> float | None:
     if not isinstance(env, dict):
         return None
     return _as_float(env.get("dynamic_pressure_pa"))
+
+
+def _angular_rate(vehicle: Mapping[str, Any]) -> float | None:
+    return _as_float(vehicle.get("angular_rate_rad_s"))
+
+
+def _throttle(vehicle: Mapping[str, Any]) -> float | None:
+    controls = vehicle.get("controls")
+    if not isinstance(controls, dict):
+        return None
+    return _as_float(controls.get("throttle"))
+
+
+def _temp_ratio(vehicle: Mapping[str, Any]) -> float | None:
+    engine = vehicle.get("engine")
+    if not isinstance(engine, dict):
+        return None
+    return _as_float(engine.get("max_temp_ratio"))
+
+
+def _axis(vehicle: Mapping[str, Any], name: str) -> float | None:
+    attitude = vehicle.get("attitude")
+    if isinstance(attitude, dict):
+        value = _as_float(attitude.get(name))
+        if value is not None:
+            return value
+    return _as_float(vehicle.get(name))
+
+
+def _prograde(vehicle: Mapping[str, Any]) -> tuple[float | None, float | None]:
+    pitch = _as_float(vehicle.get("prograde_pitch_deg"))
+    heading = _as_float(vehicle.get("prograde_heading_deg"))
+    if pitch is not None:
+        return pitch, heading
+    velocity = vehicle.get("velocity")
+    if not isinstance(velocity, dict):
+        return None, None
+    vertical = _as_float(velocity.get("vertical_mps"))
+    horizontal = _as_float(velocity.get("horizontal_mps"))
+    if vertical is None or horizontal is None:
+        return None, None
+    if math.hypot(vertical, horizontal) < PROGRADE_MIN_MPS:
+        return None, None
+    return math.degrees(math.atan2(vertical, max(0.0, horizontal))), None
 
 
 def _as_float(value: object) -> float | None:

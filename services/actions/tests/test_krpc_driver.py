@@ -43,6 +43,8 @@ def _reset_krpc_conn() -> None:
     krpc_driver._CONN = None
     krpc_driver._CONN_KEY = None
     _Conn.space_center.active_vessel = _Vessel()
+    if hasattr(_Conn.space_center, "SASMode"):
+        delattr(_Conn.space_center, "SASMode")
 
 
 def _driver() -> KrpcDriver:
@@ -165,6 +167,8 @@ def test_krpc_fly_engages_surface_autopilot() -> None:
     assert autopilot.pitch == 90.0
     assert autopilot.heading == 90.0
     assert autopilot.ref == "srf"
+    assert autopilot.stopping_time == (2.0, 2.0, 2.0)
+    assert autopilot.target_roll == 0.0
 
     ok, err = _driver().execute("ksp.fly", {"throttle": 0.0, "sas": True})
     assert ok and err is None
@@ -176,6 +180,27 @@ def test_krpc_fly_engages_surface_autopilot() -> None:
     _driver().reset()
     assert vessel.control.throttle == 0.0
     assert autopilot.engaged is False
+
+
+def test_krpc_fly_damp_selects_stability_sas() -> None:
+    class _SasMode:
+        stability_assist = "stability"
+
+    vessel = _Conn.space_center.active_vessel
+    autopilot = _AutoPilot()
+    autopilot.engaged = True
+    vessel.auto_pilot = autopilot  # type: ignore[attr-defined]
+    _Conn.space_center.SASMode = _SasMode  # type: ignore[attr-defined]
+    ok, err = _driver().execute(
+        "ksp.fly",
+        {"throttle": 0.0, "sas": True, "sas_mode": "stability"},
+    )
+    assert ok and err is None
+    assert autopilot.engaged is False
+    assert vessel.control.sas is True
+    assert vessel.control.sas_mode == "stability"  # type: ignore[attr-defined]
+    assert vessel.control.throttle == 0.0
+    assert vessel.control.staged == 0
 
 
 def test_krpc_fly_without_autopilot_still_sets_throttle() -> None:

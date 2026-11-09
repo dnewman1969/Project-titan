@@ -26,6 +26,26 @@ describe("learnSlice", () => {
     expect(state.items).toHaveLength(2);
     expect(state.items[0]?.kind).toBe("outcome");
     expect(state.items[0]?.actionId).toBe("ksp.throttle");
+    state = learnSlice.reducer(
+      state,
+      learnItemReceived({
+        key: "discoveries:flight.decision",
+        kind: "discovery",
+        text: "Waiting for a flight frame from kRPC.",
+      }),
+    );
+    state = learnSlice.reducer(
+      state,
+      learnItemReceived({
+        key: "discoveries:flight.decision",
+        kind: "discovery",
+        text: "Early ascent: holding surface prograde.",
+        actionId: "ksp.fly",
+      }),
+    );
+    expect(state.items.filter((row) => row.id === "discoveries:flight.decision")).toHaveLength(1);
+    expect(state.items[0]?.text).toBe("Early ascent: holding surface prograde.");
+    expect(state.items[0]?.actionId).toBe("ksp.fly");
     state = learnSlice.reducer(state, clearLearnItems());
     expect(state.items).toHaveLength(0);
   });

@@ -35,15 +35,30 @@ export const learnSlice = createSlice({
       }>,
     ) {
       const id = action.payload.key || `learn-${++seq}`;
-      if (state.items.some((row) => row.id === id)) return;
-      state.items.unshift({
+      const next = {
         id,
         kind: action.payload.kind,
         text: action.payload.text,
         ok: action.payload.ok ?? null,
         actionId: action.payload.actionId ?? null,
         at_ms: action.payload.at_ms ?? Date.now(),
-      });
+      };
+      const index = state.items.findIndex((row) => row.id === id);
+      if (index === -1) {
+        state.items.unshift(next);
+      } else {
+        const current = state.items[index];
+        if (
+          current?.text === next.text &&
+          current.kind === next.kind &&
+          current.ok === next.ok &&
+          current.actionId === next.actionId
+        ) {
+          return;
+        }
+        state.items.splice(index, 1);
+        state.items.unshift(next);
+      }
       if (state.items.length > 40) state.items.pop();
     },
     clearLearnItems(state) {

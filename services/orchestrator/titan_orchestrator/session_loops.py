@@ -6,7 +6,7 @@ import asyncio
 import contextlib
 import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from titan_core.bus import ORCH_CONSUMER, ORCH_GROUP
@@ -277,7 +277,7 @@ class _FlightState:
     launch_staged: bool = False
     last_sig: tuple[object, ...] | None = None
     lesson_n: int = 0
-    statuses: set[str] = field(default_factory=set)
+    last_decision: str | None = None
 
 
 async def _flight_loop(runtime: SessionRuntime, *, period_s: float) -> None:
@@ -349,11 +349,10 @@ async def _flight_tick(runtime: SessionRuntime, state: _FlightState, memory: Pla
     sig = command_signature(decision, staging=staging)
     if sig == state.last_sig:
         return
-    state.last_sig = sig
     state.lesson_n += 1
     async with runtime.sessions() as db:
         bb = runtime.blackboard_service(db)
-        await _safe_bb_put(
+        wrote = await _safe_bb_put(
             bb,
             section="lessons",
             key=f"play.flight.{state.lesson_n}",
@@ -366,7 +365,11 @@ async def _flight_tick(runtime: SessionRuntime, state: _FlightState, memory: Pla
             expected_version=-1,
             confidence=0.9,
         )
+        if not wrote:
+            state.lesson_n -= 1
+            return
         await db.commit()
+    state.last_sig = sig
     append_rec_timeline(
         kind="lesson.proposed",
         payload={
@@ -378,24 +381,28 @@ async def _flight_tick(runtime: SessionRuntime, state: _FlightState, memory: Pla
 
 
 async def _flight_status(runtime: SessionRuntime, state: _FlightState, *, status: str, message: str) -> None:
-    if status in state.statuses:
+    """Publish what the crew is doing and why. Retried until the blackboard accepts it."""
+    if state.last_decision == message:
         return
     async with runtime.sessions() as db:
         bb = runtime.blackboard_service(db)
-        await _safe_bb_put(
+        wrote = await _safe_bb_put(
             bb,
             section="discoveries",
-            key=f"flight.{status}",
+            key="flight.decision",
             value={
                 "text": message,
+                "status": status,
                 "action_id": None if status in {"no_vessel", "waiting", "paused"} else "ksp.fly",
             },
             author=Address(kind="agent", id="flight_engineer"),
             expected_version=-1,
             confidence=0.86,
         )
+        if not wrote:
+            return
         await db.commit()
-    state.statuses.add(status)
+    state.last_decision = message
 
 
 async def _block_xread(redis: Any, streams: dict[str, str], *, count: int, block_ms: int) -> Any:
@@ -405,7 +412,7 @@ async def _block_xread(redis: Any, streams: dict[str, str], *, count: int, block
         return None
 
 
-async def _safe_bb_put(bb: Any, **kwargs: Any) -> None:
+async def _safe_bb_put(bb: Any, **kwargs: Any) -> bool:
     try:
         await bb.put(**kwargs)
     except (PermissionDenied, RateLimited):
@@ -414,6 +421,8 @@ async def _safe_bb_put(bb: Any, **kwargs: Any) -> None:
             section=kwargs.get("section"),
             key=kwargs.get("key"),
         )
+        return False
+    return True
 
 
 def _event_line(event: GameEvent) -> str:

@@ -4,6 +4,8 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = $PSScriptRoot
 Set-Location $RepoRoot
 
+$PnpmVersion = "10.33.4"
+
 function Show-Error([string]$Message) {
     try {
         Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
@@ -18,14 +20,89 @@ function Test-Command([string]$Name) {
     return [bool](Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
-if (-not (Test-Command node)) { Show-Error "Node.js 22+ is required.`nInstall: winget install OpenJS.NodeJS.LTS" }
-if (-not (Test-Command pnpm)) {
-    if (Test-Command corepack) {
-        corepack enable | Out-Null
-        corepack prepare pnpm@10.33.4 --activate | Out-Null
+function Refresh-SessionPath {
+    $machine = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    $user = [Environment]::GetEnvironmentVariable("Path", "User")
+    if ($machine -and $user) {
+        $env:Path = "$machine;$user"
+    } elseif ($machine) {
+        $env:Path = $machine
+    } elseif ($user) {
+        $env:Path = $user
+    }
+    $nodeHome = (Get-Command node -ErrorAction SilentlyContinue).Source
+    if ($nodeHome) {
+        $nodeDir = Split-Path $nodeHome -Parent
+        if ($env:Path -notlike "*$nodeDir*") {
+            $env:Path = "$nodeDir;$env:Path"
+        }
     }
 }
-if (-not (Test-Command pnpm)) { Show-Error "pnpm is required.`nIn PowerShell: corepack enable; corepack prepare pnpm@10.33.4 --activate" }
+
+function Ensure-Node {
+    if (Test-Command node) { return }
+    if (Test-Command winget) {
+        Write-Host "Node.js not found. Installing Node.js LTS with winget (one-time)..." -ForegroundColor Yellow
+        try {
+            winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements
+        } catch {
+            Write-Host "winget install did not complete: $_" -ForegroundColor DarkYellow
+        }
+        Refresh-SessionPath
+    }
+    if (-not (Test-Command node)) {
+        Show-Error @"
+Node.js 22+ LTS is required.
+Install: https://nodejs.org/ (choose LTS)
+Or in PowerShell: winget install OpenJS.NodeJS.LTS
+"@
+    }
+}
+
+function Ensure-Pnpm {
+    if (Test-Command pnpm) { return }
+    Write-Host "pnpm not on PATH; enabling via corepack (one-time)..." -ForegroundColor Cyan
+    if (Test-Command corepack) {
+        try {
+            & corepack enable 2>&1 | Out-Host
+            & corepack prepare "pnpm@$PnpmVersion" --activate 2>&1 | Out-Host
+        } catch {
+            Write-Host "corepack setup reported: $_" -ForegroundColor DarkYellow
+        }
+        Refresh-SessionPath
+    } elseif (Test-Command node) {
+        $corepackJs = Join-Path (Split-Path (Get-Command node).Source -Parent) "node_modules\corepack\dist\corepack.js"
+        if (Test-Path $corepackJs) {
+            & node $corepackJs enable 2>&1 | Out-Host
+            & node $corepackJs prepare "pnpm@$PnpmVersion" --activate 2>&1 | Out-Host
+            Refresh-SessionPath
+        }
+    }
+    if (-not (Test-Command pnpm) -and (Test-Command npm)) {
+        Write-Host "Installing pnpm@$PnpmVersion via npm (fallback)..." -ForegroundColor Cyan
+        & npm install -g "pnpm@$PnpmVersion" 2>&1 | Out-Host
+        Refresh-SessionPath
+    }
+}
+
+function Invoke-Pnpm {
+    [CmdletBinding()]
+    param([Parameter(ValueFromRemainingArguments = $true)][object[]] $RemainingArgs)
+    Ensure-Pnpm
+    if (Test-Command pnpm) {
+        & pnpm @RemainingArgs
+        return
+    }
+    if (Test-Command corepack) {
+        & corepack pnpm @RemainingArgs
+        return
+    }
+    Show-Error "pnpm could not be prepared.`nOpen PowerShell in the repo and run:`ncorepack enable; corepack prepare pnpm@$PnpmVersion --activate"
+}
+
+Ensure-Node
+Ensure-Pnpm
+
 if (-not (Test-Command uv)) { Show-Error "uv is required.`nInstall: https://docs.astral.sh/uv/getting-started/installation/" }
 
 $env:TITAN__REDIS__PASSWORD = if ($env:TITAN__REDIS__PASSWORD) { $env:TITAN__REDIS__PASSWORD } else { "titan-dev" }
@@ -75,10 +152,10 @@ if (-not (Test-Path $desktopEnv) -and (Test-Path $envExample)) {
 }
 
 Write-Host "Installing dependencies (first run may take several minutes)..." -ForegroundColor Cyan
-pnpm install --frozen-lockfile
+Invoke-Pnpm install --frozen-lockfile
 uv sync --frozen --all-packages
-pnpm codegen
+Invoke-Pnpm codegen
 
 Write-Host "Launching Titan Operations Center..." -ForegroundColor Green
 Write-Host "If the window is blank for >60s, check the boot splash for Redis/Postgres/API status." -ForegroundColor DarkGray
-pnpm dev
+Invoke-Pnpm dev

@@ -14,7 +14,6 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from titan_actions.attach import probe_attach, resolve_session_source
 from titan_api.auth import Authenticated
 from titan_api.demo_replay import start_demo_replay
 from titan_api.deps import db_session
@@ -27,6 +26,7 @@ from titan_core.clock import SessionClock, utc_now
 from titan_core.config import expand_path
 from titan_core.errors import ErrorCode, TitanError
 from titan_core.ids import uuid7
+from titan_core.play_attach import probe_attach, resolve_session_source
 from titan_db.models.games import Game, GameProfile
 from titan_db.models.sessions import Session
 from titan_db.repositories.blackboard import BlackboardRepository

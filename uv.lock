@@ -1939,7 +1939,6 @@ version = "0.1.0"
 source = { editable = "services/api" }
 dependencies = [
     { name = "fastapi" },
-    { name = "titan-actions" },
     { name = "titan-core" },
     { name = "titan-db" },
     { name = "titan-game-ats" },
@@ -1954,7 +1953,6 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "titan-actions", editable = "services/actions" },
     { name = "titan-core", editable = "packages/py/titan-core" },
     { name = "titan-db", editable = "packages/py/titan-db" },
     { name = "titan-game-ats", editable = "games/ats" },

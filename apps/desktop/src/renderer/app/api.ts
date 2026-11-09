@@ -219,7 +219,8 @@ export const titanApi = createApi({
       },
       { gameSlug: string; source: "live" | "fixture" }
     >({
-      query: ({ gameSlug, source }) => `/play/readiness?game_slug=${encodeURIComponent(gameSlug)}&source=${source}`,
+      query: ({ gameSlug, source }) =>
+        `/play/readiness?game_slug=${encodeURIComponent(gameSlug)}&source=${source}`,
     }),
   }),
 });

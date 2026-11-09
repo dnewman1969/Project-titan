@@ -3,7 +3,9 @@ import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import IconButton from "@mui/material/IconButton";
+import Switch from "@mui/material/Switch";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { MONO_FONT, StatusPill } from "@titan/ui-kit";
@@ -11,10 +13,12 @@ import { useCallback, useEffect } from "react";
 
 import {
   useKillMutation,
+  useSetSessionPlayMutation,
   useStartRecordingMutation,
   useStopRecordingMutation,
   useStopSessionMutation,
 } from "../../app/api";
+import { formatApiError } from "../../app/formatApiError";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { getTitan } from "../../app/runtime";
 import type { ApiStatus } from "../../app/useApiStatus";
@@ -22,20 +26,26 @@ import { triggerKill } from "../../app/useShellBridge";
 import { showNotice } from "./layoutSlice";
 import {
   clearRecordingMenuRequest,
+  setPlayEnabled,
   setRecordingActive,
   setRecordingRootDir,
+  type PlayBackendKind,
 } from "../sessions/sessionsSlice";
 
 export function TopBar({ status }: { status: ApiStatus }) {
   const dispatch = useAppDispatch();
   const [kill] = useKillMutation();
   const [stopSession] = useStopSessionMutation();
+  const [setSessionPlay, { isLoading: playToggling }] = useSetSessionPlayMutation();
   const [startRec] = useStartRecordingMutation();
   const [stopRec] = useStopRecordingMutation();
   const activeSessionId = useAppSelector((s) => s.sessions.activeSessionId);
   const activeTitle = useAppSelector((s) => s.sessions.activeTitle);
   const sessionSource = useAppSelector((s) => s.sessions.sessionSource);
   const playEnabled = useAppSelector((s) => s.sessions.playEnabled);
+  const playBackend = useAppSelector((s) => s.sessions.playBackend);
+  const playReady = useAppSelector((s) => s.sessions.playReady);
+  const playAttachMessage = useAppSelector((s) => s.sessions.playAttachMessage);
   const recordingActive = useAppSelector((s) => s.sessions.recordingActive);
   const recordingMenuRequest = useAppSelector((s) => s.sessions.recordingMenuRequest);
   const { killHotkey, backend } = getTitan();
@@ -64,6 +74,39 @@ export function TopBar({ status }: { status: ApiStatus }) {
       dispatch(showNotice("Could not start recording — need a live session."));
     }
   }, [activeSessionId, dispatch, recordingActive, startRec, stopRec]);
+
+  const togglePlay = useCallback(async () => {
+    if (!activeSessionId) {
+      dispatch(showNotice("Create a live session first (File → New session)."));
+      return;
+    }
+    const next = !playEnabled;
+    const result = await setSessionPlay({ sessionId: activeSessionId, enabled: next });
+    if ("data" in result && result.data) {
+      const attachRaw = Reflect.get(result.data, "play_attach");
+      const attach =
+        typeof attachRaw === "object" && attachRaw !== null
+          ? (attachRaw as { backend?: string; ready?: boolean; message?: string })
+          : null;
+      dispatch(
+        setPlayEnabled({
+          playEnabled: next,
+          playBackend: (attach?.backend as PlayBackendKind | undefined) ?? (next ? "hil" : null),
+          playReady: typeof attach?.ready === "boolean" ? attach.ready : null,
+          playAttachMessage: typeof attach?.message === "string" ? attach.message : null,
+        }),
+      );
+      dispatch(
+        showNotice(
+          next
+            ? `Agent play on (${attach?.backend ?? "hil"})${attach?.message ? ` — ${attach.message}` : ""}`
+            : "Agent play off — actions worker detached.",
+        ),
+      );
+      return;
+    }
+    dispatch(showNotice(`Could not toggle play: ${formatApiError(result.error)}`));
+  }, [activeSessionId, dispatch, playEnabled, setSessionPlay]);
 
   useEffect(() => {
     if (!recordingMenuRequest) return;
@@ -118,20 +161,51 @@ export function TopBar({ status }: { status: ApiStatus }) {
         sx={{ ml: 1, maxWidth: 220 }}
       />
       {activeSessionId && sessionSource ? (
-        <Chip
-          size="small"
-          variant="outlined"
-          color={sessionSource === "live" ? "success" : "default"}
-          label={
-            sessionSource === "live"
-              ? playEnabled
-                ? "Live + play"
-                : "Live install"
-              : playEnabled
-                ? "Fixture + HIL play"
-                : "Fixture telemetry"
+        <Tooltip title={playAttachMessage ?? (sessionSource === "live" ? "Live install" : "Fixture session")}>
+          <Chip
+            size="small"
+            variant="outlined"
+            color={
+              sessionSource === "live"
+                ? playEnabled && playReady === false
+                  ? "warning"
+                  : "success"
+                : "default"
+            }
+            label={
+              sessionSource === "live"
+                ? playEnabled
+                  ? playReady === false
+                    ? `Live + ${playBackend ?? "play"} (waiting)`
+                    : `Live + ${playBackend ?? "play"}`
+                  : "Live install"
+                : playEnabled
+                  ? "Fixture + HIL play"
+                  : "Fixture telemetry"
+            }
+            sx={{ maxWidth: 200 }}
+          />
+        </Tooltip>
+      ) : null}
+      {activeSessionId ? (
+        <FormControlLabel
+          sx={{ ml: 0.5, mr: 0 }}
+          control={
+            <Switch
+              size="small"
+              checked={playEnabled}
+              disabled={playToggling}
+              onChange={() => {
+                void togglePlay();
+              }}
+              slotProps={{ input: { "aria-label": "Toggle agent play" } }}
+            />
           }
-          sx={{ maxWidth: 160 }}
+          label={
+            <Typography variant="caption" color="text.secondary">
+              Agent play
+            </Typography>
+          }
         />
       ) : null}
       <Box sx={{ flex: 1 }} />

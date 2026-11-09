@@ -41,10 +41,25 @@ async def _run(session_id: UUID, game_slug: str | None) -> int:
     play_settings = PlaySettings.from_environ()
     data_dir = os.environ.get("TITAN_SESSION_DATA_DIR")
     session_dir = Path(data_dir) if data_dir else None
+    from typing import Literal
+
+    from titan_actions.attach import probe_attach
+
+    source: Literal["live", "fixture"] = "fixture" if play_settings.backend == "hil" else "live"
+    attach = probe_attach(game_slug=play_settings.game_slug, source=source, settings=play_settings)
+    log.info(
+        "play_worker_attach",
+        backend=attach.backend,
+        ready=attach.ready,
+        source=attach.source,
+        message=attach.message,
+        session_id=str(session_id),
+    )
     executor = PlayExecutor(
         session_id=session_id,
         data_dir=session_dir,
         settings=play_settings,
+        attach=attach,
     )
     try:
         while True:

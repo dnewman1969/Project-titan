@@ -26,6 +26,7 @@ from titan_core.clock import SessionClock, utc_now
 from titan_core.config import expand_path
 from titan_core.errors import ErrorCode, TitanError
 from titan_core.ids import uuid7
+from titan_core.play_attach import probe_attach, resolve_session_source
 from titan_db.models.games import Game, GameProfile
 from titan_db.models.sessions import Session
 from titan_db.repositories.blackboard import BlackboardRepository
@@ -75,6 +76,12 @@ class StopSession(BaseModel):
     outcome: str | None = None
 
 
+class SetSessionPlay(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+
+
 def _session_json(row: Session) -> dict[str, Any]:
     return {
         "id": row.id,
@@ -110,8 +117,11 @@ def _is_one_live_unique_violation(exc: IntegrityError) -> bool:
 
 @router.post("/sessions", status_code=status.HTTP_201_CREATED)
 async def create_session(body: CreateSession, db: AsyncSession = SessionDep) -> dict[str, Any]:
+    # Learn-and-play beta uses observe + settings.play_enabled. Full autonomous mode is Phase 4+.
     if body.mode == "autonomous":
-        raise TitanError(ErrorCode.NOT_IMPLEMENTED_IN_PHASE, "autonomous mode is Phase 4+")
+        if not bool(body.settings.get("play_enabled", False)):
+            raise TitanError(ErrorCode.NOT_IMPLEMENTED_IN_PHASE, "autonomous mode is Phase 4+")
+        body = body.model_copy(update={"mode": "observe"})
     if body.game_id is not None:
         game = await db.scalar(select(Game).where(Game.id == body.game_id))
     else:
@@ -147,6 +157,19 @@ async def get_session(session_id: UUID, db: AsyncSession = SessionDep) -> dict[s
     return _session_json(row)
 
 
+@router.get("/play/readiness")
+async def play_readiness(
+    game_slug: Annotated[str, Query(description="ksp | ets2 | ats")],
+    source: Annotated[str, Query(description="live | fixture")] = "live",
+) -> dict[str, Any]:
+    """Probe kRPC/SCS/HIL attach readiness before starting a learn-and-play session."""
+    from typing import Literal
+
+    session_source: Literal["live", "fixture"] = "fixture" if source.strip().lower() == "fixture" else "live"
+    attach = probe_attach(game_slug=game_slug, source=session_source)
+    return {"play_attach": attach.as_dict()}
+
+
 @router.post("/sessions/{session_id}/start", status_code=status.HTTP_202_ACCEPTED)
 async def start_session(
     session_id: UUID,
@@ -170,6 +193,31 @@ async def start_session(
     game_row = await db.scalar(select(Game).where(Game.id == row.game_id))
     game_slug = game_row.slug if game_row is not None else "ksp"
     play_enabled = bool(row.settings.get("play_enabled", False))
+
+    profile: GameProfile | None = None
+    if row.game_profile_id is not None:
+        profile = await db.scalar(select(GameProfile).where(GameProfile.id == row.game_profile_id))
+    default_profile: GameProfile | None = None
+    if profile is None:
+        default_profile = await db.scalar(
+            select(GameProfile)
+            .where(GameProfile.game_id == row.game_id, GameProfile.is_default.is_(True))
+            .limit(1)
+        )
+    install_profile = profile or default_profile
+    has_install = install_profile is not None
+    session_source = resolve_session_source(
+        session_source=str(row.settings.get("session_source") or "") or None,
+        demo_telemetry=bool(row.settings.get("demo_telemetry", False)),
+        has_install=has_install,
+    )
+    play_attach = probe_attach(game_slug=game_slug, source=session_source) if play_enabled else None
+    if play_attach is not None:
+        settings = dict(row.settings or {})
+        settings["session_source"] = session_source
+        settings["play_attach"] = play_attach.as_dict()
+        row.settings = settings
+
     try:
         await db.flush()
         if row.settings.get("agents_enabled", True):
@@ -179,15 +227,14 @@ async def start_session(
                 play_enabled=play_enabled,
                 data_dir=row.data_dir,
             )
-        if play_enabled:
-            fixture_play = (
-                bool(row.settings.get("demo_telemetry")) or row.settings.get("session_source") == "fixture"
-            )
+        if play_enabled and play_attach is not None:
+            # Always set an explicit backend so a registered install attaches kRPC/SCS
+            # (not silent auto), and fixture sessions stay on honest HIL.
             controller.start_actions(
                 session_id,
                 game_slug=game_slug,
                 data_dir=row.data_dir,
-                play_backend="hil" if fixture_play else None,
+                play_backend=play_attach.backend,
             )
         row.state = "live"
         await db.flush()
@@ -198,27 +245,14 @@ async def start_session(
                 "Another session is still live (ux_sessions_one_live). Stop it or retry start.",
             ) from exc
         raise
-    profile: GameProfile | None = None
-    if row.game_profile_id is not None:
-        profile = await db.scalar(select(GameProfile).where(GameProfile.id == row.game_profile_id))
-    if row.settings.get("demo_telemetry", False):
+    if session_source == "fixture" or row.settings.get("demo_telemetry", False):
         await start_demo_replay(session_id)
         await _seed_director_demo_line(db, session_id)
-    elif profile is not None:
-        await start_live_telemetry(session_id, game_slug=game_slug, install_path=profile.install_path)
-    else:
-        default_profile = await db.scalar(
-            select(GameProfile)
-            .where(GameProfile.game_id == row.game_id, GameProfile.is_default.is_(True))
-            .limit(1)
-        )
-        if default_profile is not None:
-            await start_live_telemetry(
-                session_id, game_slug=game_slug, install_path=default_profile.install_path
-            )
-        elif fixture_fallback_path(game_slug) is not None:
-            await start_demo_replay(session_id)
-            await _seed_director_demo_line(db, session_id)
+    elif install_profile is not None:
+        await start_live_telemetry(session_id, game_slug=game_slug, install_path=install_profile.install_path)
+    elif fixture_fallback_path(game_slug) is not None:
+        await start_demo_replay(session_id)
+        await _seed_director_demo_line(db, session_id)
     if body.launch_game and profile is not None:
         exe = profile.executable_path
 
@@ -231,7 +265,11 @@ async def start_session(
         from titan_api.recording_ops import start_session_recording
 
         await start_session_recording(db, row)
-    return _session_json(row)
+    payload = _session_json(row)
+    if play_attach is not None:
+        payload["play_attach"] = play_attach.as_dict()
+    payload["session_source"] = session_source
+    return payload
 
 
 async def _seed_director_demo_line(db: AsyncSession, session_id: UUID) -> None:
@@ -253,6 +291,73 @@ async def _seed_director_demo_line(db: AsyncSession, session_id: UUID) -> None:
         evidence=[],
         bb_version=bb_version,
     )
+
+
+@router.post("/sessions/{session_id}/play", status_code=status.HTTP_202_ACCEPTED)
+async def set_session_play(
+    session_id: UUID,
+    body: SetSessionPlay,
+    request: Request,
+    db: AsyncSession = SessionDep,
+) -> dict[str, Any]:
+    """Enable or disable agent play on a live session (attach/detach titan-actions)."""
+    row = await _session_or_404(db, session_id)
+    if row.state != "live":
+        raise TitanError(ErrorCode.INVALID_STATE_TRANSITION, "play can only toggle on a live session")
+    controller = request.app.state.session_controller
+    game_row = await db.scalar(select(Game).where(Game.id == row.game_id))
+    game_slug = game_row.slug if game_row is not None else "ksp"
+
+    profile: GameProfile | None = None
+    if row.game_profile_id is not None:
+        profile = await db.scalar(select(GameProfile).where(GameProfile.id == row.game_profile_id))
+    default_profile: GameProfile | None = None
+    if profile is None:
+        default_profile = await db.scalar(
+            select(GameProfile)
+            .where(GameProfile.game_id == row.game_id, GameProfile.is_default.is_(True))
+            .limit(1)
+        )
+    has_install = (profile or default_profile) is not None
+    session_source = resolve_session_source(
+        session_source=str(row.settings.get("session_source") or "") or None,
+        demo_telemetry=bool(row.settings.get("demo_telemetry", False)),
+        has_install=has_install,
+    )
+
+    settings = dict(row.settings or {})
+    settings["play_enabled"] = body.enabled
+    settings["session_source"] = session_source
+    play_attach = None
+    if body.enabled:
+        play_attach = probe_attach(game_slug=game_slug, source=session_source)
+        settings["play_attach"] = play_attach.as_dict()
+        # Restart orchestrator so TITAN_SESSION_PLAY=1 wires proposal + feedback loops.
+        if row.settings.get("agents_enabled", True):
+            controller.restart_orchestrator(
+                session_id,
+                game_slug=game_slug,
+                play_enabled=True,
+                data_dir=row.data_dir,
+            )
+        controller.stop_actions(session_id)
+        controller.start_actions(
+            session_id,
+            game_slug=game_slug,
+            data_dir=row.data_dir,
+            play_backend=play_attach.backend,
+        )
+    else:
+        controller.stop_actions(session_id)
+        settings.pop("play_attach", None)
+    row.settings = settings
+    await db.flush()
+    payload = _session_json(row)
+    payload["session_source"] = session_source
+    if play_attach is not None:
+        payload["play_attach"] = play_attach.as_dict()
+    payload["play_enabled"] = body.enabled
+    return payload
 
 
 @router.post("/sessions/{session_id}/stop", status_code=status.HTTP_202_ACCEPTED)

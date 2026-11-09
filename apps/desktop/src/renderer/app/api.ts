@@ -150,6 +150,14 @@ export const titanApi = createApi({
       }),
       transformResponse: (raw: unknown) => SessionCreatedSchema.parse(raw),
     }),
+    setSessionPlay: build.mutation<SessionCreated, { sessionId: string; enabled: boolean }>({
+      query: ({ sessionId, enabled }) => ({
+        url: `/sessions/${sessionId}/play`,
+        method: "POST",
+        body: { enabled },
+      }),
+      transformResponse: (raw: unknown) => SessionCreatedSchema.parse(raw),
+    }),
     getActiveRecording: build.query<{ item: Recording | null }, string>({
       query: (sessionId) => `/sessions/${sessionId}/recordings/active`,
       transformResponse: (raw: unknown) => {
@@ -214,6 +222,21 @@ export const titanApi = createApi({
           })
           .parse(raw),
     }),
+    getPlayReadiness: build.query<
+      {
+        play_attach: {
+          source: string;
+          backend: string;
+          ready: boolean;
+          message: string;
+          detail?: Record<string, unknown>;
+        };
+      },
+      { gameSlug: string; source: "live" | "fixture" }
+    >({
+      query: ({ gameSlug, source }) =>
+        `/play/readiness?game_slug=${encodeURIComponent(gameSlug)}&source=${source}`,
+    }),
   }),
 });
 
@@ -225,6 +248,7 @@ export const {
   useCreateSessionMutation,
   useStartSessionMutation,
   useStopSessionMutation,
+  useSetSessionPlayMutation,
   useGetActiveRecordingQuery,
   useStartRecordingMutation,
   useStopRecordingMutation,
@@ -232,6 +256,7 @@ export const {
   useScanGamesMutation,
   useCreateGameProfileMutation,
   useGetBlackboardQuery,
+  useGetPlayReadinessQuery,
   useKillMutation,
   useResumeMutation,
 } = titanApi;

@@ -62,6 +62,33 @@ def test_start_orchestrator_passes_play_env() -> None:
     assert env.get("TITAN_SESSION_DATA_DIR") == data_root
 
 
+def test_restart_orchestrator_replaces_child() -> None:
+    spawned: list[object] = []
+
+    class _Proc:
+        def poll(self) -> None:
+            return None
+
+        def terminate(self) -> None:
+            pass
+
+        def wait(self, timeout: float = 0) -> int:
+            return 0
+
+    def fake_spawn(*_a: object, **_k: object) -> _Proc:
+        proc = _Proc()
+        spawned.append(proc)
+        return proc
+
+    ctl = SessionController(spawn=fake_spawn)
+    sid = UUID(int=12)
+    first = ctl.start_orchestrator(sid, play_enabled=False)
+    second = ctl.restart_orchestrator(sid, play_enabled=True, data_dir="C:/Titan/sessions/restart")
+    assert first is not second
+    assert ctl.is_running(sid)
+    assert len(spawned) == 2
+
+
 def test_start_orchestrator_idempotent_and_is_running() -> None:
     class _Proc:
         def poll(self) -> None:

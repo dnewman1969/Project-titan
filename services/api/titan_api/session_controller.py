@@ -83,7 +83,7 @@ class SessionController:
         env = {**os.environ, "TITAN_GAME_SLUG": game_slug}
         if data_dir:
             env["TITAN_SESSION_DATA_DIR"] = data_dir
-        # Fixture / no-install sessions should not pretend to drive kRPC/SCS.
+        # Explicit backend: hil for fixture, krpc/scs when an install is attached.
         if play_backend:
             env["TITAN_PLAY_BACKEND"] = play_backend
         proc = self.spawn(cmd, env=env)
@@ -111,6 +111,26 @@ class SessionController:
         except subprocess.TimeoutExpired:
             child.popen.kill()
 
+    def restart_orchestrator(
+        self,
+        session_id: UUID,
+        *,
+        game_slug: str = "ksp",
+        play_enabled: bool = False,
+        data_dir: str | None = None,
+    ) -> OrchestratorProcess:
+        self.stop_orchestrator(session_id)
+        return self.start_orchestrator(
+            session_id,
+            game_slug=game_slug,
+            play_enabled=play_enabled,
+            data_dir=data_dir,
+        )
+
     def is_running(self, session_id: UUID) -> bool:
         child = self._children.get(session_id)
+        return child is not None and child.popen.poll() is None
+
+    def actions_running(self, session_id: UUID) -> bool:
+        child = self._actions.get(session_id)
         return child is not None and child.popen.poll() is None

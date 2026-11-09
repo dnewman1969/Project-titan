@@ -26,6 +26,7 @@ export type { SystemStatus, SettingsDocument };
 export const CreateSessionSchema = z
   .object({
     game_slug: z.string(),
+    game_profile_id: z.string().uuid().optional(),
     title: z.string(),
     mode: z.enum(["observe", "replay", "autonomous"]),
     settings: z.record(z.unknown()).optional(),
@@ -54,12 +55,23 @@ export const RecordingSchema = z
   .passthrough();
 export type Recording = z.infer<typeof RecordingSchema>;
 
+export const GameProfileListSchema = z
+  .object({
+    id: z.string().uuid(),
+    install_path: z.string(),
+    executable_path: z.string(),
+    is_default: z.boolean().optional(),
+    store: z.string().optional(),
+  })
+  .passthrough();
+
 export const GameListItemSchema = z
   .object({
     id: z.string().uuid(),
     slug: z.string(),
     name: z.string(),
     research_status: z.string().optional(),
+    profiles: z.array(GameProfileListSchema).optional(),
   })
   .passthrough();
 export type GameListItem = z.infer<typeof GameListItemSchema>;
@@ -122,11 +134,11 @@ export const titanApi = createApi({
       query: (body) => ({ url: "/sessions", method: "POST", body }),
       transformResponse: (raw: unknown) => SessionCreatedSchema.parse(raw),
     }),
-    startSession: build.mutation<SessionCreated, string>({
-      query: (sessionId) => ({
+    startSession: build.mutation<SessionCreated, { sessionId: string; launch_game?: boolean }>({
+      query: ({ sessionId, launch_game = false }) => ({
         url: `/sessions/${sessionId}/start`,
         method: "POST",
-        body: { launch_game: false },
+        body: { launch_game },
       }),
       transformResponse: (raw: unknown) => SessionCreatedSchema.parse(raw),
     }),
@@ -152,7 +164,7 @@ export const titanApi = createApi({
       transformResponse: (raw: unknown) => RecordingSchema.parse(raw),
     }),
     listGames: build.query<{ items: GameListItem[] }, undefined>({
-      query: () => "/games",
+      query: () => "/games?include_profiles=true",
       transformResponse: (raw: unknown) => z.object({ items: z.array(GameListItemSchema) }).parse(raw),
     }),
     scanGames: build.mutation<{ detected: unknown[] }, undefined>({

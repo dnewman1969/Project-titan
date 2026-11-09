@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import sys
 from uuid import UUID
 
 from titan_core.ids import uuid7
 from titan_core.logging import configure_logging, get_logger
 from titan_orchestrator.runtime import SessionRuntime
+from titan_orchestrator.session_loops import run_session_loops
 from titan_orchestrator.teams import load_team_template, template_to_roster
 
 log = get_logger(__name__)
@@ -30,6 +32,7 @@ async def _run(session_id: UUID, game_slug: str) -> int:
         roster.append({**agent, "instance_id": uuid7()})
     await runtime.register_team(roster)
     await runtime.start()
+    loops = asyncio.create_task(run_session_loops(runtime), name="session-loops")
     log.info("orchestrator_started", session_id=str(session_id), game=game_slug)
     stop = asyncio.Event()
     try:
@@ -37,6 +40,9 @@ async def _run(session_id: UUID, game_slug: str) -> int:
     except asyncio.CancelledError:
         pass
     finally:
+        loops.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await loops
         await runtime.stop()
     return 0
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import subprocess
 from pathlib import Path
 from typing import Annotated, Any
 from uuid import UUID
@@ -13,13 +14,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from titan_api.auth import Authenticated
-from titan_api.demo_replay import start_demo_replay, stop_demo_replay
+from titan_api.demo_replay import start_demo_replay
 from titan_api.deps import db_session
+from titan_api.session_telemetry import (
+    fixture_fallback_path,
+    start_live_telemetry,
+    stop_all_session_telemetry,
+)
 from titan_core.clock import SessionClock, utc_now
 from titan_core.config import expand_path
 from titan_core.errors import ErrorCode, TitanError
 from titan_core.ids import uuid7
-from titan_db.models.games import Game
+from titan_db.models.games import Game, GameProfile
 from titan_db.models.sessions import Session
 from titan_db.repositories.blackboard import BlackboardRepository
 
@@ -138,7 +144,6 @@ async def start_session(
     request: Request,
     db: AsyncSession = SessionDep,
 ) -> dict[str, Any]:
-    del body
     row = await _session_or_404(db, session_id)
     if row.state in {"starting", "live", "paused", "stopping"}:
         raise TitanError(ErrorCode.SESSION_ALREADY_LIVE, "session already active")
@@ -157,26 +162,57 @@ async def start_session(
         controller.start_orchestrator(session_id, game_slug=game_slug)
     row.state = "live"
     await db.flush()
+    profile: GameProfile | None = None
+    if row.game_profile_id is not None:
+        profile = await db.scalar(select(GameProfile).where(GameProfile.id == row.game_profile_id))
     if row.settings.get("demo_telemetry", False):
         await start_demo_replay(session_id)
-        repo = BlackboardRepository(db)
-        if await repo.latest_entry(session_id, "notes", "director.hello") is None:
-            bb_version = await repo.next_bb_version(session_id)
-            await repo.append(
-                session_id=session_id,
-                section="notes",
-                key="director.hello",
-                version=1,
-                op="put",
-                value={
-                    "text": "I see fixture telemetry. Try to keep up, human — I already optimized the burn.",
-                },
-                author="agent:wernher",
-                confidence=1.0,
-                evidence=[],
-                bb_version=bb_version,
+        await _seed_director_demo_line(db, session_id)
+    elif profile is not None:
+        await start_live_telemetry(session_id, game_slug=game_slug, install_path=profile.install_path)
+    else:
+        default_profile = await db.scalar(
+            select(GameProfile)
+            .where(GameProfile.game_id == row.game_id, GameProfile.is_default.is_(True))
+            .limit(1)
+        )
+        if default_profile is not None:
+            await start_live_telemetry(
+                session_id, game_slug=game_slug, install_path=default_profile.install_path
             )
+        elif fixture_fallback_path(game_slug) is not None:
+            await start_demo_replay(session_id)
+            await _seed_director_demo_line(db, session_id)
+    if body.launch_game and profile is not None:
+        exe = profile.executable_path
+
+        def _launch() -> None:
+            if Path(exe).is_file():
+                subprocess.Popen([exe])  # noqa: S603
+
+        await asyncio.to_thread(_launch)
     return _session_json(row)
+
+
+async def _seed_director_demo_line(db: AsyncSession, session_id: UUID) -> None:
+    repo = BlackboardRepository(db)
+    if await repo.latest_entry(session_id, "notes", "director.hello") is not None:
+        return
+    bb_version = await repo.next_bb_version(session_id)
+    await repo.append(
+        session_id=session_id,
+        section="notes",
+        key="director.hello",
+        version=1,
+        op="put",
+        value={
+            "text": "I see fixture telemetry. Try to keep up, human — I already optimized the burn.",
+        },
+        author="agent:wernher",
+        confidence=1.0,
+        evidence=[],
+        bb_version=bb_version,
+    )
 
 
 @router.post("/sessions/{session_id}/stop", status_code=status.HTTP_202_ACCEPTED)
@@ -190,7 +226,7 @@ async def stop_session(
     if row.state in {"ended", "failed"}:
         raise TitanError(ErrorCode.INVALID_STATE_TRANSITION, "session already ended")
     row.state = "stopping"
-    stop_demo_replay(session_id)
+    stop_all_session_telemetry(session_id)
     request.app.state.session_controller.stop_orchestrator(session_id)
     row.state = "ended"
     row.ended_at = utc_now()

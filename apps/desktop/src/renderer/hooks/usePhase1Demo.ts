@@ -76,7 +76,7 @@ export function usePhase1Demo(): void {
         bootstrapped.current = false;
         return;
       }
-      const started = await startSession(created.data.id);
+      const started = await startSession({ sessionId: created.data.id });
       if ("data" in started && started.data) {
         dispatch(setActiveSession({ id: started.data.id, title: started.data.title }));
         dispatch(showNotice("Demo session live — fixture telemetry driving the bar; crew is listening."));

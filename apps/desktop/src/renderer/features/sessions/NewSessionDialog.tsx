@@ -1,11 +1,13 @@
 import Button from "@mui/material/Button";
+import Checkbox from "@mui/material/Checkbox";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useCreateSessionMutation, useListGamesQuery, useStartSessionMutation } from "../../app/api";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
@@ -24,36 +26,61 @@ function rtkMutationStatus(error: unknown): number | null {
   return typeof status === "number" ? status : null;
 }
 
-/** M7.T6 stub: creates a session when POST /sessions exists; otherwise explains the planned API. */
+/** Create a live session against a scanned install (or fixture fallback when none selected). */
 export function NewSessionDialog() {
   const open = useAppSelector((s) => s.sessions.dialog === "new");
   const dispatch = useAppDispatch();
   const [title, setTitle] = useState("Observe session");
   const [gameSlug, setGameSlug] = useState<string>("ksp");
+  const [profileId, setProfileId] = useState<string>("");
+  const [launchGame, setLaunchGame] = useState(false);
   const { data: gamesList } = useListGamesQuery(undefined);
   const [createSession, { isLoading: creating }] = useCreateSessionMutation();
   const [startSession, { isLoading: starting }] = useStartSessionMutation();
 
-  const games: Array<{ slug: string; label: string }> = gamesList?.items.map((g) => ({
-    slug: g.slug,
-    label: g.name,
-  })) ?? [...FALLBACK_GAMES];
-  const game = games.find((g) => g.slug === gameSlug) ?? FALLBACK_GAMES[0];
+  const games: Array<{ slug: string; label: string; profiles?: Array<{ id: string; label: string }> }> =
+    gamesList?.items.map((g) => ({
+      slug: g.slug,
+      label: g.name,
+      profiles: (g.profiles ?? []).map((p) => ({
+        id: p.id,
+        label: p.install_path,
+      })),
+    })) ?? [...FALLBACK_GAMES];
+  const game = games.find((g) => g.slug === gameSlug) ?? games[0];
+  const profiles = useMemo(() => game?.profiles ?? [], [game]);
+
+  useEffect(() => {
+    if (!profiles.length) {
+      setProfileId("");
+      return;
+    }
+    const preferred = profiles.find((p) => p.id === profileId);
+    if (!preferred) {
+      setProfileId(profiles[0]?.id ?? "");
+    }
+  }, [gameSlug, profiles, profileId]);
+
   const isLoading = creating || starting;
   const onClose = () => {
     dispatch(closeSessionDialog());
   };
 
   const onCreate = async () => {
+    if (!game) return;
     const sessionTitle = title.trim() || "Observe session";
     const result = await createSession({
       game_slug: game.slug,
+      game_profile_id: profileId || undefined,
       title: sessionTitle,
       mode: "observe",
       settings: { agents_enabled: true },
     });
     if ("data" in result && result.data) {
-      const started = await startSession(result.data.id);
+      const started = await startSession({
+        sessionId: result.data.id,
+        launch_game: launchGame && Boolean(profileId),
+      });
       if ("data" in started && started.data) {
         dispatch(
           setActiveSession({
@@ -83,7 +110,7 @@ export function NewSessionDialog() {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} aria-labelledby="new-session-title" maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={onClose} aria-labelledby="new-session-title" maxWidth="sm" fullWidth>
       <DialogTitle id="new-session-title">New session</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
         <TextField
@@ -110,6 +137,41 @@ export function NewSessionDialog() {
             </MenuItem>
           ))}
         </TextField>
+        {profiles.length > 0 ? (
+          <TextField
+            select
+            label="Installation"
+            value={profileId}
+            onChange={(e) => {
+              setProfileId(e.target.value);
+            }}
+            fullWidth
+            helperText="Use Scan installed games first if your copy is missing."
+          >
+            {profiles.map((p) => (
+              <MenuItem key={p.id} value={p.id}>
+                {p.label}
+              </MenuItem>
+            ))}
+          </TextField>
+        ) : (
+          <FormControlLabel
+            control={<Checkbox disabled checked={false} />}
+            label="No install detected — session will use fixture/demo telemetry until you scan."
+          />
+        )}
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={launchGame}
+              disabled={!profileId}
+              onChange={(e) => {
+                setLaunchGame(e.target.checked);
+              }}
+            />
+          }
+          label="Launch game executable when session starts"
+        />
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>

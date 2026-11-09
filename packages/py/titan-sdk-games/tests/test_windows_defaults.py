@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from titan_sdk_games.discovery.gog_registry import GogRegistryInstall, list_gog_registry_installs
 from titan_sdk_games.discovery.windows_defaults import (
     _steam_registry_candidates,
     enrich_discovery_context,
@@ -55,7 +56,9 @@ def test_enrich_windows_epic_manifest_and_common_scan_paths(tmp_path: Path) -> N
         extra_paths=[],
         env={"STEAM_PATH": str(steam), "PROGRAMDATA": str(programdata)},
     )
-    assert ctx.epic_manifest_dirs == [programdata / "Epic" / "EpicGamesLauncher" / "Data" / "Manifests"]
+    primary = programdata / "Epic" / "EpicGamesLauncher" / "Data" / "Manifests"
+    assert primary in ctx.epic_manifest_dirs
+    assert len(ctx.epic_manifest_dirs) >= 2
     assert common in ctx.extra_paths
 
 
@@ -77,6 +80,43 @@ def test_steam_libraryfolders_multiple_entries(tmp_path: Path) -> None:
     assert str(steam) in lib_strs
     assert str(lib_a) in lib_strs
     assert str(lib_b) in lib_strs
+
+
+def test_default_gog_roots_include_registry_install(tmp_path: Path, monkeypatch) -> None:
+    install = tmp_path / "Kerbal"
+    install.mkdir()
+    monkeypatch.setattr(
+        "titan_sdk_games.discovery.gog_registry.list_gog_registry_installs",
+        lambda: [
+            GogRegistryInstall(
+                product_id="1429864849",
+                install_path=install,
+                executable_path=None,
+                game_name="KSP",
+                build_id=None,
+            )
+        ],
+    )
+    from titan_sdk_games.discovery.windows_defaults import _default_gog_roots
+
+    roots = _default_gog_roots()
+    assert install in roots
+
+
+def test_gog_registry_empty_off_windows(monkeypatch) -> None:
+    monkeypatch.setattr("os.name", "posix")
+    assert list_gog_registry_installs() == []
+
+
+def test_enrich_windows_epic_manifest_includes_localappdata(tmp_path: Path) -> None:
+    programdata = tmp_path / "ProgramData"
+    localappdata = tmp_path / "LocalAppData"
+    ctx = enrich_discovery_context(
+        platform="windows",
+        env={"PROGRAMDATA": str(programdata), "LOCALAPPDATA": str(localappdata)},
+    )
+    local_manifests = localappdata / "EpicGamesLauncher" / "Data" / "Manifests"
+    assert local_manifests in ctx.epic_manifest_dirs
 
 
 def test_steam_registry_candidates_dedupes(monkeypatch) -> None:

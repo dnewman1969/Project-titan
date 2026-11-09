@@ -116,19 +116,66 @@ def _default_steam_libraries(env: dict[str, str]) -> list[Path]:
 
 
 def _default_epic_manifest_dirs(env: dict[str, str]) -> list[Path]:
+    dirs: list[Path] = []
     programdata = env.get("PROGRAMDATA") or r"C:\ProgramData"
-    return [Path(programdata) / "Epic" / "EpicGamesLauncher" / "Data" / "Manifests"]
+    dirs.append(Path(programdata) / "Epic" / "EpicGamesLauncher" / "Data" / "Manifests")
+    localappdata = env.get("LOCALAPPDATA")
+    if localappdata:
+        alt = Path(localappdata) / "EpicGamesLauncher" / "Data" / "Manifests"
+        if alt not in dirs:
+            dirs.append(alt)
+    for candidate in (
+        Path(r"C:\ProgramData\Epic\EpicGamesLauncher\Data\Manifests"),
+        Path(r"C:\Program Files\Epic Games"),
+    ):
+        if candidate not in dirs:
+            dirs.append(candidate)
+    return dirs
+
+
+def _gog_default_pack_path() -> Path | None:
+    if os.name != "nt":
+        return None
+    try:
+        import winreg
+
+        with winreg.OpenKey(  # type: ignore[attr-defined]
+            winreg.HKEY_LOCAL_MACHINE,  # type: ignore[attr-defined]
+            r"SOFTWARE\WOW6432Node\GOG.com",
+        ) as key:
+            raw, _ = winreg.QueryValueEx(key, "DefaultPackPath")  # type: ignore[attr-defined]
+        if isinstance(raw, str) and raw.strip():
+            return Path(raw.strip().replace("/", "\\"))
+    except OSError:
+        return None
+    return None
 
 
 def _default_gog_roots() -> list[Path]:
     roots: list[Path] = []
+    pack = _gog_default_pack_path()
+    if pack is not None and pack.is_dir():
+        roots.append(pack)
     for candidate in (
         Path(r"C:\Program Files (x86)\GOG Galaxy\Games"),
+        Path(r"C:\Program Files\GOG Galaxy\Games"),
         Path(r"C:\GOG Games"),
         Path(r"D:\GOG Games"),
+        Path(r"E:\GOG Games"),
     ):
-        if candidate.is_dir():
+        if candidate.is_dir() and candidate not in roots:
             roots.append(candidate)
+    try:
+        from titan_sdk_games.discovery.gog_registry import list_gog_registry_installs
+
+        for reg in list_gog_registry_installs():
+            parent = reg.install_path.parent
+            if parent.is_dir() and parent not in roots:
+                roots.append(parent)
+            if reg.install_path.is_dir() and reg.install_path not in roots:
+                roots.append(reg.install_path)
+    except OSError:
+        pass
     return roots
 
 

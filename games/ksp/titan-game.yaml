@@ -7,8 +7,10 @@ genre: [simulation, space]
 detection:
   # 220200 = KSP1 Steam; 2202000 = KSP2; 97000 = legacy/direct
   steam_app_ids: [2202000, 220200, 97000]
-  epic_catalog_ids: []
-  gog_product_ids: []
+  epic_catalog_ids:
+    - "84686da593b24598803ffbe7f9b1bb5e"
+    - "KerbalSpaceProgram"
+  gog_product_ids: ["1429864849"]
   executables: ["KSP_x64.exe", "KSP.exe"]
   registry_keys: []
 launch:

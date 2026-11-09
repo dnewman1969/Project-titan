@@ -24,9 +24,11 @@ from uuid import UUID
 import pytest
 
 from titan_actions.drivers.hil_driver import hil_state
+from titan_actions.drivers.krpc_driver import KrpcDriver
+from titan_actions.drivers.scs_driver import ScsDriver
 from titan_actions.executor import PlayExecutor
 from titan_actions.play_env import PlaySettings
-from titan_core.play_attach import probe_attach, resolve_session_source
+from titan_core.play_attach import PlayAttach, probe_attach, resolve_session_source
 from titan_core.protocol.envelope import Address, Envelope, make_envelope
 from titan_core.protocol.payloads import ActionExecuted, ActionPropose
 from titan_core.protocol.telemetry import TELEMETRY_SCHEMA
@@ -190,6 +192,26 @@ def _telemetry_json(session_id: UUID) -> str:
     )
 
 
+def _speeding_event_json(session_id: UUID) -> str:
+    return json.dumps(
+        {
+            "id": str(UUID(int=6)),
+            "session_id": str(session_id),
+            "seq": 1,
+            "type": "vehicle.speeding",
+            "category": "game",
+            "severity": "warning",
+            "salience": 0.75,
+            "source": "rule:vehicle.speeding",
+            "t_mono_ns": 1,
+            "t_session_ms": 1,
+            "occurred_at": datetime(2026, 1, 1, tzinfo=UTC).isoformat(),
+            "frame_seq": 1,
+            "payload": {"speed_mps": 30},
+        }
+    )
+
+
 def _ksp_launch_event_json(session_id: UUID) -> str:
     return json.dumps(
         {
@@ -311,3 +333,136 @@ async def test_learn_play_smoke_closed_loop(tmp_path: Path, monkeypatch: pytest.
     assert note.get("commentary") is True
     assert note.get("ok") is True
     assert note.get("kind") in {"incredible", "feast"}
+
+
+class _KrpcControl:
+    throttle: float = 0.0
+
+    def activate_next_stage(self) -> None:
+        return
+
+
+class _KrpcVessel:
+    control = _KrpcControl()
+
+
+class _KrpcConn:
+    space_center = type("SC", (), {"active_vessel": _KrpcVessel()})()
+
+
+class FakePad:
+    def __init__(self) -> None:
+        self.right: list[float] = []
+        self.updates = 0
+
+    def right_trigger_float(self, *, value_float: float) -> None:
+        self.right.append(value_float)
+
+    def update(self) -> None:
+        self.updates += 1
+
+
+async def _await_play_feedback(runtime: SmokeRuntime) -> None:
+    for _ in range(200):
+        feedback = [
+            p
+            for p in runtime.bb.puts
+            if p.get("section") == "lessons" and str(p.get("key", "")).startswith("feedback.")
+        ]
+        notes = [
+            p
+            for p in runtime.bb.puts
+            if p.get("section") == "notes" and str(p.get("key", "")).startswith("commentary.")
+        ]
+        if feedback and notes:
+            runtime._stopped.set()
+            return
+        await asyncio.sleep(0.02)
+    runtime._stopped.set()
+
+
+@pytest.mark.asyncio
+async def test_learn_play_krpc_backend_closed_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Event → proposal → mocked kRPC driver applies throttle (not HIL-only attach)."""
+    monkeypatch.setenv("TITAN_PLAY_BACKEND", "krpc")
+    monkeypatch.setenv("TITAN_GAME_SLUG", "ksp")
+    sid = UUID(int=4602)
+    clear_play_memory(str(sid))
+    settings = PlaySettings.from_environ()
+    attach = PlayAttach(source="live", backend="krpc", ready=True, message="mock krpc")
+    _KrpcVessel.control.throttle = 0.0
+    driver = KrpcDriver(
+        host="127.0.0.1",
+        rpc_port=50000,
+        stream_port=50001,
+        connect_fn=lambda *_a, **_k: _KrpcConn(),
+    )
+    executor = PlayExecutor(
+        session_id=sid,
+        data_dir=tmp_path,
+        settings=settings,
+        driver=driver,
+        attach=attach,
+    )
+    bus = ClosingBus(session_id=sid, executor=executor)
+    runtime = SmokeRuntime(
+        session_id=sid,
+        redis=FakeRedis(
+            sid,
+            telemetry_json=_telemetry_json(sid),
+            event_json=_ksp_launch_event_json(sid),
+        ),
+        bus=bus,
+    )
+    task = asyncio.create_task(run_session_loops(runtime, play_enabled=True))  # type: ignore[arg-type]
+    await asyncio.wait_for(_await_play_feedback(runtime), timeout=5.0)
+    await asyncio.wait_for(task, timeout=5.0)
+
+    assert _KrpcVessel.control.throttle == 0.75
+    attach_body = json.loads((tmp_path / "play_attach.json").read_text(encoding="utf-8"))
+    assert attach_body["backend"] == "krpc"
+    assert attach_body["source"] == "live"
+    proposes = [e for e in bus.published if e.type == "action.propose"]
+    assert proposes
+    assert ActionPropose.model_validate(proposes[0].payload).action_id == "ksp.throttle"
+
+
+@pytest.mark.asyncio
+async def test_learn_play_scs_vigem_backend_closed_loop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ETS2 speeding event → eased throttle on mocked ViGEm pad."""
+    monkeypatch.setenv("TITAN_PLAY_BACKEND", "scs")
+    monkeypatch.setenv("TITAN_GAME_SLUG", "ets2")
+    sid = UUID(int=4603)
+    clear_play_memory(str(sid))
+    settings = PlaySettings.from_environ()
+    pad = FakePad()
+    attach = PlayAttach(source="live", backend="scs", ready=True, message="mock vigem")
+    driver = ScsDriver(pad_factory=lambda: pad)
+    executor = PlayExecutor(
+        session_id=sid,
+        data_dir=tmp_path,
+        settings=settings,
+        driver=driver,
+        attach=attach,
+    )
+    bus = ClosingBus(session_id=sid, executor=executor)
+    runtime = SmokeRuntime(
+        session_id=sid,
+        redis=FakeRedis(
+            sid,
+            telemetry_json=_telemetry_json(sid),
+            event_json=_speeding_event_json(sid),
+        ),
+        bus=bus,
+    )
+    task = asyncio.create_task(run_session_loops(runtime, play_enabled=True))  # type: ignore[arg-type]
+    await asyncio.wait_for(_await_play_feedback(runtime), timeout=5.0)
+    await asyncio.wait_for(task, timeout=5.0)
+
+    assert pad.right == [0.2]
+    attach_body = json.loads((tmp_path / "play_attach.json").read_text(encoding="utf-8"))
+    assert attach_body["backend"] == "scs"
+    proposes = [e for e in bus.published if e.type == "action.propose"]
+    assert ActionPropose.model_validate(proposes[0].payload).action_id == "scs.throttle"

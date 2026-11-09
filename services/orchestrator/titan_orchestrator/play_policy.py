@@ -110,7 +110,12 @@ def _base_proposal(event: GameEvent) -> dict[str, Any] | None:
             "risk": "low",
             "expected_effect": "Gear down for a safer landing.",
         }
-    if event.type in {"ets2.collision", "scs.hard_brake", "ats.collision"}:
+    if event.type in {
+        "ets2.collision",
+        "vehicle.collision",
+        "scs.hard_brake",
+        "ats.collision",
+    }:
         return {
             "action_id": "scs.brake",
             "params": {"fraction": 0.6},
@@ -118,7 +123,7 @@ def _base_proposal(event: GameEvent) -> dict[str, Any] | None:
             "risk": "medium",
             "expected_effect": "Vehicle slows to a safe speed.",
         }
-    if event.type in {"ets2.overspeed", "ats.overspeed", "scs.overspeed"}:
+    if event.type in {"ets2.overspeed", "vehicle.speeding", "ats.overspeed", "scs.overspeed"}:
         return {
             "action_id": "scs.throttle",
             "params": {"throttle": 0.2},

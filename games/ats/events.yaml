@@ -29,3 +29,38 @@
   severity: warning
   salience: 0.8
   marker: { kind: funny, duration_ms: 8000 }
+- id: vehicle.speeding
+  type: vehicle.speeding
+  when:
+    all:
+      - { path: "vehicle.velocity.speed_mps", op: "crossed_above", value: 27.8 }
+      - { path: "paused", op: "==", value: false }
+  cooldown_s: 20
+  severity: warning
+  salience: 0.75
+  payload:
+    speed_mps: "vehicle.velocity.speed_mps"
+    speed_limit_mps: "environment.speed_limit_mps"
+- id: vehicle.collision
+  type: vehicle.collision
+  when:
+    all:
+      - { path: "vehicle.damage.overall", op: "changed" }
+      - { path: "vehicle.damage.overall", op: ">", value: 0.02 }
+  cooldown_s: 3
+  severity: critical
+  salience: 0.95
+  marker: { kind: failure, duration_ms: 6000 }
+  payload:
+    damage: "vehicle.damage.overall"
+- id: scs.hard_brake
+  type: scs.hard_brake
+  when:
+    all:
+      - { path: "vehicle.velocity.speed_mps", op: "crossed_below", value: 4.0 }
+      - { path: "paused", op: "==", value: false }
+  cooldown_s: 5
+  severity: notice
+  salience: 0.7
+  payload:
+    speed_mps: "vehicle.velocity.speed_mps"

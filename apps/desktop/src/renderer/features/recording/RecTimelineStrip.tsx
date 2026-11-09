@@ -14,6 +14,7 @@ function eventLabel(kind: unknown): string {
   if (kind === "lesson.proposed") return "Lesson";
   if (kind === "lesson.feedback") return "Outcome";
   if (kind === "agent.commentary") return "Banter";
+  if (kind === "video.stub") return "Video stub";
   return kind;
 }
 

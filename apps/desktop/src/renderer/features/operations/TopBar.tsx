@@ -221,6 +221,7 @@ export function TopBar({ status }: { status: ApiStatus }) {
       />
       <StatusPill status={status.postgres} label="Database" detail={status.postgresDetail} />
       <StatusPill status={status.services} label="Services" detail={status.servicesDetail} />
+      <StatusPill status={status.obs} label="OBS" detail={status.obsDetail} />
       <Tooltip
         title={
           activeSessionId

@@ -43,6 +43,18 @@ export const SessionCreatedSchema = z
   .passthrough();
 export type SessionCreated = z.infer<typeof SessionCreatedSchema>;
 
+export const CaptureTrackSchema = z
+  .object({
+    id: z.string(),
+    kind: z.string().optional(),
+    label: z.string().optional(),
+    source: z.string().optional(),
+    state: z.string().optional(),
+    path: z.string().optional(),
+  })
+  .passthrough();
+export type CaptureTrack = z.infer<typeof CaptureTrackSchema>;
+
 export const RecordingSchema = z
   .object({
     id: z.string().uuid(),
@@ -52,9 +64,37 @@ export const RecordingSchema = z
     root_dir: z.string().optional(),
     duration_ms: z.number().nullable().optional(),
     error: z.string().nullable().optional(),
+    tracks: z.array(CaptureTrackSchema).optional(),
+    obs: z
+      .object({
+        connected: z.boolean().optional(),
+        status: z.record(z.string(), z.unknown()).optional(),
+      })
+      .passthrough()
+      .optional(),
   })
   .passthrough();
 export type Recording = z.infer<typeof RecordingSchema>;
+
+export const ObsCaptureStatusSchema = z
+  .object({
+    state: z.string(),
+    detail: z.string().nullable().optional(),
+    host: z.string().optional(),
+    port: z.number().optional(),
+    connected: z.boolean(),
+    version: z.record(z.string(), z.unknown()).nullable().optional(),
+    provision: z.record(z.string(), z.unknown()).nullable().optional(),
+    record: z
+      .object({
+        active: z.boolean(),
+        paused: z.boolean(),
+        duration_ms: z.number().nullable().optional(),
+      })
+      .optional(),
+  })
+  .passthrough();
+export type ObsCaptureStatus = z.infer<typeof ObsCaptureStatusSchema>;
 
 export const TimelineEventSchema = z.record(z.string(), z.unknown());
 export type TimelineEvent = z.infer<typeof TimelineEventSchema>;
@@ -198,6 +238,10 @@ export const titanApi = createApi({
         `/sessions/${sessionId}/recordings/timeline${limit != null ? `?limit=${limit}` : ""}`,
       transformResponse: (raw: unknown) => RecordingTimelineSchema.parse(raw),
     }),
+    getObsCaptureStatus: build.query<ObsCaptureStatus, undefined>({
+      query: () => "/capture/obs",
+      transformResponse: (raw: unknown) => ObsCaptureStatusSchema.parse(raw),
+    }),
     listGames: build.query<{ items: GameListItem[] }, undefined>({
       query: () => "/games?include_profiles=true",
       transformResponse: (raw: unknown) => z.object({ items: z.array(GameListItemSchema) }).parse(raw),
@@ -270,6 +314,7 @@ export const {
   useSetSessionPlayMutation,
   useGetActiveRecordingQuery,
   useGetRecordingTimelineQuery,
+  useGetObsCaptureStatusQuery,
   useStartRecordingMutation,
   useStopRecordingMutation,
   useListGamesQuery,

@@ -34,7 +34,7 @@ async def _mock_obs_handler(connection: ServerConnection) -> None:
             response_data = {"obsVersion": "30.0.0", "obsWebSocketVersion": "5.0.1", "rpcVersion": 1}
         elif request_type == "GetRecordStatus":
             response_data = {"outputActive": True, "outputPaused": False, "outputTimecode": 12_500}
-        elif request_type == "StartRecord":
+        elif request_type in {"StartRecord", "StopRecord"}:
             response_data = {}
         else:
             response_data = {}
@@ -69,6 +69,9 @@ async def test_obs_client_handshake_and_record_status(obs_ws_server: str) -> Non
         assert status.active is True
         assert status.duration_ms == 12_500
         await client.start_recording()
+        plan = await client.provision_titan_profile()
+        assert plan["status"] == "planned"
+        assert plan["obs_version"] == "30.0.0"
     finally:
         await client.close()
 
@@ -85,7 +88,6 @@ async def test_obs_probe_http_with_respx() -> None:
 
 
 @pytest.mark.asyncio
-async def test_obs_provision_profile_stub() -> None:
-    plan = await ObsClient().provision_titan_profile()
-    assert plan["profile"] == "Titan"
-    assert plan["status"] == "stub"
+async def test_obs_provision_profile_requires_connection() -> None:
+    with pytest.raises(RuntimeError, match="not connected"):
+        await ObsClient().provision_titan_profile()

@@ -108,10 +108,18 @@ def test_recording_start_stop_without_obs(api_client: TestClient, game_slug: str
     body = started.json()
     assert body["state"] == "recording"
     assert body["manifest_path"]
+    assert body["obs"]["connected"] is False
+    assert len(body["tracks"]) == 4
+    assert body["tracks"][0]["source"] == "stub"
+    from pathlib import Path
+
+    stub = Path(body["root_dir"]) / body["tracks"][0]["path"]
+    assert stub.is_file()
 
     active = api_client.get(f"/api/v1/sessions/{sid}/recordings/active", headers=AUTH)
     assert active.status_code == 200
     assert active.json()["item"]["id"] == body["id"]
+    assert active.json()["item"]["tracks"]
 
     stopped = api_client.post(f"/api/v1/sessions/{sid}/recordings/stop", headers=AUTH)
     assert stopped.status_code == 200, stopped.text
@@ -141,3 +149,13 @@ def test_recording_timeline_endpoint(api_client: TestClient, game_slug: str) -> 
     assert body["recording"] is not None
     assert body["recording"]["id"] == started.json()["id"]
     assert any(ev.get("kind") == "recording.start" for ev in body["events"])
+    assert any(ev.get("kind") == "video.stub" for ev in body["events"])
+
+
+def test_capture_obs_endpoint(api_client: TestClient) -> None:
+    res = api_client.get("/api/v1/capture/obs", headers=AUTH)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["state"] in {"up", "down", "degraded", "unknown"}
+    assert "connected" in body
+    assert body["port"] == 4455

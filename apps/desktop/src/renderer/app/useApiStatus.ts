@@ -16,6 +16,8 @@ export interface ApiStatus {
   postgresDetail: string;
   services: Status;
   servicesDetail: string;
+  obs: Status;
+  obsDetail: string;
 }
 
 const RANK: Status[] = ["ok", "unknown", "degraded", "down"];
@@ -58,6 +60,9 @@ export function useApiStatus(): ApiStatus {
     ? summarizeServices(status.data?.services)
     : ["unknown", "API offline"];
   const postgresDetail = pg?.detail ?? pg?.version ?? (healthy ? "checking" : "API offline");
+  const obsDep = status.data?.dependencies.obs;
+  const obs: Status = healthy && obsDep ? SERVICE_STATUS[obsDep.state] : "unknown";
+  const obsDetail = obsDep?.detail ?? obsDep?.version ?? (healthy ? "obs-websocket :4455" : "API offline");
 
   const previous = useRef<Status>("unknown");
   useEffect(() => {
@@ -93,5 +98,5 @@ export function useApiStatus(): ApiStatus {
     }
   }, [api, apiDetail, dispatch]);
 
-  return { api, apiDetail, postgres, postgresDetail, services, servicesDetail };
+  return { api, apiDetail, postgres, postgresDetail, services, servicesDetail, obs, obsDetail };
 }

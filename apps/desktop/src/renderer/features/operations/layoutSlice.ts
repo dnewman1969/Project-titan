@@ -12,6 +12,7 @@ export interface LayoutState {
   notice: { id: number; text: string } | null;
   aboutOpen: boolean;
   firstRunOpen: boolean;
+  publishOpen: boolean;
 }
 
 const initialState: LayoutState = {
@@ -21,6 +22,7 @@ const initialState: LayoutState = {
   notice: null,
   aboutOpen: false,
   firstRunOpen: false,
+  publishOpen: false,
 };
 
 export const layoutSlice = createSlice({
@@ -53,6 +55,9 @@ export const layoutSlice = createSlice({
     setFirstRunOpen(state, action: PayloadAction<boolean>) {
       state.firstRunOpen = action.payload;
     },
+    setPublishOpen(state, action: PayloadAction<boolean>) {
+      state.publishOpen = action.payload;
+    },
   },
 });
 
@@ -65,4 +70,5 @@ export const {
   dismissNotice,
   setAboutOpen,
   setFirstRunOpen,
+  setPublishOpen,
 } = layoutSlice.actions;

@@ -127,6 +127,7 @@ export const MENU: readonly MenuSection[] = [
     label: "TOOLS",
     items: [
       cmd("tools.gameDiscovery", "Game Discovery"),
+      cmd("tools.youtubePublish", "YouTube Publish"),
       cmd("tools.integrationInstaller", "Integration Installer", "M7.T1"),
       sep,
       cmd("tools.logs", "Logs", "M10.T4"),

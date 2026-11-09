@@ -69,6 +69,7 @@ describe("menu", () => {
       "Recording Settings",
       "Open Folder",
       "Game Discovery",
+      "YouTube Publish",
       "Integration Installer",
       "Logs",
       "Diagnostics Bundle",

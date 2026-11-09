@@ -96,6 +96,50 @@ export const ObsCaptureStatusSchema = z
   .passthrough();
 export type ObsCaptureStatus = z.infer<typeof ObsCaptureStatusSchema>;
 
+export const YoutubeAccountSchema = z
+  .object({
+    id: z.string().uuid(),
+    platform: z.string(),
+    display_name: z.string(),
+    remote_channel_id: z.string(),
+    credential_ref: z.string(),
+    status: z.string(),
+    scopes: z.array(z.string()).optional(),
+    connected_at: z.string().nullable().optional(),
+    stub: z.boolean().optional(),
+  })
+  .passthrough();
+export type YoutubeAccount = z.infer<typeof YoutubeAccountSchema>;
+
+export const YoutubeAccountStatusSchema = z
+  .object({
+    connected: z.boolean(),
+    stub: z.boolean().optional(),
+    account: YoutubeAccountSchema.nullable(),
+    message: z.string().optional(),
+  })
+  .passthrough();
+export type YoutubeAccountStatus = z.infer<typeof YoutubeAccountStatusSchema>;
+
+export const UploadJobSchema = z
+  .object({
+    id: z.string().uuid(),
+    video_project_id: z.string().uuid(),
+    account_id: z.string().uuid(),
+    platform: z.string(),
+    status: z.string(),
+    privacy: z.string(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+    approved_at: z.string().nullable().optional(),
+    approved_by: z.string().nullable().optional(),
+    remote_video_id: z.string().nullable().optional(),
+    remote_url: z.string().nullable().optional(),
+    title: z.string().optional(),
+    session_id: z.string().uuid().nullable().optional(),
+  })
+  .passthrough();
+export type UploadJob = z.infer<typeof UploadJobSchema>;
+
 export const TimelineEventSchema = z.record(z.string(), z.unknown());
 export type TimelineEvent = z.infer<typeof TimelineEventSchema>;
 
@@ -242,6 +286,37 @@ export const titanApi = createApi({
       query: () => "/capture/obs",
       transformResponse: (raw: unknown) => ObsCaptureStatusSchema.parse(raw),
     }),
+    getYoutubeAccount: build.query<YoutubeAccountStatus, undefined>({
+      query: () => "/accounts/youtube",
+      transformResponse: (raw: unknown) => YoutubeAccountStatusSchema.parse(raw),
+    }),
+    connectYoutubeStub: build.mutation<YoutubeAccountStatus, undefined>({
+      query: () => ({ url: "/accounts/youtube/connect", method: "POST" }),
+      transformResponse: (raw: unknown) => YoutubeAccountStatusSchema.parse(raw),
+    }),
+    disconnectYoutubeStub: build.mutation<YoutubeAccountStatus, undefined>({
+      query: () => ({ url: "/accounts/youtube/disconnect", method: "POST" }),
+      transformResponse: (raw: unknown) => YoutubeAccountStatusSchema.parse(raw),
+    }),
+    listUploadJobs: build.query<{ items: UploadJob[] }, { limit?: number } | undefined>({
+      query: (args) => `/upload-jobs${args?.limit != null ? `?limit=${args.limit}` : ""}`,
+      transformResponse: (raw: unknown) => z.object({ items: z.array(UploadJobSchema) }).parse(raw),
+    }),
+    createUploadJob: build.mutation<
+      UploadJob,
+      { title: string; session_id?: string; privacy?: "private" | "unlisted" | "public" }
+    >({
+      query: (body) => ({ url: "/upload-jobs", method: "POST", body }),
+      transformResponse: (raw: unknown) => UploadJobSchema.parse(raw),
+    }),
+    approveUploadJob: build.mutation<UploadJob, string>({
+      query: (jobId) => ({ url: `/upload-jobs/${jobId}/approve`, method: "POST" }),
+      transformResponse: (raw: unknown) => UploadJobSchema.parse(raw),
+    }),
+    stubUploadJob: build.mutation<UploadJob, string>({
+      query: (jobId) => ({ url: `/upload-jobs/${jobId}/upload`, method: "POST" }),
+      transformResponse: (raw: unknown) => UploadJobSchema.parse(raw),
+    }),
     listGames: build.query<{ items: GameListItem[] }, undefined>({
       query: () => "/games?include_profiles=true",
       transformResponse: (raw: unknown) => z.object({ items: z.array(GameListItemSchema) }).parse(raw),
@@ -315,6 +390,13 @@ export const {
   useGetActiveRecordingQuery,
   useGetRecordingTimelineQuery,
   useGetObsCaptureStatusQuery,
+  useGetYoutubeAccountQuery,
+  useConnectYoutubeStubMutation,
+  useDisconnectYoutubeStubMutation,
+  useListUploadJobsQuery,
+  useCreateUploadJobMutation,
+  useApproveUploadJobMutation,
+  useStubUploadJobMutation,
   useStartRecordingMutation,
   useStopRecordingMutation,
   useListGamesQuery,

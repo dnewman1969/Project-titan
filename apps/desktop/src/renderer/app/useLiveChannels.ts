@@ -14,7 +14,7 @@ export function useLiveChannels(): void {
   useEffect(() => {
     const titan = getTitan();
     if (titan.backend === "none") return;
-    const demoSession = import.meta.env.VITE_TITAN_DEMO_SESSION as string | undefined;
+    const demoSession = import.meta.env.VITE_TITAN_DEMO_SESSION;
     const sessionChannels = demoSession
       ? [`session.${demoSession}.telemetry`, `session.${demoSession}.events`]
       : [];

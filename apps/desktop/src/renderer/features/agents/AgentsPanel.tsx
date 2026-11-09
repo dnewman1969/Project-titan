@@ -182,8 +182,8 @@ export function AgentsPanel() {
         >
           {lines.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", mt: 4 }}>
-              Live play outcomes speak through Owlbox when VITE_OWL_TTS_URL is set. Tap an agent or
-              Brag / Roast me for a demo; set VITE_COMFYUI_VIEW_URL for ComfyUI portraits.
+              Live play outcomes speak through Owlbox when VITE_OWL_TTS_URL is set. Tap an agent or Brag /
+              Roast me for a demo; set VITE_COMFYUI_VIEW_URL for ComfyUI portraits.
             </Typography>
           ) : (
             lines.map((line) => (

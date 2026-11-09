@@ -4,11 +4,7 @@ import type { AppDispatch } from "../app/store";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { setSpeaking } from "../features/agents/agentsChatSlice";
 import { OWL_VOICE_BY_ROLE } from "../features/agents/arrogantLines";
-import {
-  shouldSpeakLiveAgentLine,
-  speakAgentLine,
-  stripChatVoicePrefix,
-} from "../services/voice/speak";
+import { shouldSpeakLiveAgentLine, speakAgentLine, stripChatVoicePrefix } from "../services/voice/speak";
 
 /**
  * Speak live session agent lines (banter / play outcomes) through Owlbox TTS.

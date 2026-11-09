@@ -113,9 +113,11 @@ export async function speakAgentLine(text: string, opts: SpeakOptions = {}): Pro
 let speechQueue: Promise<void> = Promise.resolve();
 
 export function enqueueAgentSpeech(text: string, opts: SpeakOptions = {}): Promise<void> {
-  const run = speechQueue.then(() => speakAgentLine(text, opts)).catch(() => {
-    /* keep queue alive after a failed line */
-  });
+  const run = speechQueue
+    .then(() => speakAgentLine(text, opts))
+    .catch(() => {
+      /* keep queue alive after a failed line */
+    });
   speechQueue = run;
   return run;
 }
@@ -125,9 +127,5 @@ export function stripChatVoicePrefix(text: string): string {
 }
 
 export function shouldSpeakLiveAgentLine(text: string): boolean {
-  return (
-    text.startsWith("[banter]") ||
-    text.startsWith("[outcome]") ||
-    text.startsWith("[outcome fail]")
-  );
+  return text.startsWith("[banter]") || text.startsWith("[outcome]") || text.startsWith("[outcome fail]");
 }

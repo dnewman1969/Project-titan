@@ -9,7 +9,7 @@ import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useCreateGameProfileMutation, useListGamesQuery, useScanGamesMutation } from "../../app/api";
 import { formatApiError } from "../../app/formatApiError";
@@ -39,13 +39,23 @@ export function GamesDiscoveryPanel() {
 
   const profileCount = (data?.items ?? []).reduce((n, g) => n + (g.profiles?.length ?? 0), 0);
 
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
   const onScan = async () => {
     const extra = extraPath.trim() ? [extraPath.trim()] : [];
     const result = await scan({ extra_paths: extra });
     if ("data" in result && result.data) {
       const detected = Array.isArray(result.data.detected) ? result.data.detected : [];
       setLastDetected(detected);
-      dispatch(showNotice(`Scan complete: ${detected.length} Titan game install(s) found.`));
+      const ctx = result.data.scan_context;
+      const steamRoots = ctx?.steam_libraries?.length ?? 0;
+      const notice =
+        detected.length > 0
+          ? `Scan complete: ${detected.length} Titan game install(s) found.`
+          : `Scan complete: 0 Titan installs (checked ${steamRoots} Steam library root(s)). Use Register below with Browse….`;
+      dispatch(showNotice(notice));
       void refetch();
       return;
     }

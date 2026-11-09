@@ -61,11 +61,11 @@ class GameAdapter(ABC):
     def normalize(self, raw: RawFrame) -> TelemetryFrame: ...
 
     @classmethod
-    def detect(cls, ctx: DiscoveryContext) -> list[DetectedInstall]:
+    def detect(cls, ctx: DiscoveryContext, *, stores: list[str] | None = None) -> list[DetectedInstall]:
         manifest = cls.load_manifest()
         detection = manifest.detection
-        stores = ["steam", "epic", "gog", "standalone"]
-        installs = scan_all_stores(ctx, stores)
+        store_list = stores if stores is not None else ["steam", "epic", "gog", "standalone"]
+        installs = scan_all_stores(ctx, store_list)
         found: list[DetectedInstall] = []
         for inst in installs:
             if inst.store == "steam" and str(inst.app_id) not in {str(x) for x in detection.steam_app_ids}:

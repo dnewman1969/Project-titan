@@ -21,7 +21,7 @@ import {
 import { formatApiError } from "../../app/formatApiError";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { logEvent } from "../events/eventsSlice";
-import { showNotice } from "../operations/layoutSlice";
+import { showNotice, showPanel } from "../operations/layoutSlice";
 import { closeSessionDialog, setActiveSession, type PlayBackendKind } from "./sessionsSlice";
 
 const FALLBACK_GAMES = [
@@ -90,6 +90,16 @@ export function NewSessionDialog() {
     if (titleTouched) return;
     const label = games.find((g) => g.slug === slug)?.label ?? slug;
     setTitle(defaultTitle(play, label));
+  };
+
+  const onOpenGameDiscovery = () => {
+    dispatch(showPanel("games"));
+    dispatch(closeSessionDialog());
+    dispatch(
+      showNotice(
+        "Game discovery: Scan, or Browse… for KSP_x64.exe, then Register install path. Reopen File → New session.",
+      ),
+    );
   };
 
   const onCreate = async () => {
@@ -270,9 +280,19 @@ export function NewSessionDialog() {
             ))}
           </TextField>
         ) : (
-          <Alert severity="warning" sx={{ width: "100%" }}>
-            No install for this game. Open View - Games, run Scan, or Register install path, then reopen New
-            session. Without a profile, this session uses fixture telemetry only (not live play).
+          <Alert
+            severity="warning"
+            variant="outlined"
+            sx={{ width: "100%" }}
+            action={
+              <Button color="inherit" size="small" onClick={onOpenGameDiscovery}>
+                Open Game discovery
+              </Button>
+            }
+          >
+            No install for <strong>{game?.label ?? gameSlug}</strong>. View → Games → Browse… for{" "}
+            <code>KSP_x64.exe</code> (or Scan), Register install path, then reopen New session. Without a
+            profile, Launch and live play stay off (fixture/demo telemetry only).
           </Alert>
         )}
         <FormControlLabel

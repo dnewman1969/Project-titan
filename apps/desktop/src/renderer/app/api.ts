@@ -184,7 +184,14 @@ export const titanApi = createApi({
       transformResponse: (raw: unknown) => z.object({ items: z.array(GameListItemSchema) }).parse(raw),
     }),
     scanGames: build.mutation<
-      { detected: Array<{ game_slug: string; install_path: string; profile_id: string }> },
+      {
+        detected: Array<{ game_slug: string; install_path: string; profile_id: string }>;
+        scan_context?: {
+          steam_libraries?: string[];
+          extra_paths?: string[];
+          stores_scanned?: string[];
+        };
+      },
       { extra_paths?: string[] } | undefined
     >({
       query: (body) => ({

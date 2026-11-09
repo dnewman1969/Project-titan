@@ -11,13 +11,17 @@ from titan_sdk_games.vdf import parse_vdf
 
 
 def _steam_path_from_registry() -> str | None:
-    if sys.platform != "win32":
+    platform_tag = sys.platform
+    if platform_tag != "win32":
         return None
     try:
         import winreg
 
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as key:
-            raw, _ = winreg.QueryValueEx(key, "SteamPath")
+        with winreg.OpenKey(  # type: ignore[attr-defined]
+            winreg.HKEY_CURRENT_USER,  # type: ignore[attr-defined]
+            r"Software\Valve\Steam",
+        ) as key:
+            raw, _ = winreg.QueryValueEx(key, "SteamPath")  # type: ignore[attr-defined]
         if isinstance(raw, str) and raw.strip():
             return raw.replace("/", "\\")
     except OSError:

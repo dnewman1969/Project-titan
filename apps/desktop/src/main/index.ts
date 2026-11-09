@@ -6,7 +6,18 @@ import type { ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, net, protocol, session, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  globalShortcut,
+  ipcMain,
+  Menu,
+  net,
+  protocol,
+  session,
+  shell,
+} from "electron";
 
 import { IPC, type KillSwitchEvent, type SupervisorUpdate, type TitanRuntime } from "../shared/ipc";
 import { DOCS_URL } from "../shared/menu";

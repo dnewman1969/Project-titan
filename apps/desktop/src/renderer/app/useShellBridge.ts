@@ -36,9 +36,7 @@ export function useShellBridge(): void {
       const sid = appStore.getState().sessions.activeSessionId;
       triggerKill(dispatch, event);
       if (titan.backend !== "none" && sid) {
-        void dispatch(
-          titanApi.endpoints.stopSession.initiate({ sessionId: sid, outcome: "aborted" }),
-        );
+        void dispatch(titanApi.endpoints.stopSession.initiate({ sessionId: sid, outcome: "aborted" }));
       }
     });
     const offMenu = titan.onMenuCommand((id) => {

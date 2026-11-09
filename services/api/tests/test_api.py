@@ -38,6 +38,7 @@ def client() -> Iterator[TestClient]:
         supervisor=no_supervisor,
         redis=fakeredis.FakeAsyncRedis(decode_responses=True),
         start_persister=False,
+        enable_database=False,
     )
 
     extra = APIRouter()
@@ -173,6 +174,8 @@ def test_cors_origins_are_configurable(monkeypatch: pytest.MonkeyPatch) -> None:
         checks={},
         supervisor=no_supervisor,
         redis=fakeredis.FakeAsyncRedis(),
+        start_persister=False,
+        enable_database=False,
     )
     with TestClient(app) as test_client:
         response = test_client.get("/api/v1/health", headers={"Origin": "http://localhost:5173"})
@@ -190,7 +193,13 @@ def test_status_reports_the_supervisor_process_table() -> None:
         return SupervisorStatus(started_at=utc_now(), ready=True, services=services, events=[])
 
     app = create_app(
-        TitanConfig(), launch_token=TOKEN, checks={}, supervisor=supervisor, redis=fakeredis.FakeAsyncRedis()
+        TitanConfig(),
+        launch_token=TOKEN,
+        checks={},
+        supervisor=supervisor,
+        redis=fakeredis.FakeAsyncRedis(),
+        start_persister=False,
+        enable_database=False,
     )
     with TestClient(app) as test_client:
         body = test_client.get("/api/v1/system/status", headers=AUTH).json()
@@ -212,6 +221,8 @@ def test_status_bounds_slow_dependency_checks(monkeypatch: pytest.MonkeyPatch) -
         checks={"ollama": hangs, "postgres": fake_probe},
         supervisor=no_supervisor,
         redis=fakeredis.FakeAsyncRedis(),
+        start_persister=False,
+        enable_database=False,
     )
     with TestClient(app) as test_client:
         body = test_client.get("/api/v1/system/status", headers=AUTH).json()

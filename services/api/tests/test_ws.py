@@ -64,6 +64,7 @@ def client(server: fakeredis.FakeServer) -> Iterator[TestClient]:
         supervisor=no_supervisor,
         redis=redis,
         start_persister=False,
+        enable_database=False,
     )
     with TestClient(app) as test_client:
         yield test_client
@@ -189,6 +190,7 @@ def test_metrics_rest_endpoint_without_redis() -> None:
         supervisor=no_supervisor,
         redis=redis,
         start_persister=False,
+        enable_database=False,
     )
     with TestClient(app) as test_client:
         response = test_client.get("/api/v1/system/metrics", headers=AUTH)

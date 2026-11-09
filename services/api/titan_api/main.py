@@ -63,16 +63,28 @@ def create_app(
     engine: AsyncEngine | None = None,
     session_factory: async_sessionmaker[AsyncSession] | None = None,
     start_persister: bool = True,
+    enable_database: bool = True,
 ) -> FastAPI:
     cfg = config if config is not None else load_config()
     token = launch_token if launch_token is not None else launch_token_from_env()
     client = redis if redis is not None else redis_client(cfg.redis)
     controller = SafetyController(client)
 
-    owns_engine = engine is None
-    db_engine = engine if engine is not None else create_engine(cfg.postgres)
-    session_maker = session_factory if session_factory is not None else create_session_factory(db_engine)
-    persister = StreamPersister(client, session_maker) if start_persister else None
+    owns_engine = enable_database and engine is None
+    db_engine: AsyncEngine | None
+    session_maker: async_sessionmaker[AsyncSession] | None
+    if session_factory is not None:
+        db_engine = engine
+        session_maker = session_factory
+    elif enable_database:
+        db_engine = engine if engine is not None else create_engine(cfg.postgres)
+        session_maker = create_session_factory(db_engine)
+    else:
+        db_engine = None
+        session_maker = None
+    persister = (
+        StreamPersister(client, session_maker) if start_persister and session_maker is not None else None
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -84,7 +96,7 @@ def create_app(
         if persister is not None:
             await persister.stop()
         await controller.drain()
-        if owns_engine:
+        if owns_engine and db_engine is not None:
             await db_engine.dispose()
         if redis is None:
             await client.aclose()

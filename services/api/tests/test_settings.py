@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Iterator
 
 import fakeredis
@@ -44,8 +45,11 @@ def api_client(pg_server, temp_db: TempDatabase, monkeypatch: pytest.MonkeyPatch
         session_factory=factory,
         start_persister=False,
     )
-    with TestClient(app, raise_server_exceptions=False) as client:
-        yield client
+    try:
+        with TestClient(app, raise_server_exceptions=False) as client:
+            yield client
+    finally:
+        asyncio.run(engine.dispose())
 
 
 def test_settings_get_and_patch(api_client: TestClient) -> None:

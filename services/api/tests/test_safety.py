@@ -38,6 +38,7 @@ def make_client(server: fakeredis.FakeServer) -> TestClient:
         supervisor=no_supervisor,
         redis=redis,
         start_persister=False,
+        enable_database=False,
     )
     return TestClient(app)
 

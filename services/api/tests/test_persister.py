@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Iterator
 
 import fakeredis
 import pytest
@@ -26,10 +27,14 @@ pytestmark = pytest.mark.postgres
 
 
 @pytest.fixture
-def db_factory(pg_server, temp_db: TempDatabase) -> async_sessionmaker[AsyncSession]:  # noqa: F811
+def db_factory(pg_server, temp_db: TempDatabase) -> Iterator[async_sessionmaker[AsyncSession]]:  # noqa: F811
     upgrade(temp_db.url)
     engine = create_engine(temp_db.pg)
-    return create_session_factory(engine)
+    factory = create_session_factory(engine)
+    try:
+        yield factory
+    finally:
+        asyncio.run(engine.dispose())
 
 
 @pytest.fixture

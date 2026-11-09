@@ -16,7 +16,10 @@ from titan_core.obs_ws import ObsClient
 from titan_core.recording_manifest import (
     append_timeline_event,
     build_manifest,
+    build_track_entries,
     default_preset,
+    materialize_stub_tracks,
+    read_manifest,
     write_manifest,
 )
 from titan_db.models.recording import Recording
@@ -24,7 +27,7 @@ from titan_db.models.sessions import Session
 
 
 def recording_json(row: Recording) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "id": row.id,
         "session_id": row.session_id,
         "state": row.state,
@@ -36,7 +39,19 @@ def recording_json(row: Recording) -> dict[str, Any]:
         "root_dir": row.root_dir,
         "manifest_path": row.manifest_path,
         "error": row.error,
+        "tracks": [],
+        "obs": {"connected": False, "status": {}},
     }
+    if row.manifest_path:
+        manifest = read_manifest(Path(row.manifest_path))
+        if manifest is not None:
+            tracks = manifest.get("tracks")
+            if isinstance(tracks, list):
+                payload["tracks"] = tracks
+            obs = manifest.get("obs")
+            if isinstance(obs, dict):
+                payload["obs"] = obs
+    return payload
 
 
 async def start_session_recording(db: AsyncSession, session_row: Session) -> dict[str, Any]:
@@ -59,27 +74,45 @@ async def start_session_recording(db: AsyncSession, session_row: Session) -> dic
     manifest_path = root / "manifest.json"
     obs_status: dict[str, Any] = {}
     obs_error: str | None = None
+    obs_connected = False
+    provision: dict[str, str] | None = None
     state = "recording"
     try:
         client = ObsClient()
         await client.connect()
         try:
             status = await client.get_record_status()
-            obs_status = {"active": status.active, "paused": status.paused, "duration_ms": status.duration_ms}
+            obs_status = {
+                "active": status.active,
+                "paused": status.paused,
+                "duration_ms": status.duration_ms,
+            }
+            provision = await client.provision_titan_profile()
+            obs_status["provision"] = provision
             await client.start_recording()
+            obs_connected = True
         finally:
             await client.close()
     except (OSError, RuntimeError) as exc:
         obs_error = str(exc)
         state = "recording"
         obs_status = {"degraded": True, "message": obs_error}
+
+    if obs_connected:
+        tracks = build_track_entries(obs_connected=True, root_dir=root)
+    else:
+        tracks = await asyncio.to_thread(materialize_stub_tracks, root)
+
     manifest = build_manifest(
         session_id=str(session_row.id),
         recording_id=str(rec_id),
-        obs_active=obs_error is None,
+        obs_active=obs_connected,
         obs_status=obs_status,
         preset=preset,
+        tracks=tracks,
     )
+    if provision is not None:
+        manifest["obs"]["provision"] = provision
     await asyncio.to_thread(write_manifest, manifest_path, manifest)
     await asyncio.to_thread(
         append_timeline_event,
@@ -89,14 +122,21 @@ async def start_session_recording(db: AsyncSession, session_row: Session) -> dic
             "kind": "recording.start",
             "recording_id": str(rec_id),
             "obs": obs_status,
+            "tracks": len(tracks),
         },
     )
-    placeholder = root / "tracks" / "game-placeholder.txt"
-    await asyncio.to_thread(
-        _write_placeholder_track,
-        placeholder,
-        "Game video lands when OBS is connected; this session still records metadata and timeline.",
-    )
+    if not obs_connected:
+        await asyncio.to_thread(
+            append_timeline_event,
+            root,
+            {
+                "t": utc_now().isoformat(),
+                "kind": "video.stub",
+                "recording_id": str(rec_id),
+                "message": "OBS unavailable — writing stub track files under recording/tracks/",
+                "tracks": [t["id"] for t in tracks],
+            },
+        )
     row = Recording(
         id=rec_id,
         session_id=session_row.id,
@@ -111,8 +151,3 @@ async def start_session_recording(db: AsyncSession, session_row: Session) -> dic
     db.add(row)
     await db.flush()
     return recording_json(row)
-
-
-def _write_placeholder_track(path: Path, message: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(message + "\n", encoding="utf-8")

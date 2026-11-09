@@ -104,12 +104,15 @@ class ObsClient:
         await self.request("StopRecord")
 
     async def provision_titan_profile(self) -> dict[str, str]:
-        """Idempotent profile/scene provisioning is M8 follow-up; returns a stub plan."""
+        """Best-effort Titan profile plan; full scene graph is a later M8 slice."""
+        version = await self.get_version()
+        obs_version = str(version.get("obsVersion") or version.get("obs_version") or "unknown")
         return {
             "profile": "Titan",
             "collection": "Titan",
             "scene": "Titan Gameplay",
-            "status": "stub",
+            "status": "planned",
+            "obs_version": obs_version,
         }
 
     async def probe_http(self) -> bool:

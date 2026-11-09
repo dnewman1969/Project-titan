@@ -67,7 +67,9 @@ def test_memory_browse_and_write(api_client: TestClient) -> None:
         respx.get(f"{base}/api/v1/tenants/titan/databases/default/collections/memories").mock(
             return_value=httpx.Response(200, json={"id": coll_id, "name": "memories"})
         )
-        get_route = respx.post(f"{base}/api/v1/tenants/titan/databases/default/collections/{coll_id}/get").mock(
+        get_route = respx.post(
+            f"{base}/api/v1/tenants/titan/databases/default/collections/{coll_id}/get"
+        ).mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -77,9 +79,9 @@ def test_memory_browse_and_write(api_client: TestClient) -> None:
                 },
             )
         )
-        upsert = respx.post(f"{base}/api/v1/tenants/titan/databases/default/collections/{coll_id}/upsert").mock(
-            return_value=httpx.Response(200, json={})
-        )
+        upsert = respx.post(
+            f"{base}/api/v1/tenants/titan/databases/default/collections/{coll_id}/upsert"
+        ).mock(return_value=httpx.Response(200, json={}))
         browse = api_client.get("/api/v1/memory/browse", headers=AUTH)
         assert browse.status_code == 200
         assert browse.json()["items"][0]["id"] == "m1"

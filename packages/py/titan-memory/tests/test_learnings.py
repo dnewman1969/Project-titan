@@ -30,7 +30,9 @@ def test_build_rows_includes_summary() -> None:
             created_at=None,
         ),
     ]
-    ids, docs, metas = build_rows(rows, session_id=sid, game_slug="ksp", outcome="success", session_title="Test")
+    ids, docs, metas = build_rows(
+        rows, session_id=sid, game_slug="ksp", outcome="success", session_title="Test"
+    )
     assert len(ids) == 3
     assert any(meta["kind"] == "discovery" for meta in metas)
     assert docs[-1].startswith("Session Test")

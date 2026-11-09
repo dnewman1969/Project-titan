@@ -12,6 +12,7 @@ from titan_models.embedder import Embedder, FakeEmbedder
 
 ToolHandler = Callable[..., Awaitable[Any]]
 
+
 def _format_chroma_hits(body: dict[str, Any]) -> list[dict[str, Any]]:
     ids = body.get("ids")
     documents = body.get("documents")

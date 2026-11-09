@@ -37,6 +37,21 @@ function Refresh-SessionPath {
             $env:Path = "$nodeDir;$env:Path"
         }
     }
+    Add-ToolchainDirsToPath
+}
+
+function Add-ToolchainDirsToPath {
+    $dirs = @(
+        (Join-Path $env:USERPROFILE ".local\bin"),
+        (Join-Path $env:USERPROFILE ".cargo\bin"),
+        (Join-Path $env:APPDATA "npm"),
+        (Join-Path $env:LOCALAPPDATA "uv")
+    )
+    foreach ($dir in $dirs) {
+        if ($dir -and (Test-Path $dir) -and ($env:Path -notlike "*$dir*")) {
+            $env:Path = "$dir;$env:Path"
+        }
+    }
 }
 
 function Ensure-Node {
@@ -150,10 +165,42 @@ function Invoke-Pnpm {
     Show-Error "pnpm could not be prepared.`nInstall without admin: npm install -g pnpm@$PnpmVersion`nOr: corepack prepare pnpm@$PnpmVersion --activate"
 }
 
+function Ensure-Uv {
+    if (Test-Command uv) { return }
+    Write-Host "uv not found; installing Python toolchain (one-time)..." -ForegroundColor Cyan
+
+    if (Test-Command winget) {
+        Write-Host "Trying winget (astral-sh.uv)..." -ForegroundColor DarkGray
+        Invoke-External winget install --id astral-sh.uv -e --accept-package-agreements --accept-source-agreements | Out-Null
+        Refresh-SessionPath
+        if (Test-Command uv) { return }
+    }
+
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        Write-Host "Running Astral installer (https://astral.sh/uv/install.ps1)..." -ForegroundColor Cyan
+        $installScript = Invoke-RestMethod -Uri "https://astral.sh/uv/install.ps1" -UseBasicParsing
+        Invoke-Expression $installScript
+    } catch {
+        Write-Host "uv install script did not complete: $_" -ForegroundColor DarkYellow
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+    Refresh-SessionPath
+
+    if (-not (Test-Command uv)) {
+        Show-Error @"
+uv is required for Python services.
+Install: powershell -ExecutionPolicy Bypass -c "irm https://astral.sh/uv/install.ps1 | iex"
+Or: winget install astral-sh.uv
+"@
+    }
+}
+
 Ensure-Node
 Ensure-Pnpm
-
-if (-not (Test-Command uv)) { Show-Error "uv is required.`nInstall: https://docs.astral.sh/uv/getting-started/installation/" }
+Ensure-Uv
 
 $env:TITAN__REDIS__PASSWORD = if ($env:TITAN__REDIS__PASSWORD) { $env:TITAN__REDIS__PASSWORD } else { "titan-dev" }
 

@@ -10,7 +10,7 @@ See [docs/titan-architecture-spec.md](docs/titan-architecture-spec.md) for the a
 
 That script checks toolchain, fetches portable PostgreSQL on first run, ensures Redis on `127.0.0.1:63790` (Memurai or one Docker Redis container), then opens the **Operations Center**. Missing **pnpm** is fixed automatically via corepack (or npm); missing **Node** can install via **winget** when available. No Kerbal install needed for the built-in demo — fixture telemetry and the crew talk on a live session automatically.
 
-Prerequisites once: [Node 22](https://nodejs.org/) LTS (or let `Start-Titan.ps1` run `winget install OpenJS.NodeJS.LTS`), [uv](https://docs.astral.sh/uv/), and either **Memurai Developer** (Redis, port **63790**, password **titan-dev**) or Docker Desktop (only for Redis if Memurai is absent). Postgres and Chroma are started by Titan — not by Docker.
+Prerequisites once: [Node 22](https://nodejs.org/) LTS (or let `Start-Titan.ps1` run `winget install OpenJS.NodeJS.LTS`), [uv](https://docs.astral.sh/uv/) (auto-installed via winget or Astral’s install script when missing), and either **Memurai Developer** (Redis, port **63790**, password **titan-dev**) or Docker Desktop (only for Redis if Memurai is absent). Postgres and Chroma are started by Titan — not by Docker.
 
 For contributor setup and architecture, see [docs/dev-setup.md](docs/dev-setup.md). For the learn-and-play beta (HIL + real KSP/truck installs), see [docs/learn-and-play-beta.md](docs/learn-and-play-beta.md).
 

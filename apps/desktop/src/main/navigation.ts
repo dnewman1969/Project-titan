@@ -1,4 +1,4 @@
-import { join, relative, resolve, sep } from "node:path";
+import { extname, join, relative, resolve, sep } from "node:path";
 
 /**
  * The packaged renderer is served from a privileged `app://titan` scheme rather than file://, so it
@@ -45,4 +45,54 @@ export function resolveAppFile(root: string, url: string): string | null {
   if (rel === "" || rel.startsWith("..") || rel.includes(`..${sep}`) || resolve(base, rel) !== file)
     return null;
   return file;
+}
+
+/** Content type for a renderer file. A wrong script type makes the module fail and the page stay blank. */
+export function mediaType(file: string): string {
+  switch (extname(file).toLowerCase()) {
+    case ".html":
+      return "text/html; charset=utf-8";
+    case ".js":
+    case ".mjs":
+      return "text/javascript; charset=utf-8";
+    case ".css":
+      return "text/css; charset=utf-8";
+    case ".json":
+    case ".map":
+      return "application/json";
+    case ".svg":
+      return "image/svg+xml";
+    case ".png":
+      return "image/png";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".webp":
+      return "image/webp";
+    case ".ico":
+      return "image/x-icon";
+    case ".woff2":
+      return "font/woff2";
+    default:
+      return "application/octet-stream";
+  }
+}
+
+/**
+ * Read a renderer file into a response. `net.fetch(file://)` rejects with ERR_FILE_NOT_FOUND on
+ * Windows even when the file exists, and a rejected protocol handler leaves the client area blank.
+ */
+export async function readRendererBody(
+  file: string,
+  read: (path: string) => Promise<Uint8Array>,
+): Promise<Response> {
+  try {
+    const body = await read(file);
+    return new Response(body, { headers: { "content-type": mediaType(file) } });
+  } catch {
+    return new Response("Not found", {
+      status: 404,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
 }

@@ -10,7 +10,7 @@ import type { GameViewStatus, KillSwitchEvent, SupervisorUpdate, TitanBridge } f
 import { App } from "../../src/renderer/app/App";
 import { markFirstRunComplete } from "../../src/renderer/features/first-run/FirstRunWizard";
 import { makeStore } from "../../src/renderer/app/store";
-import { gridTemplate } from "../../src/renderer/features/operations/OperationsCenter";
+import { gridTemplate, operationsFrameSize } from "../../src/renderer/features/operations/OperationsCenter";
 import { formatMetrics } from "../../src/renderer/features/telemetry/TelemetryBar";
 import { metricsReceived } from "../../src/renderer/features/telemetry/systemSlice";
 import { summarizeServices } from "../../src/renderer/app/useApiStatus";
@@ -600,6 +600,12 @@ describe("formatMetrics", () => {
 });
 
 describe("gridTemplate", () => {
+  it("fills the root so a zero viewport-height first layout cannot blank the client area", () => {
+    expect(operationsFrameSize).toEqual({ height: "100%", minHeight: 0 });
+    renderApp();
+    expect(screen.getByRole("main")).toBeInTheDocument();
+  });
+
   it("makes the game the only flexible row between the agents column and the side rail", () => {
     const t = gridTemplate({
       agents: true,

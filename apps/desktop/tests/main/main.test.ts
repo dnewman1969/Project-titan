@@ -10,7 +10,8 @@ import { DEFAULT_KILL_HOTKEY, resolveMainConfig } from "../../src/main/config";
 import { postKill, registerKillSwitch } from "../../src/main/killSwitch";
 import { allowCapturePermission } from "../../src/main/permissions";
 import { buildMenuTemplate } from "../../src/main/menu";
-import { APP_ORIGIN, isAppUrl, resolveAppFile } from "../../src/main/navigation";
+import { applyFirstPaintSwitches, firstPaintSwitches, revealWindow } from "../../src/main/firstPaint";
+import { APP_ORIGIN, isAppUrl, mediaType, readRendererBody, resolveAppFile } from "../../src/main/navigation";
 import {
   CrashBudget,
   startSupervisor,
@@ -420,6 +421,81 @@ describe("navigation guard", () => {
     expect(isAppUrl("https://example.com/", undefined)).toBe(false);
     expect(isAppUrl("not a url", undefined)).toBe(false);
     expect(isAppUrl(undefined, undefined)).toBe(false);
+  });
+});
+
+describe("Windows first paint", () => {
+  it("disables the features that keep the hidden window's blank client frame", () => {
+    expect(firstPaintSwitches("win32")).toEqual([
+      { switchName: "disable-features", value: "CalculateNativeWinOcclusion,WidgetLayering" },
+    ]);
+    expect(firstPaintSwitches("linux")).toEqual([]);
+    const applied: string[] = [];
+    applyFirstPaintSwitches(
+      {
+        appendSwitch(name, value) {
+          applied.push(`${name}=${value ?? ""}`);
+        },
+      },
+      "win32",
+    );
+    expect(applied).toEqual(["disable-features=CalculateNativeWinOcclusion,WidgetLayering"]);
+  });
+
+  it("shows the window and forces a second layout on Windows", () => {
+    const sizes: [number, number][] = [];
+    let shown = 0;
+    const win = {
+      show() {
+        shown += 1;
+      },
+      getSize: () => [1600, 1000] as const,
+      setSize(width: number, height: number) {
+        sizes.push([width, height]);
+      },
+    };
+    revealWindow(win, "win32");
+    expect(shown).toBe(1);
+    expect(sizes).toEqual([
+      [1600, 1001],
+      [1600, 1000],
+    ]);
+    revealWindow(win, "linux");
+    expect(shown).toBe(2);
+    expect(sizes).toEqual([
+      [1600, 1001],
+      [1600, 1000],
+    ]);
+  });
+
+  it("does not resize a window that has not been given a size yet", () => {
+    const sizes: [number, number][] = [];
+    revealWindow(
+      {
+        show() {
+          /* shown */
+        },
+        getSize: () => [0, 0],
+        setSize(width, height) {
+          sizes.push([width, height]);
+        },
+      },
+      "win32",
+    );
+    expect(sizes).toEqual([]);
+  });
+});
+
+describe("renderer route", () => {
+  it("serves the script with a javascript type and turns a missing file into 404", async () => {
+    expect(mediaType("index.html")).toBe("text/html; charset=utf-8");
+    expect(mediaType("assets/index-abc.js")).toBe("text/javascript; charset=utf-8");
+    const page = await readRendererBody("index.html", () => Promise.resolve(new Uint8Array([60, 112, 62])));
+    expect(page.status).toBe(200);
+    expect(page.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    expect(new TextDecoder().decode(await page.arrayBuffer())).toBe("<p>");
+    const missing = await readRendererBody("missing.png", () => Promise.reject(new Error("ENOENT")));
+    expect(missing.status).toBe(404);
   });
 });
 

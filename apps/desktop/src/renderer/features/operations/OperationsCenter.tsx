@@ -15,6 +15,15 @@ const AGENT_TRACK = "minmax(240px, 280px)";
 const GAME_TRACK = "minmax(0, 1fr)";
 const RAIL_TRACK = "minmax(208px, 240px)";
 
+/**
+ * Fill `#root` (itself `height: 100%`). `100vh` is resolved while the window is still hidden and
+ * stays 0 after Windows shows the menu, so the whole client area remains the window background.
+ */
+export const operationsFrameSize = {
+  height: "100%",
+  minHeight: 0,
+} as const;
+
 /** Side rail is the thinner column: webcam, telemetry, events, game discovery. */
 export function railVisible(panels: LayoutState["panels"]): boolean {
   return panels.webcam || panels.telemetry || panels.events || panels.games;
@@ -47,7 +56,7 @@ export function OperationsCenter({ status }: { status: ApiStatus }) {
     <Box
       component="main"
       sx={{
-        height: "100vh",
+        ...operationsFrameSize,
         display: "grid",
         gridTemplateAreas: template.areas,
         gridTemplateRows: template.rows,

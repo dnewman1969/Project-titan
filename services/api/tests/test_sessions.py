@@ -658,6 +658,125 @@ def test_session_play_toggle(api_client: TestClient, game_slug: str, monkeypatch
     assert flags["stop_actions"] >= 1
 
 
+def test_session_start_exposes_failed_contracts_for_the_same_game(
+    api_client: TestClient, game_slug: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A miss saved in the memory store is on the next session's board before the crew starts."""
+    import asyncio
+
+    import titan_api.memory_ops as memory_ops
+    import titan_api.routers.sessions as sessions_routes
+    from titan_memory.learnings import FailedContract, save_failed_contracts
+    from titan_models.embedder import FakeEmbedder
+
+    key = "altituderecord|reach 5000 m"
+    title = "Reach 5,000 m"
+    reason = "out of fuel at 2200 m"
+    previous = "00000000-0000-4000-8000-00000000c0de"
+
+    class _Store:
+        def __init__(self) -> None:
+            self.docs: dict[str, tuple[str, dict[str, object]]] = {}
+
+        async def upsert(
+            self,
+            _collection: str,
+            *,
+            ids: list[str],
+            documents: list[str],
+            metadatas: list[dict[str, object]],
+            embeddings: list[list[float]] | None = None,
+        ) -> None:
+            del embeddings
+            for mem_id, document, metadata in zip(ids, documents, metadatas, strict=True):
+                self.docs[mem_id] = (document, dict(metadata))
+
+        async def query(self, _collection: str, **_kwargs: object) -> dict[str, object]:
+            return {"ids": [[]], "documents": [[]], "metadatas": [[]]}
+
+        async def get(self, _collection: str, **_kwargs: object) -> dict[str, object]:
+            ids = list(self.docs)
+            return {
+                "ids": ids,
+                "documents": [self.docs[mem_id][0] for mem_id in ids],
+                "metadatas": [self.docs[mem_id][1] for mem_id in ids],
+            }
+
+    store = _Store()
+    asyncio.run(
+        save_failed_contracts(
+            store,
+            FakeEmbedder(),
+            [
+                FailedContract(
+                    contract_id=key,
+                    title=title,
+                    reason=reason,
+                    session_id=previous,
+                    game_slug=game_slug,
+                ),
+                FailedContract(
+                    contract_id="survey|mun",
+                    title="Survey the Mun",
+                    reason="out of fuel",
+                    session_id=previous,
+                    game_slug="not-this-game",
+                ),
+            ],
+        )
+    )
+    monkeypatch.setattr(memory_ops, "memory_store", lambda: store)
+
+    class _Ctl:
+        def start_orchestrator(self, session_id: UUID, **kwargs: object) -> None:
+            del session_id, kwargs
+
+        def start_actions(self, session_id: UUID, **kwargs: object) -> None:
+            del session_id, kwargs
+
+        def stop_orchestrator(self, session_id: UUID) -> None:
+            del session_id
+
+        def stop_actions(self, session_id: UUID) -> None:
+            del session_id
+
+    api_client.app.state.session_controller = _Ctl()
+
+    async def noop(*_args: object, **_kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr(sessions_routes, "start_demo_replay", noop)
+    monkeypatch.setattr(sessions_routes, "start_live_telemetry", noop)
+
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={
+            "game_slug": game_slug,
+            "title": "remember the miss",
+            "settings": {"agents_enabled": True, "demo_telemetry": True},
+        },
+    )
+    assert created.status_code == 201, created.text
+    sid = created.json()["id"]
+    started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False})
+    assert started.status_code == 202, started.text
+
+    board = api_client.get(f"/api/v1/sessions/{sid}/blackboard", headers=AUTH, params={"sections": "notes"})
+    assert board.status_code == 200, board.text
+    notes = {entry["key"]: entry["value"] for entry in board.json()["entries"] if entry["section"] == "notes"}
+    missed = notes["prior.fail.00"]
+    assert missed["ok"] is False
+    assert missed["contract_key"] == key
+    assert missed["contract_title"] == title
+    assert missed["failure_reason"] == reason
+    assert missed["session_id"] == previous
+    assert f"contract key `{key}`" in missed["text"]
+    assert "do not accept contract key" in missed["text"].lower()
+    assert all(entry.get("contract_key") != "survey|mun" for entry in notes.values())
+    assert notes["prior.seed"]["failed_contracts"] == 1
+
+
 def test_play_readiness_endpoint(api_client: TestClient) -> None:
     fixture = api_client.get(
         "/api/v1/play/readiness", headers=AUTH, params={"game_slug": "ksp", "source": "fixture"}

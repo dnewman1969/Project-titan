@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from titan_memory.learnings import FailedContract, exposed_failure_notes
 from titan_orchestrator.career import (
     CareerMemory,
     advance_career,
@@ -369,6 +370,34 @@ def test_prior_lesson_text_is_enough_to_refuse_the_contract() -> None:
         _frame(offered=[_contract(_ALTITUDE, [_param(_ALTITUDE)], contract_type="AltitudeRecord")]),
     )
     assert directive.actions == ()
+
+
+def test_stored_failure_loads_as_the_skip_list() -> None:
+    """The durable note is the row the career loop already refuses. Fly policy is untouched."""
+    key = contract_key("AltitudeRecord", _ALTITUDE)
+    notes = exposed_failure_notes(
+        [
+            FailedContract(
+                contract_id=key,
+                title=_ALTITUDE,
+                reason="out of fuel at 2200 m",
+                session_id="00000000-0000-4000-8000-00000000c0de",
+                game_slug="ksp",
+            )
+        ]
+    )
+    found = failed_keys_from_rows(
+        [{"section": "notes", "key": note_key, "value": value} for note_key, value in notes]
+    )
+    assert found == {key}
+    memory = CareerMemory(failed_keys=found, loaded_failures=True)
+    directive = advance_career(
+        memory,
+        _frame(offered=[_contract(_ALTITUDE, [_param(_ALTITUDE)], contract_type="AltitudeRecord")]),
+    )
+    assert directive.actions == ()
+    idle = next(note.value["text"] for note in directive.notes if note.key == "career.idle")
+    assert "already failed" in idle
 
 
 def test_missing_career_field_keeps_the_generic_ascent() -> None:

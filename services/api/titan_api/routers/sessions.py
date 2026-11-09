@@ -279,21 +279,10 @@ async def _activate_created_session(
 
     try:
         await db.flush()
+        # The play loop loads its skip list once, from this session's notes.
+        # Write missed contracts before that process starts, then commit them.
         if row.settings.get("agents_enabled", True):
-            controller.start_orchestrator(
-                session_id,
-                game_slug=game_slug,
-                play_enabled=play_actions,
-                data_dir=row.data_dir,
-            )
-        if play_actions and play_attach is not None:
-            # Explicit backend: hil for fixture, krpc/scs when an install is attached and ready.
-            controller.start_actions(
-                session_id,
-                game_slug=game_slug,
-                data_dir=row.data_dir,
-                play_backend=play_attach.backend,
-            )
+            await seed_prior_memories_on_blackboard(db, session_id=session_id, game_slug=game_slug)
         row.state = "live"
         await db.flush()
     except IntegrityError as exc:
@@ -303,16 +292,11 @@ async def _activate_created_session(
                 "Another session is still live (ux_sessions_one_live). Stop it or retry start.",
             ) from exc
         raise
-    if session_source == "fixture" or row.settings.get("demo_telemetry", False):
-        await start_demo_replay(session_id)
+    demo_line = session_source == "fixture" or bool(row.settings.get("demo_telemetry", False))
+    if not demo_line and install_profile is None:
+        demo_line = fixture_fallback_path(game_slug) is not None
+    if demo_line:
         await _seed_director_demo_line(db, session_id)
-    elif install_profile is not None:
-        await start_live_telemetry(session_id, game_slug=game_slug, install_path=install_profile.install_path)
-    elif fixture_fallback_path(game_slug) is not None:
-        await start_demo_replay(session_id)
-        await _seed_director_demo_line(db, session_id)
-    if row.settings.get("agents_enabled", True):
-        await seed_prior_memories_on_blackboard(db, session_id=session_id, game_slug=game_slug)
     recording_payload: dict[str, object] | None = None
     recording_error: str | None = None
     if row.settings.get("record_on_start"):
@@ -325,9 +309,30 @@ async def _activate_created_session(
                 raise
             # Session start still succeeds. REC does not write a stub timeline when OBS is down.
             recording_error = exc.detail
-    # Persist live state before the HTTP response so follow-up GETs never race.
+    # Commit the skip list before the crew starts. The flight loop reads it once.
     await db.commit()
     await db.refresh(row)
+    if row.settings.get("agents_enabled", True):
+        controller.start_orchestrator(
+            session_id,
+            game_slug=game_slug,
+            play_enabled=play_actions,
+            data_dir=row.data_dir,
+        )
+    if play_actions and play_attach is not None:
+        # Explicit backend: hil for fixture, krpc/scs when an install is attached and ready.
+        controller.start_actions(
+            session_id,
+            game_slug=game_slug,
+            data_dir=row.data_dir,
+            play_backend=play_attach.backend,
+        )
+    if session_source == "fixture" or row.settings.get("demo_telemetry", False):
+        await start_demo_replay(session_id)
+    elif install_profile is not None:
+        await start_live_telemetry(session_id, game_slug=game_slug, install_path=install_profile.install_path)
+    elif fixture_fallback_path(game_slug) is not None:
+        await start_demo_replay(session_id)
     payload = _session_json(row)
     if play_attach is not None:
         payload["play_attach"] = play_attach.as_dict()

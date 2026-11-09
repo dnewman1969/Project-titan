@@ -183,11 +183,27 @@ export const BlackboardEntrySchema = z
   })
   .passthrough();
 
+/** Health/status stay snappy; session start may wait for kRPC after launching KSP. */
+const DEFAULT_TIMEOUT_MS = 2500;
+const SESSION_START_TIMEOUT_MS = 120_000;
+const SESSION_MUTATION_TIMEOUT_MS = 30_000;
+
+function requestTimeoutMs(args: string | FetchArgs): number {
+  const url = typeof args === "string" ? args : args.url;
+  if (typeof url !== "string") return DEFAULT_TIMEOUT_MS;
+  if (url.includes("/sessions/") && url.endsWith("/start")) return SESSION_START_TIMEOUT_MS;
+  if (url.includes("/sessions/") && (url.endsWith("/play") || url.endsWith("/stop"))) {
+    return SESSION_MUTATION_TIMEOUT_MS;
+  }
+  if (url === "/sessions" || url.endsWith("/sessions")) return SESSION_MUTATION_TIMEOUT_MS;
+  return DEFAULT_TIMEOUT_MS;
+}
+
 const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (args, api, extra) => {
   const { apiBase, token } = getTitan();
   return fetchBaseQuery({
     baseUrl: `${apiBase}${API_PREFIX}`,
-    timeout: 2500,
+    timeout: requestTimeoutMs(args),
     prepareHeaders: (headers) => {
       if (token) headers.set("Authorization", `Bearer ${token}`);
       return headers;

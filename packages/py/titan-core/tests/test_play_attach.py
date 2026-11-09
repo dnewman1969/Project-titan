@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import errno
 
+import pytest
+
 from titan_core.play_attach import (
+    PlayAttach,
     attach_probe_timeout_s,
+    attach_wait_deadline_s,
     probe_attach,
     probe_hil,
     probe_krpc,
     probe_scs,
     resolve_backend,
     resolve_session_source,
+    wait_probe_attach,
 )
 
 
@@ -44,6 +49,79 @@ def test_attach_probe_timeout_env(monkeypatch: object) -> None:
     assert attach_probe_timeout_s() == 0.6
     monkeypatch.setenv("TITAN_PLAY_ATTACH_TIMEOUT_S", "99")  # type: ignore[attr-defined]
     assert attach_probe_timeout_s() == 5.0
+
+
+def test_attach_wait_deadline_env(monkeypatch: object) -> None:
+    monkeypatch.delenv("TITAN_PLAY_ATTACH_WAIT_S", raising=False)  # type: ignore[attr-defined]
+    assert attach_wait_deadline_s(launched_game=False) == 8.0
+    assert attach_wait_deadline_s(launched_game=True) == 60.0
+    monkeypatch.setenv("TITAN_PLAY_ATTACH_WAIT_S", "12")  # type: ignore[attr-defined]
+    assert attach_wait_deadline_s(launched_game=True) == 12.0
+
+
+@pytest.mark.asyncio
+async def test_wait_probe_attach_retries_until_ready(monkeypatch: object) -> None:
+    import titan_core.play_attach as mod
+
+    calls = {"n": 0}
+
+    def flaky(**_kwargs: object) -> PlayAttach:
+        calls["n"] += 1
+        if calls["n"] < 3:
+            return PlayAttach(
+                source="live",
+                backend="krpc",
+                ready=False,
+                message="not yet",
+                detail={"krpc_mod_hint": True},
+            )
+        return PlayAttach(
+            source="live",
+            backend="krpc",
+            ready=True,
+            message="ready",
+            detail={},
+        )
+
+    monkeypatch.setattr(mod, "probe_attach", flaky)
+    attach = await wait_probe_attach(
+        game_slug="ksp",
+        source="live",
+        launched_game=True,
+        deadline_s=2.0,
+        poll_s=0.05,
+    )
+    assert attach.ready is True
+    assert calls["n"] >= 3
+    assert attach.detail.get("launched_game") is True
+
+
+@pytest.mark.asyncio
+async def test_wait_probe_attach_degrades_with_mod_hint(monkeypatch: object) -> None:
+    import titan_core.play_attach as mod
+
+    monkeypatch.setattr(
+        mod,
+        "probe_attach",
+        lambda **_k: PlayAttach(
+            source="live",
+            backend="krpc",
+            ready=False,
+            message="kRPC is not running.",
+            detail={"krpc_mod_hint": True},
+        ),
+    )
+    attach = await wait_probe_attach(
+        game_slug="ksp",
+        source="live",
+        launched_game=True,
+        deadline_s=0.2,
+        poll_s=0.05,
+    )
+    assert attach.ready is False
+    assert attach.detail.get("degraded_to_observe") is True
+    assert "observe/learn" in attach.message.lower()
+    assert "kRPC mod" in attach.message
 
 
 def test_probe_krpc_unreachable() -> None:

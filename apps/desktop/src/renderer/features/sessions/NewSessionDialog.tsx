@@ -201,6 +201,7 @@ export function NewSessionDialog() {
                 ready?: boolean;
                 message?: string;
                 source?: string;
+                detail?: { krpc_mod_hint?: boolean; degraded_to_observe?: boolean };
               })
             : null;
         const resolvedSource =
@@ -209,6 +210,8 @@ export function NewSessionDialog() {
             ? (Reflect.get(started.data, "session_source") as "live" | "fixture")
             : sessionSource;
         const backend = (attach?.backend as PlayBackendKind | undefined) ?? null;
+        const attachReady = typeof attach?.ready === "boolean" ? attach.ready : null;
+        const playActions = Reflect.get(started.data, "play_actions") === true;
         dispatch(
           setActiveSession({
             id: started.data.id,
@@ -219,7 +222,7 @@ export function NewSessionDialog() {
             sessionSource: resolvedSource,
             playEnabled: agentPlay,
             playBackend: backend,
-            playReady: typeof attach?.ready === "boolean" ? attach.ready : null,
+            playReady: attachReady,
             playAttachMessage: typeof attach?.message === "string" ? attach.message : null,
           }),
         );
@@ -228,11 +231,29 @@ export function NewSessionDialog() {
             ? agentPlay
               ? "Fixture + HIL play"
               : "Fixture telemetry"
-            : agentPlay
+            : agentPlay && playActions
               ? `Live + ${backend ?? "play"}`
-              : "Live install";
+              : agentPlay
+                ? "Live observe (play waiting on attach)"
+                : "Live install";
         const attachNote = attach?.message ? ` — ${attach.message}` : "";
         dispatch(showNotice(`${kind}: ${liveTitle}${attachNote}`));
+        if (agentPlay && attachReady === false) {
+          const modHint =
+            attach?.detail?.krpc_mod_hint === true ||
+            backend === "krpc" ||
+            (typeof attach?.message === "string" && /kRPC mod/i.test(attach.message));
+          dispatch(
+            logEvent({
+              type: "session.play_attach_waiting",
+              category: "system",
+              severity: "warning",
+              text: modHint
+                ? `kRPC not ready — session is in observe/learn mode. ${attach?.message ?? "Install the kRPC mod, load a flight, then toggle Agent play."}`
+                : (attach?.message ?? "Play attach not ready; session continues in observe mode."),
+            }),
+          );
+        }
         dispatch(closeSessionDialog());
         return;
       }
@@ -317,6 +338,14 @@ export function NewSessionDialog() {
           >
             Play attach ({playAttach.backend}
             {sessionSource === "live" ? ", live" : ", fixture"}): {playAttach.message}
+            {!playAttach.ready && playAttach.backend === "krpc" ? (
+              <>
+                {" "}
+                If KSP just launched, Titan will wait for kRPC after Start. Missing mod? Install{" "}
+                <strong>kRPC</strong> under <code>GameData</code>, enable RPC 50000 / stream 50001, then retry
+                Agent play — the session still starts in observe/learn mode.
+              </>
+            ) : null}
           </Alert>
         ) : null}
         <TextField
@@ -417,7 +446,7 @@ export function NewSessionDialog() {
           <FormHelperText sx={{ mt: -1.5, mx: 0 }}>
             {sessionSource === "live"
               ? gameSlug === "ksp"
-                ? "Starts titan-actions with TITAN_PLAY_BACKEND=krpc. Start KSP with the kRPC mod (RPC 50000 / stream 50001)."
+                ? "Waits for kRPC after launch (up to ~60s). Needs the kRPC mod in GameData (RPC 50000 / stream 50001). If attach fails, session still starts in observe/learn — toggle Agent play once kRPC is up."
                 : "Starts titan-actions with TITAN_PLAY_BACKEND=scs (ViGEm on Windows, keyboard brake fallback)."
               : "Starts titan-actions with TITAN_PLAY_BACKEND=hil for software play without a game."}
           </FormHelperText>

@@ -35,6 +35,8 @@ async def no_supervisor() -> SupervisorStatus | None:
 @pytest.fixture
 def api_client(migrated_db: TempDatabase, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     monkeypatch.setenv(LAUNCH_TOKEN_ENV, TOKEN)
+    # Keep attach waits short in unit tests; HIL uses the real post-launch deadline.
+    monkeypatch.setenv("TITAN_PLAY_ATTACH_WAIT_S", "0.2")
     cfg = TitanConfig().model_copy(update={"postgres": migrated_db.pg})
     app = create_app(
         cfg,
@@ -373,12 +375,14 @@ def test_session_start_live_play_attaches_krpc(
 ) -> None:
     """Registered install + play_enabled starts actions with explicit krpc/scs backend."""
     import titan_api.routers.sessions as sessions_routes
+    from titan_core.play_attach import PlayAttach
 
     flags: dict[str, object] = {}
 
     class _Ctl:
         def start_orchestrator(self, session_id: UUID, **kwargs: object) -> None:
             flags["orch"] = True
+            flags["orch_play"] = kwargs.get("play_enabled")
 
         def start_actions(self, session_id: UUID, **kwargs: object) -> None:
             flags["actions"] = True
@@ -395,9 +399,21 @@ def test_session_start_live_play_attaches_krpc(
     async def noop(*_a: object, **_k: object) -> None:
         return None
 
+    expected_backend = "krpc" if game_slug == "ksp" else "scs" if game_slug in {"ets2", "ats"} else "hil"
+
+    async def ready_attach(**_kwargs: object) -> PlayAttach:
+        return PlayAttach(
+            source="live",
+            backend=expected_backend,  # type: ignore[arg-type]
+            ready=True,
+            message="ready",
+            detail={},
+        )
+
     monkeypatch.setattr(sessions_routes, "start_demo_replay", noop)
     monkeypatch.setattr(sessions_routes, "_seed_director_demo_line", noop)
     monkeypatch.setattr(sessions_routes, "start_live_telemetry", noop)
+    monkeypatch.setattr(sessions_routes, "wait_probe_attach", ready_attach)
 
     exe = tmp_path / ("KSP_x64.exe" if game_slug == "ksp" else "eurotrucks2.exe")
     exe.write_bytes(b"MZ")
@@ -429,11 +445,90 @@ def test_session_start_live_play_attaches_krpc(
     started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False})
     assert started.status_code == 202, started.text
     assert flags.get("actions") and flags.get("orch")
-    expected_backend = "krpc" if game_slug == "ksp" else "scs" if game_slug in {"ets2", "ats"} else "hil"
+    assert flags.get("orch_play") is True
     assert flags.get("play_backend") == expected_backend
     body = started.json()
     assert body.get("session_source") == "live"
+    assert body.get("play_actions") is True
     assert body.get("play_attach", {}).get("backend") == expected_backend
+
+
+def test_session_start_degrades_when_krpc_missing(
+    api_client: TestClient, game_slug: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Live play without kRPC still yields a live observe session (not a hard failure)."""
+    if game_slug != "ksp":
+        pytest.skip("kRPC degrade path is KSP-specific")
+    import titan_api.routers.sessions as sessions_routes
+    from titan_core.play_attach import PlayAttach
+
+    flags: dict[str, object] = {"actions": 0}
+
+    class _Ctl:
+        def start_orchestrator(self, session_id: UUID, **kwargs: object) -> None:
+            flags["orch_play"] = kwargs.get("play_enabled")
+
+        def start_actions(self, session_id: UUID, **kwargs: object) -> None:
+            flags["actions"] = int(flags["actions"]) + 1
+
+        def stop_orchestrator(self, session_id: UUID) -> None:
+            return
+
+        def stop_actions(self, session_id: UUID) -> None:
+            return
+
+    api_client.app.state.session_controller = _Ctl()
+
+    async def noop(*_a: object, **_k: object) -> None:
+        return None
+
+    async def not_ready(**_kwargs: object) -> PlayAttach:
+        return PlayAttach(
+            source="live",
+            backend="krpc",
+            ready=False,
+            message="kRPC is not running. Install the kRPC mod under KSP/GameData.",
+            detail={"degraded_to_observe": True, "krpc_mod_hint": True},
+        )
+
+    monkeypatch.setattr(sessions_routes, "start_demo_replay", noop)
+    monkeypatch.setattr(sessions_routes, "_seed_director_demo_line", noop)
+    monkeypatch.setattr(sessions_routes, "start_live_telemetry", noop)
+    monkeypatch.setattr(sessions_routes, "wait_probe_attach", not_ready)
+
+    exe = tmp_path / "KSP_x64.exe"
+    exe.write_bytes(b"MZ")
+    registered = api_client.post(
+        "/api/v1/game-profiles",
+        headers=AUTH,
+        json={"game_slug": "ksp", "executable_path": str(exe)},
+    )
+    assert registered.status_code == 201, registered.text
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={
+            "game_slug": "ksp",
+            "game_profile_id": registered.json()["id"],
+            "title": "observe-fallback",
+            "settings": {
+                "agents_enabled": True,
+                "play_enabled": True,
+                "demo_telemetry": False,
+                "session_source": "live",
+            },
+        },
+    )
+    sid = created.json()["id"]
+    started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": True})
+    assert started.status_code == 202, started.text
+    body = started.json()
+    assert body["state"] == "live"
+    assert body.get("play_actions") is False
+    assert body.get("play_attach", {}).get("ready") is False
+    assert "kRPC" in body.get("play_attach", {}).get("message", "")
+    assert flags.get("orch_play") is False
+    assert flags.get("actions") == 0
 
 
 def test_create_autonomous_with_play_coerces_to_observe(api_client: TestClient, game_slug: str) -> None:

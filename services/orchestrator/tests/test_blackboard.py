@@ -66,4 +66,3 @@ async def test_blackboard_cas_and_cache(
                 bb_write_sections=["facts"],
             )
     await engine.dispose()
-

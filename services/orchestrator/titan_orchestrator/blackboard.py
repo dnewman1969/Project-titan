@@ -111,9 +111,7 @@ class BlackboardService:
                     raise VersionMismatch(current)
                 version = expected_version + 1
             ttl = ttl_s if ttl_s is not None else DEFAULT_TTL_S.get(section)
-            expires_at = (
-                datetime.now(UTC) + timedelta(seconds=ttl) if ttl is not None and ttl > 0 else None
-            )
+            expires_at = datetime.now(UTC) + timedelta(seconds=ttl) if ttl is not None and ttl > 0 else None
             bb_version = await self._repo.next_bb_version(self._session_id)
             row = await self._repo.append(
                 session_id=self._session_id,
@@ -210,9 +208,7 @@ class BlackboardService:
             existing = None  # ownership enforced at call sites for MVP
             del existing, key
 
-    async def _write_cache(
-        self, section: str, key: str, row: Any, expires_at: datetime | None
-    ) -> None:
+    async def _write_cache(self, section: str, key: str, row: Any, expires_at: datetime | None) -> None:
         wire = cache_entry_wire(
             version=row.version,
             value=row.value,
@@ -225,9 +221,7 @@ class BlackboardService:
         await self._redis.hset(bb_section_hash(self._session_id, section), key, wire)
         await self._redis.set(bb_version_key(self._session_id), str(row.bb_version))
 
-    async def _emit_written(
-        self, section: str, key: str, version: int, bb_version: int, op: str
-    ) -> None:
+    async def _emit_written(self, section: str, key: str, version: int, bb_version: int, op: str) -> None:
         if self._emit is None:
             return
         section_lit = cast(Section, section)

@@ -85,9 +85,7 @@ async def _session_or_404(session: AsyncSession, session_id: UUID) -> Session:
 
 
 @router.post("/sessions", status_code=status.HTTP_201_CREATED)
-async def create_session(
-    body: CreateSession, db: AsyncSession = SessionDep
-) -> dict[str, Any]:
+async def create_session(body: CreateSession, db: AsyncSession = SessionDep) -> dict[str, Any]:
     if body.mode == "autonomous":
         raise TitanError(ErrorCode.NOT_IMPLEMENTED_IN_PHASE, "autonomous mode is Phase 4+")
     game = await db.scalar(select(Game).where(Game.id == body.game_id))
@@ -178,9 +176,7 @@ async def get_blackboard(
 ) -> dict[str, Any]:
     await _session_or_404(db, session_id)
     repo = BlackboardRepository(db)
-    bb_version, entries = await repo.snapshot(
-        session_id, sections=sections, since_bb_version=since_version
-    )
+    bb_version, entries = await repo.snapshot(session_id, sections=sections, since_bb_version=since_version)
     return {
         "bb_version": bb_version,
         "entries": [
@@ -200,4 +196,3 @@ async def get_blackboard(
             for row in entries
         ],
     }
-

@@ -125,17 +125,11 @@ def _score(
     now_ms: int,
 ) -> float:
     del role
-    time_since = min(
-        1.0, (now_ms - min(manager._last_spoke_ms.values(), default=now_ms - 60_000)) / 60_000
-    )
+    time_since = min(1.0, (now_ms - min(manager._last_spoke_ms.values(), default=now_ms - 60_000)) / 60_000)
     repetition = 0.2 if manager._last_utterances else 0.0
     same_speaker = 0.1 if manager._holder else 0.0
     return (
-        0.45 * payload.urgency
-        + 0.15 * time_since
-        + 0.10 * talkativeness
-        - 0.20 * repetition
-        - same_speaker
+        0.45 * payload.urgency + 0.15 * time_since + 0.10 * talkativeness - 0.20 * repetition - same_speaker
     )
 
 

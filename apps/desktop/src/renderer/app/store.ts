@@ -1,5 +1,6 @@
 import { combineReducers, configureStore } from "@reduxjs/toolkit";
 
+import { agentsChatSlice } from "../features/agents/agentsChatSlice";
 import { eventsSlice } from "../features/events/eventsSlice";
 import { layoutSlice } from "../features/operations/layoutSlice";
 import { safetySlice } from "../features/safety/safetySlice";
@@ -15,6 +16,7 @@ const rootReducer = combineReducers({
   layout: layoutSlice.reducer,
   safety: safetySlice.reducer,
   events: eventsSlice.reducer,
+  agentsChat: agentsChatSlice.reducer,
   system: systemSlice.reducer,
   gameTelemetry: gameTelemetrySlice.reducer,
   sessions: sessionsSlice.reducer,

@@ -11,6 +11,7 @@ import TableCell from "@mui/material/TableCell";
 import TableRow from "@mui/material/TableRow";
 import { MONO_FONT } from "@titan/ui-kit";
 
+import { FirstRunWizard } from "../features/first-run/FirstRunWizard";
 import { BootSplash } from "../features/operations/BootSplash";
 import { dismissNotice, setAboutOpen, showNotice } from "../features/operations/layoutSlice";
 import { OperationsCenter } from "../features/operations/OperationsCenter";
@@ -115,6 +116,7 @@ export function App() {
       <BootSplash />
       <AboutDialog />
       <SessionDialogs />
+      <FirstRunWizard />
       <Snackbar
         key={notice?.id}
         open={notice !== null}

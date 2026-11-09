@@ -8,6 +8,7 @@ dependencies = [
     "langgraph>=1.2.20",
     "titan-core",
     "titan-db",
+    "titan-memory",
     "titan-models",
 ]
 
@@ -24,4 +25,5 @@ packages = ["titan_orchestrator"]
 [tool.uv.sources]
 titan-core = { workspace = true }
 titan-db = { workspace = true }
+titan-memory = { workspace = true }
 titan-models = { workspace = true }

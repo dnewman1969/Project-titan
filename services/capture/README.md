@@ -2,4 +2,5 @@
 
 Recording: OBS over obs-websocket v5, FFmpeg webcam, MJPEG preview, manifest (Section 2.12).
 
-Status: skeleton only. Implemented in M8 (see `docs/titan-architecture-spec.md`, Section 8.2).
+Status: M8.T1 stub (`titan_capture.obs.ObsClient` plus respx/loopback WS tests). FFmpeg, manifest and
+MJPEG preview remain in M8.

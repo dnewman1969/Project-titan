@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite
 
 import type { KillSwitchEvent, SupervisorUpdate, TitanBridge } from "../../src/shared/ipc";
 import { App } from "../../src/renderer/app/App";
+import { markFirstRunComplete } from "../../src/renderer/features/first-run/FirstRunWizard";
 import { makeStore } from "../../src/renderer/app/store";
 import { gridTemplate } from "../../src/renderer/features/operations/OperationsCenter";
 import { formatMetrics } from "../../src/renderer/features/telemetry/TelemetryBar";
@@ -187,6 +188,7 @@ let shell: FakeBridge;
 let fetchMock: Mock<(input: Request) => Promise<Response>>;
 
 beforeEach(() => {
+  markFirstRunComplete();
   shell = fakeBridge();
   window.titan = shell.bridge;
   FakeWebSocket.instances = [];
@@ -200,7 +202,11 @@ beforeEach(() => {
       return Promise.resolve(
         jsonResponse({
           version: 2,
-          values: { "ui.layout": { panels: { agents: true, webcam: false, telemetry: true, events: true, games: false } } },
+          values: {
+            "ui.layout": {
+              panels: { agents: true, webcam: false, telemetry: true, events: true, games: false },
+            },
+          },
         }),
       );
     if (url.endsWith("/api/v1/sessions") && input.method === "POST")
@@ -238,7 +244,8 @@ describe("Operations Center", () => {
     }
     expect(screen.getByRole("button", { name: /kill/i })).toBeInTheDocument();
     expect(screen.getAllByRole("listitem").length).toBeGreaterThanOrEqual(5);
-    expect(screen.getByRole("textbox", { name: "Message the crew" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "Message the crew" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Brag" })).toBeInTheDocument();
   });
 
   it("shows API and database health from the backend, sending the launch token", async () => {
@@ -329,9 +336,7 @@ describe("Operations Center", () => {
     });
     const sessionDialog = await screen.findByRole("dialog", { name: "New session" });
     await userEvent.setup().click(within(sessionDialog).getByRole("button", { name: "Create" }));
-    expect(
-      await screen.findByText(/Session API is not on this backend yet/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Session API is not on this backend yet/)).toBeInTheDocument();
   });
 
   it("filters the event log by category", async () => {

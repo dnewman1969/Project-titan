@@ -48,5 +48,11 @@ export const layoutSlice = createSlice({
   },
 });
 
-export const { togglePanel, hydrateFromSettings, setSettingsVersion, showNotice, dismissNotice, setAboutOpen } =
-  layoutSlice.actions;
+export const {
+  togglePanel,
+  hydrateFromSettings,
+  setSettingsVersion,
+  showNotice,
+  dismissNotice,
+  setAboutOpen,
+} = layoutSlice.actions;

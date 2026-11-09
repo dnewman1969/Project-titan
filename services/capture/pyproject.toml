@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Project Titan recording"
 requires-python = ">=3.12,<3.13"
 license = "Apache-2.0"
-dependencies = ["titan-core"]
+dependencies = ["titan-core", "websockets>=14.0,<16"]
 
 [build-system]
 requires = ["hatchling>=1.25"]

@@ -36,6 +36,12 @@ class HilDriver:
             "ksp.sas",
             "ksp.rcs",
             "ksp.brake",
+            "ksp.brakes",
+            "ksp.gear",
+            "ksp.steer",
+            "ksp.pitch",
+            "ksp.yaw",
+            "ksp.roll",
             "scs.brake",
             "scs.throttle",
         }
@@ -60,6 +66,25 @@ class HilDriver:
                 ksp["sas"] = bool(params.get("enabled", True))
             elif action_id == "ksp.rcs":
                 ksp["rcs"] = bool(params.get("enabled", True))
+            elif action_id in {"ksp.brake", "ksp.brakes"}:
+                if "enabled" in params:
+                    ksp["brakes"] = bool(params.get("enabled"))
+                else:
+                    ksp["brakes"] = float(params.get("brake", params.get("fraction", 1.0))) > 0.05
+            elif action_id == "ksp.gear":
+                ksp["gear"] = bool(params.get("deployed", params.get("enabled", True)))
+            elif action_id == "ksp.steer":
+                steer = dict(ksp.get("steer") or {})
+                for axis in ("pitch", "yaw", "roll"):
+                    if axis in params:
+                        steer[axis] = max(-1.0, min(1.0, float(params[axis])))
+                ksp["steer"] = steer
+            elif action_id == "ksp.pitch":
+                ksp["pitch"] = max(-1.0, min(1.0, float(params.get("pitch", params.get("value", 0.0)))))
+            elif action_id == "ksp.yaw":
+                ksp["yaw"] = max(-1.0, min(1.0, float(params.get("yaw", params.get("value", 0.0)))))
+            elif action_id == "ksp.roll":
+                ksp["roll"] = max(-1.0, min(1.0, float(params.get("roll", params.get("value", 0.0)))))
         if action_id.startswith("scs."):
             scs = _STATE.setdefault("scs", {})
             if not isinstance(scs, dict):

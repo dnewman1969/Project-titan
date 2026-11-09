@@ -1,4 +1,4 @@
-"""kRPC driver (mocked connection)."""
+"""kRPC driver (mocked connection — no live KSP)."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from titan_actions.drivers import krpc_driver
+from titan_actions.drivers.krpc_driver import KrpcDriver
 
 
 class _Control:
@@ -14,6 +15,10 @@ class _Control:
     sas: bool = False
     rcs: bool = False
     brakes: bool = False
+    gear: bool = False
+    pitch: float = 0.0
+    yaw: float = 0.0
+    roll: float = 0.0
     staged: int = 0
 
     def activate_next_stage(self) -> None:
@@ -37,13 +42,20 @@ class _Conn:
 def _reset_krpc_conn() -> None:
     krpc_driver._CONN = None
     krpc_driver._CONN_KEY = None
+    _Conn.space_center.active_vessel = _Vessel()
 
 
-def test_krpc_throttle_and_stage(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(krpc_driver, "_connect", lambda *_a, **_k: _Conn())
-    from titan_actions.drivers.krpc_driver import KrpcDriver
+def _driver() -> KrpcDriver:
+    return KrpcDriver(
+        host="127.0.0.1",
+        rpc_port=50000,
+        stream_port=50001,
+        connect_fn=lambda *_a, **_k: _Conn(),
+    )
 
-    driver = KrpcDriver(host="127.0.0.1", rpc_port=50000, stream_port=50001)
+
+def test_krpc_throttle_and_stage() -> None:
+    driver = _driver()
     ok, err = driver.execute("ksp.throttle", {"throttle": 0.8})
     assert ok and err is None
     vessel = _Conn.space_center.active_vessel
@@ -52,13 +64,66 @@ def test_krpc_throttle_and_stage(monkeypatch: pytest.MonkeyPatch) -> None:
     assert ok and vessel.control.staged == 1
 
 
+def test_krpc_steer_pitch_yaw_roll() -> None:
+    driver = _driver()
+    ok, err = driver.execute("ksp.steer", {"pitch": -0.4, "yaw": 0.1, "roll": 0.0})
+    assert ok and err is None
+    control = _Conn.space_center.active_vessel.control
+    assert control.pitch == -0.4
+    assert control.yaw == 0.1
+    assert control.roll == 0.0
+
+    ok, err = driver.execute("ksp.pitch", {"value": 0.5})
+    assert ok and control.pitch == 0.5
+    ok, err = driver.execute("ksp.yaw", {"yaw": -0.25})
+    assert ok and control.yaw == -0.25
+    ok, err = driver.execute("ksp.roll", {"roll": 0.75})
+    assert ok and control.roll == 0.75
+
+
+def test_krpc_steer_requires_axis() -> None:
+    ok, err = _driver().execute("ksp.steer", {})
+    assert not ok
+    assert err is not None and "requires" in err
+
+
+def test_krpc_gear_sas_rcs_brake() -> None:
+    driver = _driver()
+    control = _Conn.space_center.active_vessel.control
+    assert driver.execute("ksp.gear", {"deployed": True}) == (True, None)
+    assert control.gear is True
+    assert driver.execute("ksp.sas", {"enabled": True}) == (True, None)
+    assert control.sas is True
+    assert driver.execute("ksp.rcs", {"enabled": False}) == (True, None)
+    assert control.rcs is False
+    assert driver.execute("ksp.brake", {"enabled": True}) == (True, None)
+    assert control.brakes is True
+
+
+def test_krpc_reset_neutralizes_controls() -> None:
+    driver = _driver()
+    control = _Conn.space_center.active_vessel.control
+    driver.execute("ksp.throttle", {"throttle": 1.0})
+    driver.execute("ksp.steer", {"pitch": 0.8, "yaw": -0.5, "roll": 0.2})
+    driver.reset()
+    assert control.throttle == 0.0
+    assert control.pitch == 0.0
+    assert control.yaw == 0.0
+    assert control.roll == 0.0
+
+
 def test_krpc_connect_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     def boom(*_a: Any, **_k: Any) -> Any:
         raise OSError("refused")
 
-    monkeypatch.setattr(krpc_driver, "_connect", boom)
-    from titan_actions.drivers.krpc_driver import KrpcDriver
-
-    ok, err = KrpcDriver(host="127.0.0.1", rpc_port=1, stream_port=2).execute("ksp.throttle", {})
+    driver = KrpcDriver(host="127.0.0.1", rpc_port=1, stream_port=2, connect_fn=boom)
+    ok, err = driver.execute("ksp.throttle", {})
     assert not ok
     assert err is not None and "refused" in err
+
+
+def test_krpc_no_active_vessel() -> None:
+    _Conn.space_center.active_vessel = None  # type: ignore[assignment]
+    ok, err = _driver().execute("ksp.throttle", {"throttle": 0.5})
+    assert not ok
+    assert err is not None and "no active vessel" in err

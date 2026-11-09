@@ -35,13 +35,13 @@ HIL does **not** touch the game; it updates in-memory state and optional `hil.nd
 
 ## Real KSP (kRPC)
 
-| Step    | Detail                                                                |
-| ------- | --------------------------------------------------------------------- |
-| Mod     | kRPC 0.5.x in `GameData/kRPC` (pinned in `third_party/manifest.yaml`) |
-| Server  | RPC `50000`, stream `50001`, `127.0.0.1`, auto-accept                 |
-| Titan   | New session → KSP install → **agent play** → start (optional launch)  |
-| Driver  | `TITAN_PLAY_BACKEND=auto` (default) + `TITAN_GAME_SLUG=ksp`           |
-| Actions | `ksp.throttle`, `ksp.stage`, `ksp.sas`, `ksp.rcs`, `ksp.brake`        |
+| Step    | Detail                                                                       |
+| ------- | ---------------------------------------------------------------------------- |
+| Mod     | kRPC 0.5.x in `GameData/kRPC` (pinned in `third_party/manifest.yaml`)        |
+| Server  | RPC `50000`, stream `50001`, `127.0.0.1`, auto-accept                        |
+| Titan   | New session → KSP install → **agent play** → start (optional launch)         |
+| Driver  | `TITAN_PLAY_BACKEND=auto` (default) + `TITAN_GAME_SLUG=ksp`                  |
+| Actions | Thrust/stage/SAS/RCS/brakes/gear + `ksp.steer` pitch/yaw/roll (mocked in CI) |
 
 If kRPC is down, `action.executed` reports `ok: false` with a connect error (no fake success).
 

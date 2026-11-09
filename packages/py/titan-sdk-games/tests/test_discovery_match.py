@@ -21,6 +21,32 @@ def test_detect_skips_unmatched_steam_app_id(tmp_path: Path) -> None:
     assert KspAdapter.detect(ctx) == []
 
 
+def test_ksp_detects_classic_steam_app_220200(tmp_path: Path) -> None:
+    primary = tmp_path / "Steam"
+    secondary = tmp_path / "SteamLibrary"
+    primary_steamapps = primary / "steamapps"
+    primary_steamapps.mkdir(parents=True)
+    secondary_steamapps = secondary / "steamapps"
+    secondary_steamapps.mkdir(parents=True)
+    (primary_steamapps / "libraryfolders.vdf").write_text(
+        f'"libraryfolders"\n{{\n\t"1"\n\t{{\n\t\t"path"\t\t"{secondary}"\n\t}}\n}}\n',
+        encoding="utf-8",
+    )
+    ksp = secondary / "common" / "Kerbal Space Program"
+    ksp.mkdir(parents=True)
+    (ksp / "KSP_x64.exe").write_bytes(b"MZ")
+    manifest = (
+        '"AppState"\n{\n\t"appid"\t\t"220200"\n\t"buildid"\t\t"99"\n\t"installdir"\t\t"'
+        'Kerbal Space Program"\n}\n'
+    )
+    (secondary_steamapps / "appmanifest_220200.acf").write_text(manifest, encoding="utf-8")
+    ctx = DiscoveryContext(platform="windows", steam_libraries=[primary], env={"STEAM_PATH": str(primary)})
+    hits = KspAdapter.detect(ctx)
+    assert len(hits) == 1
+    assert hits[0].game_slug == "ksp"
+    assert "Kerbal" in hits[0].install_path or "Kerbal" in hits[0].executable_path
+
+
 def test_steam_scanner_uses_steam_path_env(tmp_path: Path) -> None:
     lib = tmp_path / "Steam"
     steamapps = lib / "steamapps"

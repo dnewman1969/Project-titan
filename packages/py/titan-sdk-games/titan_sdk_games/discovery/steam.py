@@ -11,22 +11,56 @@ class SteamScanner(StoreScanner):
     name = "steam"
 
     def scan(self, ctx: DiscoveryContext) -> list[StoreInstall]:
-        libraries = list(ctx.steam_libraries)
-        if not libraries and ctx.platform == "windows":
-            steam_path = ctx.env.get("STEAM_PATH")
-            if steam_path:
-                libraries = [Path(steam_path)]
+        libraries = self._collect_library_roots(ctx)
         out: list[StoreInstall] = []
+        seen_libs: set[str] = set()
         for lib in libraries:
             if not lib.is_dir():
                 continue
+            try:
+                key = str(lib.resolve())
+            except OSError:
+                key = str(lib)
+            if key in seen_libs:
+                continue
+            seen_libs.add(key)
             out.extend(self._scan_library(lib))
-            folders_vdf = lib / "steamapps" / "libraryfolders.vdf"
-            if folders_vdf.is_file():
-                for extra in self._extra_libraries(folders_vdf):
-                    if extra.is_dir():
-                        out.extend(self._scan_library(extra))
         return out
+
+    def _collect_library_roots(self, ctx: DiscoveryContext) -> list[Path]:
+        """Steam install root plus every path from libraryfolders.vdf (multi-library)."""
+        roots: list[Path] = []
+        seen: set[str] = set()
+
+        def add(raw: Path) -> None:
+            if not raw:
+                return
+            try:
+                resolved = str(raw.resolve())
+            except OSError:
+                resolved = str(raw)
+            if resolved in seen:
+                return
+            seen.add(resolved)
+            roots.append(raw)
+
+        for lib in ctx.steam_libraries:
+            add(lib)
+        if not roots and ctx.platform == "windows":
+            steam_path = ctx.env.get("STEAM_PATH")
+            if steam_path:
+                add(Path(steam_path))
+
+        idx = 0
+        while idx < len(roots):
+            lib = roots[idx]
+            idx += 1
+            folders_vdf = lib / "steamapps" / "libraryfolders.vdf"
+            if not folders_vdf.is_file():
+                continue
+            for extra in self._extra_libraries(folders_vdf):
+                add(extra)
+        return roots
 
     def _extra_libraries(self, path: Path) -> list[Path]:
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -39,8 +73,8 @@ class SteamScanner(StoreScanner):
             if not isinstance(entry, dict):
                 continue
             lib_path = entry.get("path") or entry.get("Path")
-            if isinstance(lib_path, str) and lib_path:
-                libs.append(Path(lib_path))
+            if isinstance(lib_path, str) and lib_path.strip():
+                libs.append(Path(_normalize_steam_path(lib_path)))
         return libs
 
     def _scan_library(self, library: Path) -> list[StoreInstall]:
@@ -86,3 +120,10 @@ class SteamScanner(StoreScanner):
         if candidates:
             return candidates[0]
         return None
+
+
+def _normalize_steam_path(path: str) -> str:
+    trimmed = path.strip().replace("\\\\", "\\")
+    if "\\" in trimmed or (len(trimmed) > 1 and trimmed[1] == ":"):
+        return trimmed.replace("/", "\\")
+    return trimmed

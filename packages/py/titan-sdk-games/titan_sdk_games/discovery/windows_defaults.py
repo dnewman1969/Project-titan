@@ -10,23 +10,54 @@ from titan_sdk_games.types import DiscoveryContext
 from titan_sdk_games.vdf import parse_vdf
 
 
-def _steam_path_from_registry() -> str | None:
-    platform_tag = sys.platform
-    if platform_tag != "win32":
-        return None
+def _read_registry_string(hive: int, subkey: str, value_name: str) -> str | None:
     try:
         import winreg
 
-        with winreg.OpenKey(  # type: ignore[attr-defined]
-            winreg.HKEY_CURRENT_USER,  # type: ignore[attr-defined]
-            r"Software\Valve\Steam",
-        ) as key:
-            raw, _ = winreg.QueryValueEx(key, "SteamPath")  # type: ignore[attr-defined]
-        if isinstance(raw, str) and raw.strip():
-            return raw.replace("/", "\\")
+        with winreg.OpenKey(hive, subkey) as key:  # type: ignore[attr-defined]
+            raw, _ = winreg.QueryValueEx(key, value_name)  # type: ignore[attr-defined]
     except OSError:
         return None
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip().replace("/", "\\")
     return None
+
+
+def _steam_registry_candidates() -> list[str]:
+    if os.name != "nt":
+        return []
+    import winreg
+
+    specs: list[tuple[int, str, str]] = [
+        (winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam", "SteamPath"),  # type: ignore[attr-defined]
+        (winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam", "InstallPath"),  # type: ignore[attr-defined]
+        (
+            winreg.HKEY_LOCAL_MACHINE,  # type: ignore[attr-defined]
+            r"SOFTWARE\WOW6432Node\Valve\Steam",
+            "InstallPath",
+        ),
+        (
+            winreg.HKEY_LOCAL_MACHINE,  # type: ignore[attr-defined]
+            r"SOFTWARE\WOW6432Node\Valve\Steam",
+            "SteamPath",
+        ),
+    ]
+    found: list[str] = []
+    seen: set[str] = set()
+    for hive, subkey, value in specs:
+        raw = _read_registry_string(hive, subkey, value)
+        if not raw:
+            continue
+        norm = raw.replace("/", "\\")
+        if norm not in seen:
+            seen.add(norm)
+            found.append(norm)
+    return found
+
+
+def _steam_path_from_registry() -> str | None:
+    candidates = _steam_registry_candidates()
+    return candidates[0] if candidates else None
 
 
 def _steam_library_roots_from_vdf(steam_root: Path) -> list[Path]:
@@ -47,15 +78,26 @@ def _steam_library_roots_from_vdf(steam_root: Path) -> list[Path]:
             continue
         lib_path = entry.get("path") or entry.get("Path")
         if isinstance(lib_path, str) and lib_path.strip():
-            norm = lib_path.replace("/", "\\") if sys.platform == "win32" else lib_path
+            norm = lib_path.strip().replace("\\\\", "\\")
+            if sys.platform == "win32":
+                norm = norm.replace("/", "\\")
             roots.append(Path(norm))
     return roots
 
 
 def _default_steam_libraries(env: dict[str, str]) -> list[Path]:
     libs: list[Path] = []
-    steam = env.get("STEAM_PATH") or _steam_path_from_registry()
-    if steam:
+    steam_candidates: list[str] = []
+    if env.get("STEAM_PATH"):
+        steam_candidates.append(env["STEAM_PATH"])
+    for reg in _steam_registry_candidates():
+        if reg not in steam_candidates:
+            steam_candidates.append(reg)
+    if not steam_candidates:
+        fallback = _steam_path_from_registry()
+        if fallback:
+            steam_candidates.append(fallback)
+    for steam in steam_candidates:
         libs.append(Path(steam))
     for candidate in (
         Path(r"C:\Program Files (x86)\Steam"),

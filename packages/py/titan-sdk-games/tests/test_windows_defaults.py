@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from titan_sdk_games.discovery.windows_defaults import enrich_discovery_context
+from titan_sdk_games.discovery.windows_defaults import (
+    _steam_registry_candidates,
+    enrich_discovery_context,
+)
 
 
 def test_enrich_linux_has_no_steam_libs_by_default(tmp_path: Path) -> None:
@@ -54,6 +57,46 @@ def test_enrich_windows_epic_manifest_and_common_scan_paths(tmp_path: Path) -> N
     )
     assert ctx.epic_manifest_dirs == [programdata / "Epic" / "EpicGamesLauncher" / "Data" / "Manifests"]
     assert common in ctx.extra_paths
+
+
+def test_steam_libraryfolders_multiple_entries(tmp_path: Path) -> None:
+    steam = tmp_path / "Steam"
+    steam.mkdir()
+    lib_a = tmp_path / "LibA"
+    lib_b = tmp_path / "LibB"
+    lib_a.mkdir()
+    lib_b.mkdir()
+    vdf_dir = steam / "steamapps"
+    vdf_dir.mkdir()
+    vdf_dir.joinpath("libraryfolders.vdf").write_text(
+        f'"libraryfolders"\n{{\n\t"1"\n\t{{\n\t\t"path"\t\t"{lib_a}"\n\t}}\n\t"2"\n\t{{\n\t\t"path"\t\t"{lib_b}"\n\t}}\n}}\n',
+        encoding="utf-8",
+    )
+    ctx = enrich_discovery_context(platform="windows", env={"STEAM_PATH": str(steam)})
+    lib_strs = {str(p) for p in ctx.steam_libraries}
+    assert str(steam) in lib_strs
+    assert str(lib_a) in lib_strs
+    assert str(lib_b) in lib_strs
+
+
+def test_steam_registry_candidates_dedupes(monkeypatch) -> None:
+    import sys
+    import types
+
+    monkeypatch.setattr("os.name", "nt")
+    winreg = types.SimpleNamespace(HKEY_CURRENT_USER=1, HKEY_LOCAL_MACHINE=2)
+    monkeypatch.setitem(sys.modules, "winreg", winreg)
+
+    def fake_read(_hive: int, _subkey: str, value_name: str) -> str | None:
+        if value_name in {"SteamPath", "InstallPath"}:
+            return r"C:\Games\Steam"
+        return None
+
+    monkeypatch.setattr(
+        "titan_sdk_games.discovery.windows_defaults._read_registry_string",
+        fake_read,
+    )
+    assert _steam_registry_candidates() == [r"C:\Games\Steam"]
 
 
 def test_steam_libraryfolders_ignores_missing_vdf(tmp_path: Path) -> None:

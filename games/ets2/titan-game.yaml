@@ -5,7 +5,7 @@ adapter_version: 1.0.0
 domain: ground_vehicle
 genre: [simulation, driving]
 detection:
-  steam_app_ids: [227300]
+  steam_app_ids: [227300, 228380]
   epic_catalog_ids: []
   gog_product_ids: []
   executables: ["bin/win_x64/eurotrucks2.exe"]

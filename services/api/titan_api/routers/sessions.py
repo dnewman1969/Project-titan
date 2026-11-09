@@ -21,7 +21,6 @@ from titan_api.session_lifecycle import end_session_row, supersede_other_live_se
 from titan_api.session_telemetry import (
     fixture_fallback_path,
     start_live_telemetry,
-    stop_all_session_telemetry,
 )
 from titan_core.clock import SessionClock, utc_now
 from titan_core.config import expand_path

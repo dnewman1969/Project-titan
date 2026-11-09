@@ -1,4 +1,5 @@
 import Alert from "@mui/material/Alert";
+import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import Button from "@mui/material/Button";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -13,6 +14,7 @@ import { useState } from "react";
 import { useCreateGameProfileMutation, useListGamesQuery, useScanGamesMutation } from "../../app/api";
 import { formatApiError } from "../../app/formatApiError";
 import { useAppDispatch } from "../../app/hooks";
+import { getTitan } from "../../app/runtime";
 import { logEvent } from "../events/eventsSlice";
 import { showNotice } from "../operations/layoutSlice";
 
@@ -52,6 +54,13 @@ export function GamesDiscoveryPanel() {
     dispatch(
       logEvent({ type: "games.scan_failed", category: "system", severity: "error", text: msg }),
     );
+  };
+
+  const onBrowseExecutable = async () => {
+    const picked = await getTitan().pickExecutable();
+    if (picked) {
+      setManualExe(picked);
+    }
   };
 
   const onRegisterPath = async () => {
@@ -136,17 +145,34 @@ export function GamesDiscoveryPanel() {
             </MenuItem>
           ))}
         </TextField>
-        <TextField
-          label="Path to game .exe"
-          placeholder="C:\...\Kerbal Space Program\KSP_x64.exe"
-          value={manualExe}
-          onChange={(e) => {
-            setManualExe(e.target.value);
-          }}
-          fullWidth
-          size="small"
-        />
-        <Button variant="contained" color="secondary" disabled={registering || isError} onClick={() => void onRegisterPath()}>
+        <Stack direction="row" spacing={1} alignItems="flex-start">
+          <TextField
+            label="Path to game .exe"
+            placeholder="C:\...\Kerbal Space Program\KSP_x64.exe"
+            value={manualExe}
+            onChange={(e) => {
+              setManualExe(e.target.value);
+            }}
+            fullWidth
+            size="small"
+          />
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={isError}
+            startIcon={<FolderOpenIcon />}
+            onClick={() => void onBrowseExecutable()}
+            sx={{ mt: 0.5, whiteSpace: "nowrap" }}
+          >
+            Browse…
+          </Button>
+        </Stack>
+        <Button
+          variant="contained"
+          color="secondary"
+          disabled={registering || isError || manualExe.trim().length === 0}
+          onClick={() => void onRegisterPath()}
+        >
           Register install path
         </Button>
         </Paper>

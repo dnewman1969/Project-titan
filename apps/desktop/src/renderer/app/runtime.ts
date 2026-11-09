@@ -20,6 +20,7 @@ const BROWSER_FALLBACK: TitanBridge = {
   getSupervisorStatus: () => Promise.resolve(null),
   openPath: () => Promise.resolve("unavailable"),
   openExternal: () => Promise.resolve(),
+  pickExecutable: () => Promise.resolve(null),
 };
 
 export function getTitan(): TitanBridge {

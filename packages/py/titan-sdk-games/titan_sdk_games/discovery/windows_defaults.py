@@ -14,7 +14,7 @@ def _steam_path_from_registry() -> str | None:
     if sys.platform != "win32":
         return None
     try:
-        import winreg  # noqa: PLC0415
+        import winreg
 
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as key:
             raw, _ = winreg.QueryValueEx(key, "SteamPath")
@@ -95,8 +95,7 @@ def _common_extra_paths(steam_libs: list[Path]) -> list[Path]:
     for candidate in (
         Path(r"C:\Program Files (x86)\Steam\steamapps\common"),
         Path(r"C:\Program Files\Steam\steamapps\common"),
-        Path(r"D:\SteamLibrary\steamapps\common"),
-        Path(r"E:\SteamLibrary\steamapps\common"),
+        *(Path(f"{letter}:\\SteamLibrary\\steamapps\\common") for letter in "CDEFGHIJKLMNOPQRSTUVWXYZ"),
     ):
         if candidate.is_dir() and candidate not in paths:
             paths.append(candidate)

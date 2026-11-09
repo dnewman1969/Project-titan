@@ -1,0 +1,33 @@
+- id: ksp.scene_changed
+  type: ksp.scene_changed
+  when: { path: "scene", op: "changed" }
+  severity: info
+  salience: 0.2
+- id: ksp.launch
+  type: ksp.launch
+  when:
+    all:
+      - { path: "vehicle.situation", op: "changed_to", value: "flying" }
+  severity: notice
+  salience: 0.8
+  marker: { kind: highlight, duration_ms: 8000 }
+- id: ksp.staging
+  type: ksp.staging
+  when: { path: "vehicle.stage.current", op: "changed" }
+  severity: info
+  salience: 0.5
+- id: ksp.max_q
+  type: ksp.max_q
+  when: { peak: { path: "environment.dynamic_pressure_pa", min_value: 5000, window_s: 3 } }
+  severity: notice
+  salience: 0.7
+  marker: { kind: highlight, duration_ms: 8000 }
+  payload:
+    dynamic_pressure_pa: "$peak"
+    altitude_m: "vehicle.geo.alt_m"
+- id: ksp.orbit_achieved
+  type: ksp.orbit_achieved
+  when: { path: "vehicle.situation", op: "changed_to", value: "orbiting" }
+  severity: notice
+  salience: 0.9
+  marker: { kind: achievement, duration_ms: 12000 }

@@ -19,6 +19,7 @@ PERSIST_GROUP = "persist"
 PERSIST_CONSUMER = "api"
 BUS_TAIL = ":bus"
 EVENTS_TAIL = ":events"
+TELEMETRY_TAIL = ":telemetry"
 
 SYS_METRICS = "titan:sys:metrics"
 SYS_METRICS_MAXLEN = 3600
@@ -63,6 +64,10 @@ def session_bus_stream(session_id: str) -> str:
 
 def session_events_stream(session_id: str) -> str:
     return f"{SESSION_STREAM_PREFIX}{session_id}{EVENTS_TAIL}"
+
+
+def session_telemetry_stream(session_id: str) -> str:
+    return f"{SESSION_STREAM_PREFIX}{session_id}{TELEMETRY_TAIL}"
 
 
 def parse_session_stream(stream: str, *, tail: str) -> str | None:

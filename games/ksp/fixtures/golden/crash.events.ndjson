@@ -1,0 +1,1 @@
+{"id":"386e5076-35ca-5b47-ae30-df80f977c4df","session_id":"00000000-0000-0000-0000-000000000000","seq":0,"type":"ksp.vessel_destroyed","category":"game","severity":"critical","salience":1.0,"source":"adapter:ksp","t_mono_ns":2020000000,"t_session_ms":1000,"occurred_at":"2020-01-01T00:00:01Z","frame_seq":3,"payload":{},"marker":null}

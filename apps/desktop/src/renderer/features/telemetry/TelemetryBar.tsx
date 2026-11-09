@@ -41,8 +41,16 @@ export function formatMetrics(m: SystemMetrics | null): MetricCell[] {
 export function TelemetryBar() {
   const latest = useAppSelector((s) => s.system.latest);
   const history = useAppSelector((s) => s.system.history);
+  const gameFrame = useAppSelector((s) => s.gameTelemetry.latest);
+  const gameSpeedHistory = useAppSelector((s) => s.gameTelemetry.speedHistory);
   const cells = formatMetrics(latest);
+  if (gameFrame?.vehicle.velocity?.speed_mps != null) {
+    const speed = Math.round(gameFrame.vehicle.velocity.speed_mps * 3.6);
+    const fpsCell = cells.find((c) => c.key === "fps");
+    if (fpsCell) fpsCell.value = `${speed} km/h`;
+  }
   const cpuSeries = history.slice(-120).map((m, i) => ({ i, cpu: m.cpu_pct }));
+  const speedSeries = gameSpeedHistory.map((v, i) => ({ i, speed: v * 3.6 }));
   return (
     <Paper
       component="section"
@@ -88,7 +96,21 @@ export function TelemetryBar() {
         </Box>
       ))}
       <Box sx={{ flex: 1 }} />
-      {cpuSeries.length > 1 ? (
+      {speedSeries.length > 1 ? (
+        <Box aria-label="Vehicle speed history" role="img" sx={{ px: 1 }}>
+          <LineChart width={120} height={26} data={speedSeries}>
+            <YAxis hide domain={[0, "auto"]} />
+            <Line
+              type="monotone"
+              dataKey="speed"
+              stroke="#8ef0b2"
+              strokeWidth={1.5}
+              dot={false}
+              isAnimationActive={false}
+            />
+          </LineChart>
+        </Box>
+      ) : cpuSeries.length > 1 ? (
         <Box aria-label="CPU history" role="img" sx={{ px: 1 }}>
           <LineChart width={120} height={26} data={cpuSeries}>
             <YAxis hide domain={[0, 100]} />

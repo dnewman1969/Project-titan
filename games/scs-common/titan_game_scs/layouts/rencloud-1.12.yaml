@@ -1,0 +1,20 @@
+revision: 12
+size: 512
+header:
+  sdk_active: { offset: 0, type: bool }
+  paused: { offset: 1, type: bool }
+  plugin_revision: { offset: 4, type: u32 }
+  game_id: { offset: 8, type: u32 }
+fields:
+  timestamp: { offset: 16, type: u64, unit: ms }
+  speed_mps: { offset: 32, type: f32, unit: m/s }
+  fuel_l: { offset: 48, type: f32, unit: L }
+  fuel_capacity_l: { offset: 52, type: f32, unit: L }
+  gear: { offset: 56, type: i32 }
+  game_time_min: { offset: 64, type: u32, unit: min }
+  job_active: { offset: 72, type: bool }
+  job_delivered: { offset: 73, type: bool }
+  player_fined: { offset: 74, type: bool }
+  nav_distance_m: { offset: 80, type: f32, unit: m }
+  speed_limit_mps: { offset: 84, type: f32, unit: m/s }
+  cargo_damage: { offset: 88, type: f32 }

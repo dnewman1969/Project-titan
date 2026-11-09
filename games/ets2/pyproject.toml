@@ -19,6 +19,8 @@ packages = ["titan_game_ets2"]
 [tool.hatch.build.targets.wheel.force-include]
 "titan-game.yaml" = "titan-game.yaml"
 "controls_default.yaml" = "controls_default.yaml"
+"events.yaml" = "events.yaml"
+"fixtures" = "fixtures"
 
 [tool.uv.sources]
 titan-game-scs-common = { workspace = true }

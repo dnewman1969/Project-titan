@@ -1,0 +1,31 @@
+- id: vehicle.fuel_low
+  type: vehicle.fuel_low
+  when:
+    all:
+      - { path: "resources[id=fuel].ratio", op: "<", value: 0.15 }
+      - { path: "paused", op: "==", value: false }
+  for_s: 5
+  cooldown_s: 600
+  severity: warning
+  salience: 0.6
+  payload:
+    fuel_l: "resources[id=fuel].amount"
+    nav_distance_remaining_km: { path: "job.nav_distance_m", scale: 0.001 }
+- id: scs.job.started
+  type: scs.job.started
+  when: { path: "job.active", op: "changed_to", value: true }
+  severity: notice
+  salience: 0.5
+  marker: { kind: chapter, duration_ms: 6000 }
+- id: scs.job.delivered
+  type: scs.job.delivered
+  when: { path: "game_specific.job_delivered", op: "==", value: true }
+  severity: notice
+  salience: 0.9
+  marker: { kind: achievement, duration_ms: 12000 }
+- id: scs.player.fined
+  type: scs.player.fined
+  when: { path: "game_specific.player_fined", op: "==", value: true }
+  severity: warning
+  salience: 0.8
+  marker: { kind: funny, duration_ms: 8000 }

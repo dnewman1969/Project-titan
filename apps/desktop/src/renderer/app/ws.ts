@@ -3,12 +3,16 @@
  * validated with the generated zod schemas, reconnect with backoff.
  */
 import {
+  GameEventSchema,
   SafetyStateSchema,
   ServerFrameSchema,
   SystemMetricsSchema,
+  TelemetryFrameUISchema,
   WS_CLOSE_UNAUTHORIZED,
+  type GameEvent,
   type SafetyState,
   type SystemMetrics,
+  type TelemetryFrameUI,
 } from "@titan/protocol";
 
 export const AUTH_REQ_ID = "auth";
@@ -19,6 +23,8 @@ export const RECONNECT_MAX_MS = 10_000;
 export interface LiveHandlers {
   onMetrics(metrics: SystemMetrics): void;
   onSafety(state: SafetyState): void;
+  onGameEvent?(event: GameEvent): void;
+  onTelemetryFrame?(frame: TelemetryFrameUI): void;
   onConnection(connected: boolean, detail: string): void;
 }
 
@@ -27,6 +33,7 @@ export interface LiveOptions {
   token: string;
   client: string;
   handlers: LiveHandlers;
+  sessionChannels?: string[];
   WebSocketImpl?: typeof WebSocket;
 }
 
@@ -97,7 +104,7 @@ export class LiveConnection {
     if (data.op === "ack" && data.req_id === AUTH_REQ_ID && data.ok) {
       this.retryMs = RECONNECT_MIN_MS;
       this.options.handlers.onConnection(true, "connected");
-      for (const channel of CHANNELS) {
+      for (const channel of [...CHANNELS, ...(this.options.sessionChannels ?? [])]) {
         socket.send(JSON.stringify({ op: "subscribe", req_id: `s${this.nextReq++}`, channel }));
       }
     } else if (data.op === "msg" && data.type === "system.metrics") {
@@ -106,6 +113,12 @@ export class LiveConnection {
     } else if (data.op === "msg" && data.type === "safety.state") {
       const safety = SafetyStateSchema.safeParse(data.data);
       if (safety.success) this.options.handlers.onSafety(safety.data);
+    } else if (data.op === "msg" && data.type === "telemetry.frame") {
+      const frame = TelemetryFrameUISchema.safeParse(data.data);
+      if (frame.success) this.options.handlers.onTelemetryFrame?.(frame.data);
+    } else if (data.op === "msg" && data.type === "game.event") {
+      const event = GameEventSchema.safeParse(data.data);
+      if (event.success) this.options.handlers.onGameEvent?.(event.data);
     }
   }
 }

@@ -515,12 +515,24 @@ describe("formatMetrics", () => {
 
 describe("gridTemplate", () => {
   it("lays out all panels", () => {
-    const t = gridTemplate({ agents: true, webcam: true, telemetry: true, events: true });
+    const t = gridTemplate({
+      agents: true,
+      webcam: true,
+      telemetry: true,
+      events: true,
+      games: false,
+    });
     expect(t.areas).toBe('"top top" "game game" "agents webcam" "telemetry telemetry" "events events"');
   });
 
   it("collapses hidden panels", () => {
-    const t = gridTemplate({ agents: false, webcam: true, telemetry: false, events: false });
+    const t = gridTemplate({
+      agents: false,
+      webcam: true,
+      telemetry: false,
+      events: false,
+      games: false,
+    });
     expect(t.areas).toBe('"top top" "game game" "webcam webcam"');
     expect(t.rows.split(" ").length).toBeGreaterThanOrEqual(3);
   });

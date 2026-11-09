@@ -8,7 +8,7 @@ import { useGetSystemStatusQuery } from "../../app/api";
 
 /** Skeleton for TOOLS → Game Discovery (M4.T5; full installer flows land in M7). */
 export function GamesDiscoveryPanel() {
-  const { isError } = useGetSystemStatusQuery();
+  const { isError } = useGetSystemStatusQuery(undefined);
   return (
     <Paper sx={{ p: 2, height: "100%", overflow: "auto" }} variant="outlined">
       <Stack spacing={1.5}>

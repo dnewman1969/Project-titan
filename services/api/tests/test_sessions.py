@@ -7,7 +7,9 @@ from pathlib import Path
 from uuid import UUID
 
 import fakeredis
+import httpx
 import pytest
+import respx
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -157,6 +159,66 @@ def test_start_supersedes_prior_live_session(api_client: TestClient, game_id: st
     got_a = api_client.get(f"/api/v1/sessions/{sid_a}", headers=AUTH)
     assert got_a.json()["state"] == "ended"
     assert got_a.json()["outcome"] == "aborted"
+
+
+@respx.mock
+def test_session_stop_persists_learnings(
+    api_client: TestClient, game_id: str, migrated_db: TempDatabase
+) -> None:
+    base = "http://127.0.0.1:8766"
+    coll_id = "00000000-0000-4000-8000-0000000000cc"
+    respx.get(f"{base}/api/v1/tenants/titan/databases/default/collections/memories").mock(
+        return_value=httpx.Response(200, json={"id": coll_id, "name": "memories"})
+    )
+    upsert = respx.post(f"{base}/api/v1/tenants/titan/databases/default/collections/{coll_id}/upsert").mock(
+        return_value=httpx.Response(200, json={})
+    )
+    respx.post(f"{base}/api/v1/tenants/titan/databases/default/collections/{coll_id}/query").mock(
+        return_value=httpx.Response(200, json={"ids": [[]], "documents": [[]], "metadatas": [[]]})
+    )
+
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={"game_id": game_id, "title": "memory-persist", "settings": {"agents_enabled": False}},
+    )
+    assert created.status_code == 201, created.text
+    sid = created.json()["id"]
+    started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False})
+    assert started.status_code == 202, started.text
+
+    import asyncio
+
+    from titan_db.repositories.blackboard import BlackboardRepository
+    from titan_db.session import create_engine
+
+    async def _seed() -> None:
+        engine = create_engine(migrated_db.pg)
+        factory = create_session_factory(engine)
+        async with factory() as db:
+            bb = BlackboardRepository(db)
+            bb_version = await bb.next_bb_version(UUID(sid))
+            await bb.append(
+                session_id=UUID(sid),
+                section="discoveries",
+                key="event.00001",
+                version=1,
+                op="put",
+                value={"text": "Fuel margins tight on ascent"},
+                author="agent:fe",
+                confidence=0.85,
+                evidence=[],
+                bb_version=bb_version,
+            )
+            await db.commit()
+        await engine.dispose()
+
+    asyncio.run(_seed())
+
+    stopped = api_client.post(f"/api/v1/sessions/{sid}/stop", headers=AUTH, json={"outcome": "success"})
+    assert stopped.status_code == 202, stopped.text
+    assert stopped.json().get("memory_persist", {}).get("written", 0) >= 1
+    assert upsert.called
 
 
 def test_session_create_start_stop(api_client: TestClient, game_id: str) -> None:

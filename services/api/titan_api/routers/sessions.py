@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from titan_api.auth import Authenticated
 from titan_api.demo_replay import start_demo_replay
 from titan_api.deps import db_session
+from titan_api.memory_ops import seed_prior_memories_on_blackboard, write_learning_on_session_end
 from titan_api.session_lifecycle import end_session_row, supersede_other_live_sessions
 from titan_api.session_telemetry import (
     fixture_fallback_path,
@@ -253,6 +254,8 @@ async def start_session(
     elif fixture_fallback_path(game_slug) is not None:
         await start_demo_replay(session_id)
         await _seed_director_demo_line(db, session_id)
+    if row.settings.get("agents_enabled", True):
+        await seed_prior_memories_on_blackboard(db, session_id=session_id, game_slug=game_slug)
     if body.launch_game and profile is not None:
         exe = profile.executable_path
 
@@ -376,8 +379,20 @@ async def stop_session(
     controller = request.app.state.session_controller
     row.state = "stopping"
     end_session_row(row, controller, outcome=body.outcome)
+    game_row = await db.scalar(select(Game).where(Game.id == row.game_id))
+    game_slug = game_row.slug if game_row is not None else "ksp"
+    memory_result = await write_learning_on_session_end(
+        db,
+        session_id=session_id,
+        game_slug=game_slug,
+        session_title=row.title,
+        outcome=body.outcome,
+    )
     await db.flush()
-    return _session_json(row)
+    payload = _session_json(row)
+    if memory_result.get("written"):
+        payload["memory_persist"] = memory_result
+    return payload
 
 
 @router.get("/sessions/{session_id}/blackboard")

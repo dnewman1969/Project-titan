@@ -59,6 +59,27 @@ export function useBlackboardAgents(): void {
   useEffect(() => {
     if (!data?.entries.length) return;
     for (const row of data.entries) {
+      if (
+        row.section === "notes" &&
+        typeof row.value === "object" &&
+        row.value !== null &&
+        Reflect.get(row.value, "prior_memory") === true
+      ) {
+        const priorKey = `prior:${row.key}:${String(row.bb_version)}`;
+        if (seen.current.has(priorKey)) continue;
+        seen.current.add(priorKey);
+        const priorText = valueText(row.value);
+        if (!priorText.trim()) continue;
+        dispatch(
+          learnItemReceived({
+            key: priorKey,
+            kind: "lesson",
+            text: `Prior memory: ${priorText}`,
+          }),
+        );
+        continue;
+      }
+
       const agentSection =
         row.section === "notes" ||
         row.section === "goals" ||

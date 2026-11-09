@@ -109,7 +109,7 @@ export const MENU: readonly MenuSection[] = [
       sep,
       cmd("ai.models", "Models", "M3.T2"),
       cmd("ai.directorReport", "Director Report", "M7.T5"),
-      cmd("ai.memoryBrowser", "Memory Browser", "M9.T4"),
+      cmd("ai.memoryBrowser", "Memory Browser"),
     ],
   },
   {

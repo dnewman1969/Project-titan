@@ -133,3 +133,34 @@ def test_demo_session_seeds_director_note(
     assert board.status_code == 200
     entries = board.json()["entries"]
     assert any(e.get("key") == "director.hello" for e in entries)
+
+
+def test_session_start_invokes_live_telemetry(
+    api_client: TestClient, game_slug: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import titan_api.routers.sessions as sessions_routes
+
+    called: list[str] = []
+
+    async def fake_live(session_id: object, *, game_slug: str, install_path: str) -> None:
+        called.append(install_path)
+
+    async def fake_profile(*args: object, **kwargs: object) -> None:
+        return None
+
+    monkeypatch.setattr(sessions_routes, "start_live_telemetry", fake_live)
+    monkeypatch.setattr(sessions_routes, "start_demo_replay", fake_profile)
+    monkeypatch.setattr(sessions_routes, "fixture_fallback_path", lambda slug: None)
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={
+            "game_slug": game_slug,
+            "title": "live",
+            "settings": {"agents_enabled": False},
+        },
+    )
+    sid = created.json()["id"]
+    started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False})
+    assert started.status_code == 202
+    assert not called  # no profile, no default, no fixture

@@ -46,3 +46,22 @@ async def test_start_live_telemetry_spawns_subprocess(monkeypatch: pytest.Monkey
     assert captured
     assert "--install-path" in captured[0]
     assert "/games/ksp" in captured[0]
+    await session_telemetry.start_live_telemetry(sid, game_slug="ksp", install_path="/games/ksp")
+    assert len(captured) == 1
+
+
+def test_stop_live_telemetry_terminates(monkeypatch: pytest.MonkeyPatch) -> None:
+    sid = UUID("00000000-0000-0000-0000-000000000004")
+
+    class FakeProc:
+        returncode = None
+        terminated = False
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+    proc = FakeProc()
+    session_telemetry._LIVE_PROCS[sid] = proc  # noqa: SLF001
+    session_telemetry.stop_live_telemetry(sid)
+    assert proc.terminated
+    assert sid not in session_telemetry._LIVE_PROCS  # noqa: SLF001

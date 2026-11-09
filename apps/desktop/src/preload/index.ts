@@ -40,6 +40,8 @@ const bridge: TitanBridge = {
       listener(payload as SupervisorUpdate);
     }),
   getSupervisorStatus: () => ipcRenderer.invoke(IPC.supervisorSnapshot) as Promise<SupervisorUpdate | null>,
+  openPath: (path: string) => ipcRenderer.invoke(IPC.openPath, path) as Promise<string>,
+  openExternal: (url: string) => ipcRenderer.invoke(IPC.openExternal, url) as Promise<void>,
 };
 
 contextBridge.exposeInMainWorld("titan", bridge);

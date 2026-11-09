@@ -35,3 +35,6 @@ export function makeStore(preloadedState?: Partial<RootState>) {
 
 export type AppStore = ReturnType<typeof makeStore>;
 export type AppDispatch = AppStore["dispatch"];
+
+/** Single renderer store (menu commands read state outside React). */
+export const appStore = makeStore();

@@ -18,6 +18,12 @@ const GAMES = [
   { id: "ats", profile: "ats_default", label: "American Truck Simulator" },
 ] as const;
 
+function rtkMutationStatus(error: unknown): number | null {
+  if (typeof error !== "object" || error === null || !("status" in error)) return null;
+  const status = (error as { status: unknown }).status;
+  return typeof status === "number" ? status : null;
+}
+
 /** M7.T6 stub: creates a session when POST /sessions exists; otherwise explains the planned API. */
 export function NewSessionDialog() {
   const open = useAppSelector((s) => s.sessions.dialog === "new");
@@ -43,10 +49,7 @@ export function NewSessionDialog() {
       dispatch(closeSessionDialog());
       return;
     }
-    const status =
-      result.error && "status" in result.error && typeof result.error.status === "number"
-        ? result.error.status
-        : null;
+    const status = rtkMutationStatus(result.error);
     if (status === 404 || status === 405 || status === 501) {
       dispatch(
         showNotice(
@@ -66,7 +69,9 @@ export function NewSessionDialog() {
         <TextField
           label="Title"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => {
+            setTitle(e.target.value);
+          }}
           fullWidth
           autoFocus
         />
@@ -74,7 +79,9 @@ export function NewSessionDialog() {
           select
           label="Game"
           value={gameId}
-          onChange={(e) => setGameId(e.target.value as (typeof GAMES)[number]["id"])}
+          onChange={(e) => {
+            setGameId(e.target.value as (typeof GAMES)[number]["id"]);
+          }}
           fullWidth
         >
           {GAMES.map((g) => (

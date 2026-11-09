@@ -293,7 +293,6 @@ describe("Operations Center", () => {
   });
 
   it("handles menu commands: panel toggles, About, and milestone notices", async () => {
-    const user = userEvent.setup();
     renderApp();
     await waitFor(() => {
       expect(fetchMock.mock.calls.some(([r]) => r.url.endsWith("/settings"))).toBe(true);

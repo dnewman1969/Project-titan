@@ -93,6 +93,33 @@ def game_slug(migrated_db: TempDatabase) -> str:
     return asyncio.run(_load())
 
 
+def test_start_supersedes_prior_live_session(api_client: TestClient, game_id: str) -> None:
+    first = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={"game_id": game_id, "title": "auto demo", "settings": {"agents_enabled": False, "demo_telemetry": True}},
+    )
+    assert first.status_code == 201
+    sid_a = first.json()["id"]
+    started_a = api_client.post(f"/api/v1/sessions/{sid_a}/start", headers=AUTH, json={"launch_game": False})
+    assert started_a.status_code == 202
+    assert started_a.json()["state"] == "live"
+
+    second = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={"game_id": game_id, "title": "real session", "settings": {"agents_enabled": False}},
+    )
+    assert second.status_code == 201
+    sid_b = second.json()["id"]
+    started_b = api_client.post(f"/api/v1/sessions/{sid_b}/start", headers=AUTH, json={"launch_game": False})
+    assert started_b.status_code == 202, started_b.text
+    assert started_b.json()["state"] == "live"
+    got_a = api_client.get(f"/api/v1/sessions/{sid_a}", headers=AUTH)
+    assert got_a.json()["state"] == "ended"
+    assert got_a.json()["outcome"] == "aborted"
+
+
 def test_session_create_start_stop(api_client: TestClient, game_id: str) -> None:
     created = api_client.post(
         "/api/v1/sessions",

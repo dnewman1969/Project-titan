@@ -11,7 +11,9 @@ import Typography from "@mui/material/Typography";
 import { useState } from "react";
 
 import { useCreateGameProfileMutation, useListGamesQuery, useScanGamesMutation } from "../../app/api";
+import { formatApiError } from "../../app/formatApiError";
 import { useAppDispatch } from "../../app/hooks";
+import { logEvent } from "../events/eventsSlice";
 import { showNotice } from "../operations/layoutSlice";
 
 const MANUAL_SLUGS = [
@@ -45,7 +47,11 @@ export function GamesDiscoveryPanel() {
       void refetch();
       return;
     }
-    dispatch(showNotice("Game scan failed. Is the API up?"));
+    const msg = formatApiError(result.error);
+    dispatch(showNotice(`Game scan failed: ${msg}`));
+    dispatch(
+      logEvent({ type: "games.scan_failed", category: "system", severity: "error", text: msg }),
+    );
   };
 
   const onRegisterPath = async () => {
@@ -61,7 +67,11 @@ export function GamesDiscoveryPanel() {
       void refetch();
       return;
     }
-    dispatch(showNotice("Could not register install. Check the .exe path and API logs."));
+    const msg = formatApiError(result.error);
+    dispatch(showNotice(`Register install failed: ${msg}`));
+    dispatch(
+      logEvent({ type: "games.register_failed", category: "system", severity: "error", text: msg }),
+    );
   };
 
   return (
@@ -76,9 +86,10 @@ export function GamesDiscoveryPanel() {
         {isError ? (
           <Alert severity="warning">API unreachable; discovery needs a live backend.</Alert>
         ) : profileCount === 0 ? (
-          <Alert severity="info">
-            No installs in the database yet. Run Scan, or register a path to the game .exe below (for example
-            KSP_x64.exe under steamapps\common).
+          <Alert severity="warning" variant="outlined">
+            Scan did not find installs? Use <strong>Register install path</strong> below with the full path to
+            your game .exe (for example <code>KSP_x64.exe</code>). Then open File → New session and pick that
+            installation — registered paths work even when Scan returns zero.
           </Alert>
         ) : (
           <Alert severity="success">{profileCount} install profile(s) ready for New session.</Alert>
@@ -105,7 +116,10 @@ export function GamesDiscoveryPanel() {
             ))}
           </List>
         ) : null}
-        <Typography variant="subtitle2">Manual install path</Typography>
+        <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "action.hover" }}>
+        <Typography variant="subtitle2" gutterBottom>
+          Register install path (recommended when Scan finds nothing)
+        </Typography>
         <TextField
           select
           label="Game"
@@ -132,9 +146,10 @@ export function GamesDiscoveryPanel() {
           fullWidth
           size="small"
         />
-        <Button variant="outlined" disabled={registering || isError} onClick={() => void onRegisterPath()}>
+        <Button variant="contained" color="secondary" disabled={registering || isError} onClick={() => void onRegisterPath()}>
           Register install path
         </Button>
+        </Paper>
         <List dense>
           {(data?.items ?? []).map((game) => (
             <ListItem key={game.id}>

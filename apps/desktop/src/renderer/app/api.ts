@@ -37,8 +37,8 @@ export type CreateSessionRequest = z.infer<typeof CreateSessionSchema>;
 export const SessionCreatedSchema = z
   .object({
     id: z.string().uuid(),
-    title: z.string(),
-    state: z.string(),
+    title: z.union([z.string(), z.null()]).optional(),
+    state: z.string().optional(),
   })
   .passthrough();
 export type SessionCreated = z.infer<typeof SessionCreatedSchema>;

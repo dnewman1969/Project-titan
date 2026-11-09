@@ -11,11 +11,13 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from titan_api.auth import Authenticated
 from titan_api.demo_replay import start_demo_replay
 from titan_api.deps import db_session
+from titan_api.session_lifecycle import end_session_row, supersede_other_live_sessions
 from titan_api.session_telemetry import (
     fixture_fallback_path,
     start_live_telemetry,
@@ -98,6 +100,15 @@ async def _session_or_404(session: AsyncSession, session_id: UUID) -> Session:
     return row
 
 
+def _is_one_live_unique_violation(exc: IntegrityError) -> bool:
+    orig = getattr(exc, "orig", None)
+    name = getattr(orig, "constraint_name", None) if orig is not None else None
+    if name == "ux_sessions_one_live":
+        return True
+    blob = " ".join((str(exc), str(orig) if orig is not None else ""))
+    return "ux_sessions_one_live" in blob
+
+
 @router.post("/sessions", status_code=status.HTTP_201_CREATED)
 async def create_session(body: CreateSession, db: AsyncSession = SessionDep) -> dict[str, Any]:
     if body.mode == "autonomous":
@@ -149,6 +160,8 @@ async def start_session(
         raise TitanError(ErrorCode.SESSION_ALREADY_LIVE, "session already active")
     if row.state != "created":
         raise TitanError(ErrorCode.INVALID_STATE_TRANSITION, f"cannot start from state {row.state!r}")
+    controller = request.app.state.session_controller
+    await supersede_other_live_sessions(db, controller, exclude_id=session_id)
     row.state = "starting"
     row.started_at = utc_now()
     if row.clock_origin_mono_ns is None:
@@ -157,19 +170,27 @@ async def start_session(
         row.clock_origin_wall = clock.origin_wall
     game_row = await db.scalar(select(Game).where(Game.id == row.game_id))
     game_slug = game_row.slug if game_row is not None else "ksp"
-    controller = request.app.state.session_controller
     play_enabled = bool(row.settings.get("play_enabled", False))
-    if row.settings.get("agents_enabled", True):
-        controller.start_orchestrator(
-            session_id,
-            game_slug=game_slug,
-            play_enabled=play_enabled,
-            data_dir=row.data_dir,
-        )
-    if play_enabled:
-        controller.start_actions(session_id, game_slug=game_slug, data_dir=row.data_dir)
-    row.state = "live"
-    await db.flush()
+    try:
+        await db.flush()
+        if row.settings.get("agents_enabled", True):
+            controller.start_orchestrator(
+                session_id,
+                game_slug=game_slug,
+                play_enabled=play_enabled,
+                data_dir=row.data_dir,
+            )
+        if play_enabled:
+            controller.start_actions(session_id, game_slug=game_slug, data_dir=row.data_dir)
+        row.state = "live"
+        await db.flush()
+    except IntegrityError as exc:
+        if _is_one_live_unique_violation(exc):
+            raise TitanError(
+                ErrorCode.SESSION_ALREADY_LIVE,
+                "Another session is still live (ux_sessions_one_live). Stop it or retry start.",
+            ) from exc
+        raise
     profile: GameProfile | None = None
     if row.game_profile_id is not None:
         profile = await db.scalar(select(GameProfile).where(GameProfile.id == row.game_profile_id))
@@ -237,14 +258,9 @@ async def stop_session(
     row = await _session_or_404(db, session_id)
     if row.state in {"ended", "failed"}:
         raise TitanError(ErrorCode.INVALID_STATE_TRANSITION, "session already ended")
-    row.state = "stopping"
-    stop_all_session_telemetry(session_id)
     controller = request.app.state.session_controller
-    controller.stop_actions(session_id)
-    controller.stop_orchestrator(session_id)
-    row.state = "ended"
-    row.ended_at = utc_now()
-    row.outcome = body.outcome
+    row.state = "stopping"
+    end_session_row(row, controller, outcome=body.outcome)
     await db.flush()
     return _session_json(row)
 

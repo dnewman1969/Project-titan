@@ -8,10 +8,12 @@ import DialogTitle from "@mui/material/DialogTitle";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useCreateSessionMutation, useListGamesQuery, useStartSessionMutation } from "../../app/api";
+import { formatApiError } from "../../app/formatApiError";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
+import { logEvent } from "../events/eventsSlice";
 import { showNotice } from "../operations/layoutSlice";
 import { closeSessionDialog, setActiveSession } from "./sessionsSlice";
 
@@ -37,7 +39,14 @@ export function NewSessionDialog() {
   const [launchGame, setLaunchGame] = useState(false);
   const [agentPlay, setAgentPlay] = useState(true);
   const [recordOnStart, setRecordOnStart] = useState(true);
-  const { data: gamesList } = useListGamesQuery(undefined);
+  const { data: gamesList, refetch: refetchGames } = useListGamesQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+  useEffect(() => {
+    if (open) {
+      void refetchGames();
+    }
+  }, [open, refetchGames]);
   const [createSession, { isLoading: creating }] = useCreateSessionMutation();
   const [startSession, { isLoading: starting }] = useStartSessionMutation();
 
@@ -61,6 +70,9 @@ export function NewSessionDialog() {
 
   const onCreate = async () => {
     if (!game) return;
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("titan.skipAutoDemo", "1");
+    }
     const sessionTitle = title.trim() || "Observe session";
     const result = await createSession({
       game_slug: game.slug,
@@ -83,20 +95,29 @@ export function NewSessionDialog() {
         const dataDir = Reflect.get(started.data, "data_dir");
         const recordingRoot =
           recordOnStart && typeof dataDir === "string" && dataDir.length > 0 ? `${dataDir}/recording` : null;
+        const liveTitle = started.data.title?.trim() || sessionTitle;
         dispatch(
           setActiveSession({
             id: started.data.id,
-            title: started.data.title,
+            title: liveTitle,
             recordingActive: recordOnStart,
             recordingRootDir: recordingRoot,
           }),
         );
-        dispatch(showNotice(`Live session: ${started.data.title}`));
+        dispatch(showNotice(`Live session: ${liveTitle}`));
         dispatch(closeSessionDialog());
         return;
       }
-      dispatch(showNotice(`Session created but could not start: check API logs.`));
-      dispatch(closeSessionDialog());
+      const startMsg = formatApiError(started.error);
+      dispatch(showNotice(`Session start failed: ${startMsg}`));
+      dispatch(
+        logEvent({
+          type: "session.start_failed",
+          category: "session",
+          severity: "error",
+          text: startMsg,
+        }),
+      );
       return;
     }
     const status = rtkMutationStatus(result.error);
@@ -109,7 +130,16 @@ export function NewSessionDialog() {
       dispatch(closeSessionDialog());
       return;
     }
-    dispatch(showNotice("Could not create a session. Check the API logs and try again."));
+    const createMsg = formatApiError(result.error);
+    dispatch(showNotice(`Could not create session: ${createMsg}`));
+    dispatch(
+      logEvent({
+        type: "session.create_failed",
+        category: "session",
+        severity: "error",
+        text: createMsg,
+      }),
+    );
   };
 
   return (
@@ -154,7 +184,7 @@ export function NewSessionDialog() {
               setProfileId(e.target.value);
             }}
             fullWidth
-            helperText="Use Scan installed games first if your copy is missing."
+            helperText="Registered paths work even when Scan finds nothing."
           >
             {profiles.map((p) => (
               <MenuItem key={p.id} value={p.id}>

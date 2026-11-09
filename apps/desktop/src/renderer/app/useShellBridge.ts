@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { logEvent } from "../features/events/eventsSlice";
 import { handleMenuCommand } from "../features/operations/commands";
 import { killSwitchTriggered } from "../features/safety/safetySlice";
+import { clearActiveSession } from "../features/sessions/sessionsSlice";
 import type { KillSwitchEvent } from "../../shared/ipc";
 import { appStore, type AppDispatch } from "./store";
 import { useAppDispatch } from "./hooks";
@@ -10,12 +11,16 @@ import { getTitan } from "./runtime";
 
 export function triggerKill(dispatch: AppDispatch, event: KillSwitchEvent): void {
   dispatch(killSwitchTriggered(event));
+  dispatch(clearActiveSession());
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem("titan.skipAutoDemo", "1");
+  }
   dispatch(
     logEvent({
       type: "safety.kill",
       category: "safety",
       severity: "critical",
-      text: `Kill switch engaged (${event.source}). Phase 1 has no AI input path, so nothing needed stopping.`,
+      text: `Kill switch engaged (${event.source}). Live session cleared; API ends any remaining live session.`,
       at: event.at,
     }),
   );

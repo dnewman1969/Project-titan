@@ -142,6 +142,14 @@ export const titanApi = createApi({
       }),
       transformResponse: (raw: unknown) => SessionCreatedSchema.parse(raw),
     }),
+    stopSession: build.mutation<SessionCreated, { sessionId: string; outcome?: string }>({
+      query: ({ sessionId, outcome }) => ({
+        url: `/sessions/${sessionId}/stop`,
+        method: "POST",
+        body: { outcome: outcome ?? "aborted" },
+      }),
+      transformResponse: (raw: unknown) => SessionCreatedSchema.parse(raw),
+    }),
     getActiveRecording: build.query<{ item: Recording | null }, string>({
       query: (sessionId) => `/sessions/${sessionId}/recordings/active`,
       transformResponse: (raw: unknown) => {
@@ -209,6 +217,7 @@ export const {
   usePatchSettingsMutation,
   useCreateSessionMutation,
   useStartSessionMutation,
+  useStopSessionMutation,
   useGetActiveRecordingQuery,
   useStartRecordingMutation,
   useStopRecordingMutation,

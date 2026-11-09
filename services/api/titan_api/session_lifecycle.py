@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from fastapi import FastAPI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from titan_api.demo_replay import stop_demo_replay
 from titan_api.session_telemetry import stop_all_session_telemetry
 from titan_core.clock import utc_now
+from titan_core.logging import get_logger
 from titan_db.models.sessions import Session
 
 if TYPE_CHECKING:
     from titan_api.session_controller import SessionController
+
+log = get_logger(__name__)
 
 LIVE_STATES = frozenset({"starting", "live", "paused", "stopping"})
 
@@ -68,3 +72,21 @@ async def end_all_live_sessions(db: AsyncSession, controller: SessionController)
     if ended:
         await db.flush()
     return ended
+
+
+async def end_live_sessions_for_app(app: FastAPI) -> list[UUID]:
+    """End every row counted by ux_sessions_one_live (kill switch, resume, supersede)."""
+    factory: Any = app.state.session_factory
+    if factory is None:
+        return []
+    controller = app.state.session_controller
+    try:
+        async with factory() as db:
+            ended = await end_all_live_sessions(db, controller)
+            if ended:
+                log.info("ended_live_sessions", count=len(ended), session_ids=[str(x) for x in ended])
+            await db.commit()
+            return ended
+    except Exception as exc:
+        log.error("end_live_sessions_for_app_failed", error=type(exc).__name__, exc_info=exc)
+        return []

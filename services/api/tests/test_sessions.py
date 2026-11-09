@@ -93,6 +93,31 @@ def game_slug(migrated_db: TempDatabase) -> str:
     return asyncio.run(_load())
 
 
+def test_kill_and_resume_release_live_session(api_client: TestClient, game_id: str) -> None:
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={"game_id": game_id, "title": "sticky", "settings": {"agents_enabled": False, "demo_telemetry": True}},
+    )
+    sid = created.json()["id"]
+    assert api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False}).status_code == 202
+
+    assert api_client.post("/api/v1/safety/kill", headers=AUTH, json={"source": "hotkey"}).status_code == 200
+    assert api_client.get(f"/api/v1/sessions/{sid}", headers=AUTH).json()["state"] == "ended"
+
+    assert (
+        api_client.post("/api/v1/safety/resume", headers=AUTH, json={"confirm": "RESUME"}).status_code == 200
+    )
+    fresh = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={"game_id": game_id, "title": "after resume", "settings": {"agents_enabled": False}},
+    )
+    sid2 = fresh.json()["id"]
+    started = api_client.post(f"/api/v1/sessions/{sid2}/start", headers=AUTH, json={"launch_game": False})
+    assert started.status_code == 202, started.text
+
+
 def test_start_supersedes_prior_live_session(api_client: TestClient, game_id: str) -> None:
     first = api_client.post(
         "/api/v1/sessions",

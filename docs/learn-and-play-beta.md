@@ -71,9 +71,14 @@ Linux dev hosts cannot drive SCS; use HIL or a Windows machine.
 - **Software HIL** — `TITAN_PLAY_BACKEND=hil`, pytest integration test above; no Windows/game required.
 - **Hardware HIL** — manual sign-off for OBS, GPU, soak tests: `tests/hil/CHECKLIST.md` (add learn-and-play rows when validating on the reference PC).
 
+## YouTube publish stub
+
+**Tools → YouTube Publish** opens the Ops Center dialog. Connect stub auth (`POST /accounts/youtube/connect`, no Google OAuth), create a **private** draft upload job for the active session, approve, then run the stub uploader (fake Studio URL). Real OAuth / resumable upload remains Phase 7.
+
 ## Related code
 
 - `services/actions/titan_actions/drivers/` — kRPC, SCS, HIL
 - `services/orchestrator/titan_orchestrator/play_policy.py` — event → proposal
 - `services/orchestrator/titan_orchestrator/session_loops.py` — telemetry, learn, feedback
+- `services/api/titan_api/youtube_stub.py` — YouTube auth + draft upload stubs
 - `services/actions/README.md` — backend env table

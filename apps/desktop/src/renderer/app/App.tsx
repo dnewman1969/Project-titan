@@ -26,6 +26,7 @@ import { useLiveChannels } from "./useLiveChannels";
 import { useShellBridge } from "./useShellBridge";
 import { useBlackboardAgents } from "../hooks/useBlackboardAgents";
 import { useRecordingSync } from "../hooks/useRecordingSync";
+import { YouTubePublishDialog } from "../features/publish/YouTubePublishDialog";
 import { usePhase1Demo } from "../hooks/usePhase1Demo";
 import { useSupervisor } from "./useSupervisor";
 
@@ -124,6 +125,7 @@ export function App() {
       <AboutDialog />
       <SessionDialogs />
       <FirstRunWizard />
+      <YouTubePublishDialog />
       <Snackbar
         key={notice?.id}
         open={notice !== null}

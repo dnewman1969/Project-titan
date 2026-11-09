@@ -11,7 +11,13 @@ from titan_core.config import load_config
 from titan_core.logging import get_logger
 from titan_db.repositories.blackboard import BlackboardRepository
 from titan_memory.chroma_store import ChromaVectorStore
-from titan_memory.learnings import LearningRow, fetch_prior_memory_lines, persist_session_learnings
+from titan_memory.learnings import (
+    LearningRow,
+    exposed_failure_notes,
+    fetch_failed_contracts,
+    fetch_prior_memory_lines,
+    persist_session_learnings,
+)
 from titan_models.embedder import FakeEmbedder
 
 log = get_logger(__name__)
@@ -125,7 +131,9 @@ async def seed_prior_memories_on_blackboard(
         query=f"{game_slug} session lessons discoveries play",
         n_results=5,
     )
-    if not lines:
+    failures = await fetch_failed_contracts(store, game_slug=game_slug)
+    failure_notes = exposed_failure_notes(failures)
+    if not lines and not failure_notes:
         return 0
     for index, line in enumerate(lines):
         bb_version = await repo.next_bb_version(session_id)
@@ -141,6 +149,20 @@ async def seed_prior_memories_on_blackboard(
             evidence=[],
             bb_version=bb_version,
         )
+    for key, value in failure_notes:
+        bb_version = await repo.next_bb_version(session_id)
+        await repo.append(
+            session_id=session_id,
+            section="notes",
+            key=key,
+            version=1,
+            op="put",
+            value=value,
+            author="system:memory",
+            confidence=0.85,
+            evidence=[],
+            bb_version=bb_version,
+        )
     bb_version = await repo.next_bb_version(session_id)
     await repo.append(
         session_id=session_id,
@@ -148,10 +170,17 @@ async def seed_prior_memories_on_blackboard(
         key="prior.seed",
         version=1,
         op="put",
-        value={"text": f"Loaded {len(lines)} prior memories for {game_slug}.", "prior_memory": True},
+        value={
+            "text": (
+                f"Loaded {len(lines)} prior memories and {len(failure_notes)} failed contracts "
+                f"for {game_slug}."
+            ),
+            "prior_memory": True,
+            "failed_contracts": len(failure_notes),
+        },
         author="system:memory",
         confidence=1.0,
         evidence=[],
         bb_version=bb_version,
     )
-    return len(lines)
+    return len(lines) + len(failure_notes)

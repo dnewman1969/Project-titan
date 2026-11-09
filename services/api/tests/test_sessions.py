@@ -231,12 +231,38 @@ def test_session_create_start_stop(api_client: TestClient, game_id: str) -> None
     )
     assert created.status_code == 201, created.text
     sid = created.json()["id"]
+    # Eager commit on create: GET must see the row before /start (Windows HIL race).
+    got = api_client.get(f"/api/v1/sessions/{sid}", headers=AUTH)
+    assert got.status_code == 200, got.text
+    assert got.json()["state"] == "created"
     started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False})
     assert started.status_code == 202
     assert started.json()["state"] == "live"
     stopped = api_client.post(f"/api/v1/sessions/{sid}/stop", headers=AUTH, json={"outcome": "success"})
     assert stopped.status_code == 202
     assert stopped.json()["state"] == "ended"
+
+
+def test_session_auto_start_atomic(api_client: TestClient, game_id: str) -> None:
+    """New Session dialog path: one POST creates and starts (no follow-up /start)."""
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={
+            "game_id": game_id,
+            "title": "atomic start",
+            "auto_start": True,
+            "launch_game": False,
+            "settings": {"agents_enabled": False, "demo_telemetry": True},
+        },
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["state"] == "live"
+    assert body["id"]
+    got = api_client.get(f"/api/v1/sessions/{body['id']}", headers=AUTH)
+    assert got.status_code == 200
+    assert got.json()["state"] == "live"
 
 
 def test_demo_session_seeds_director_note(

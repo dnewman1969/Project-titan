@@ -30,6 +30,9 @@ export const CreateSessionSchema = z
     title: z.string(),
     mode: z.enum(["observe", "replay", "autonomous"]),
     settings: z.record(z.unknown()).optional(),
+    /** Atomic create+start — avoids create→start 404 race on Windows. */
+    auto_start: z.boolean().optional(),
+    launch_game: z.boolean().optional(),
   })
   .strict();
 export type CreateSessionRequest = z.infer<typeof CreateSessionSchema>;
@@ -192,10 +195,11 @@ function requestTimeoutMs(args: string | FetchArgs): number {
   const url = typeof args === "string" ? args : args.url;
   if (typeof url !== "string") return DEFAULT_TIMEOUT_MS;
   if (url.includes("/sessions/") && url.endsWith("/start")) return SESSION_START_TIMEOUT_MS;
+  // POST /sessions with auto_start may wait for kRPC after launch (~60s+).
+  if (url === "/sessions" || url.endsWith("/sessions")) return SESSION_START_TIMEOUT_MS;
   if (url.includes("/sessions/") && (url.endsWith("/play") || url.endsWith("/stop"))) {
     return SESSION_MUTATION_TIMEOUT_MS;
   }
-  if (url === "/sessions" || url.endsWith("/sessions")) return SESSION_MUTATION_TIMEOUT_MS;
   return DEFAULT_TIMEOUT_MS;
 }
 

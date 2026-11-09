@@ -57,6 +57,10 @@ class CreateSession(BaseModel):
     settings: dict[str, Any] = Field(default_factory=dict)
     replay_of_session_id: UUID | None = None
     missions: list[MissionCreate] = Field(default_factory=list)
+    # Atomic create+start avoids the FastAPI yield-dep race where create commits AFTER
+    # the HTTP response, so a follow-up /start can 404 on Windows (David HIL).
+    auto_start: bool = False
+    launch_game: bool = False
 
     @model_validator(mode="after")
     def _game_ref_present(self) -> CreateSession:
@@ -117,7 +121,11 @@ def _is_one_live_unique_violation(exc: IntegrityError) -> bool:
 
 
 @router.post("/sessions", status_code=status.HTTP_201_CREATED)
-async def create_session(body: CreateSession, db: AsyncSession = SessionDep) -> dict[str, Any]:
+async def create_session(
+    body: CreateSession,
+    request: Request,
+    db: AsyncSession = SessionDep,
+) -> dict[str, Any]:
     # Learn-and-play beta uses observe + settings.play_enabled. Full autonomous mode is Phase 4+.
     if body.mode == "autonomous":
         if not bool(body.settings.get("play_enabled", False)):
@@ -149,6 +157,17 @@ async def create_session(body: CreateSession, db: AsyncSession = SessionDep) -> 
     )
     db.add(row)
     await db.flush()
+    # Commit before the response leaves the API. FastAPI runs yield-dep cleanup AFTER
+    # the body is sent, so a client that immediately POSTs /start can otherwise 404.
+    await db.commit()
+    await db.refresh(row)
+    if body.auto_start:
+        return await _activate_created_session(
+            row,
+            request=request,
+            db=db,
+            launch_game=body.launch_game,
+        )
     return _session_json(row)
 
 
@@ -171,14 +190,15 @@ async def play_readiness(
     return {"play_attach": attach.as_dict()}
 
 
-@router.post("/sessions/{session_id}/start", status_code=status.HTTP_202_ACCEPTED)
-async def start_session(
-    session_id: UUID,
-    body: StartSession,
+async def _activate_created_session(
+    row: Session,
+    *,
     request: Request,
-    db: AsyncSession = SessionDep,
+    db: AsyncSession,
+    launch_game: bool,
 ) -> dict[str, Any]:
-    row = await _session_or_404(db, session_id)
+    """Move a `created` row to `live` (shared by /start and create auto_start)."""
+    session_id = row.id
     if row.state in {"starting", "live", "paused", "stopping"}:
         raise TitanError(ErrorCode.SESSION_ALREADY_LIVE, "session already active")
     if row.state != "created":
@@ -216,7 +236,7 @@ async def start_session(
     # Launch before attach wait so kRPC/SCS have time to come up with the game.
     launched_game = False
     launch_error: str | None = None
-    if body.launch_game and profile is not None:
+    if launch_game and profile is not None:
         exe = profile.executable_path
 
         def _launch() -> str | None:
@@ -296,6 +316,9 @@ async def start_session(
         from titan_api.recording_ops import start_session_recording
 
         recording_payload = await start_session_recording(db, row)
+    # Persist live state before the HTTP response so follow-up GETs never race.
+    await db.commit()
+    await db.refresh(row)
     payload = _session_json(row)
     if play_attach is not None:
         payload["play_attach"] = play_attach.as_dict()
@@ -307,6 +330,17 @@ async def start_session(
     if recording_payload is not None:
         payload["recording"] = recording_payload
     return payload
+
+
+@router.post("/sessions/{session_id}/start", status_code=status.HTTP_202_ACCEPTED)
+async def start_session(
+    session_id: UUID,
+    body: StartSession,
+    request: Request,
+    db: AsyncSession = SessionDep,
+) -> dict[str, Any]:
+    row = await _session_or_404(db, session_id)
+    return await _activate_created_session(row, request=request, db=db, launch_game=body.launch_game)
 
 
 async def _seed_director_demo_line(db: AsyncSession, session_id: UUID) -> None:

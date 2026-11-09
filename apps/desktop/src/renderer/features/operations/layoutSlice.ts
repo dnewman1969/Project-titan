@@ -30,6 +30,9 @@ export const layoutSlice = createSlice({
     togglePanel(state, action: PayloadAction<PanelId>) {
       state.panels[action.payload] = !state.panels[action.payload];
     },
+    showPanel(state, action: PayloadAction<PanelId>) {
+      state.panels[action.payload] = true;
+    },
     hydrateFromSettings(state, action: PayloadAction<SettingsDocument>) {
       state.panels = panelsFromSettings(action.payload.values, state.panels);
       state.settingsVersion = action.payload.version;
@@ -55,6 +58,7 @@ export const layoutSlice = createSlice({
 
 export const {
   togglePanel,
+  showPanel,
   hydrateFromSettings,
   setSettingsVersion,
   showNotice,

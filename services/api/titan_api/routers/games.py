@@ -175,7 +175,7 @@ async def scan_games(
     for adapter_cls in (catalog.get(g.slug) for g in games):
         if adapter_cls is None:
             continue
-        for hit in adapter_cls.detect(ctx):
+        for hit in adapter_cls.detect(ctx, stores=body.stores):
             game = slug_to_game.get(hit.game_slug)
             if game is None:
                 unmatched.append(hit.model_dump())
@@ -191,7 +191,17 @@ async def scan_games(
                 }
             )
     await session.commit()
-    return {"detected": detected, "unmatched": unmatched}
+    return {
+        "detected": detected,
+        "unmatched": unmatched,
+        "scan_context": {
+            "platform": ctx.platform,
+            "steam_libraries": [str(p) for p in ctx.steam_libraries],
+            "epic_manifest_dirs": [str(p) for p in ctx.epic_manifest_dirs],
+            "extra_paths": [str(p) for p in ctx.extra_paths],
+            "stores_scanned": body.stores,
+        },
+    }
 
 
 async def _upsert_profile(session: AsyncSession, game: Game, hit: Any) -> GameProfile:

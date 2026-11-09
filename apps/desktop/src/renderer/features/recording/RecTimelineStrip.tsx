@@ -79,7 +79,10 @@ export function RecTimelineStrip() {
         <Stack spacing={0.5} sx={{ maxHeight: 110, overflowY: "auto" }}>
           {newestFirst.map((ev, idx) => {
             const kind = Reflect.get(ev, "kind");
-            const key = `${String(Reflect.get(ev, "t") ?? idx)}:${String(kind)}:${idx}`;
+            const tRaw = Reflect.get(ev, "t");
+            const t = typeof tRaw === "string" || typeof tRaw === "number" ? String(tRaw) : String(idx);
+            const kindKey = typeof kind === "string" ? kind : "event";
+            const key = `${t}:${kindKey}:${idx}`;
             return (
               <Stack key={key} direction="row" spacing={1} alignItems="flex-start">
                 <Chip size="small" label={eventLabel(kind)} variant="outlined" sx={{ minWidth: 72 }} />

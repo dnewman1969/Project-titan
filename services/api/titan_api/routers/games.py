@@ -198,6 +198,7 @@ async def scan_games(
             "platform": ctx.platform,
             "steam_libraries": [str(p) for p in ctx.steam_libraries],
             "epic_manifest_dirs": [str(p) for p in ctx.epic_manifest_dirs],
+            "gog_install_roots": [str(p) for p in ctx.gog_install_roots],
             "extra_paths": [str(p) for p in ctx.extra_paths],
             "stores_scanned": body.stores,
         },

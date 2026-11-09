@@ -6,15 +6,52 @@ import json
 from pathlib import Path
 
 from titan_sdk_games.discovery.base import StoreInstall, StoreScanner
+from titan_sdk_games.discovery.gog_registry import list_gog_registry_installs
 from titan_sdk_games.types import DiscoveryContext
+
+
+def _install_path_str(path: Path) -> str:
+    try:
+        return str(path.resolve())
+    except (NotImplementedError, OSError):
+        return str(path)
 
 
 class GogScanner(StoreScanner):
     name = "gog"
 
     def scan(self, ctx: DiscoveryContext) -> list[StoreInstall]:
-        roots = list(ctx.gog_install_roots)
         out: list[StoreInstall] = []
+        seen_paths: set[str] = set()
+
+        def add(inst: StoreInstall) -> None:
+            key = inst.install_path.lower()
+            if key in seen_paths:
+                return
+            seen_paths.add(key)
+            out.append(inst)
+
+        if ctx.platform == "windows":
+            for reg in list_gog_registry_installs():
+                if not reg.install_path.is_dir():
+                    continue
+                executable = reg.executable_path
+                if executable is None or not executable.is_file():
+                    executable = reg.install_path
+                add(
+                    StoreInstall(
+                        store="gog",
+                        install_path=_install_path_str(reg.install_path),
+                        executable_path=_install_path_str(
+                            executable if isinstance(executable, Path) else Path(executable)
+                        ),
+                        app_id=reg.product_id,
+                        build_id=reg.build_id,
+                        name=reg.game_name,
+                    )
+                )
+
+        roots = list(ctx.gog_install_roots)
         for root in roots:
             if not root.is_dir():
                 continue
@@ -23,7 +60,7 @@ class GogScanner(StoreScanner):
                     continue
                 parsed = self._read_goggame(manifest)
                 if parsed is not None:
-                    out.append(parsed)
+                    add(parsed)
         if ctx.platform != "windows" and not roots:
             return []
         return out

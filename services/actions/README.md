@@ -4,8 +4,8 @@ Sole input owner for Project Titan (Section 6.9). Learn-and-play beta routes `ac
 
 ## Backends (`TITAN_PLAY_BACKEND`)
 
-| Value            | Use                                                                                                          |
-| ---------------- | ------------------------------------------------------------------------------------------------------------ |
+| Value            | Use                                                                                                            |
+| ---------------- | -------------------------------------------------------------------------------------------------------------- |
 | `auto` (default) | `ksp` → kRPC (`127.0.0.1:50000/50001`); `ets2`/`ats` → ViGEm virtual X360 (no physical pad), else keyboard W/S |
 | `krpc`           | Force kRPC (KSP)                                                                                               |
 | `scs`            | Force SCS path (ViGEm preferred, keyboard fallback)                                                            |

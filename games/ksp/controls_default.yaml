@@ -1,0 +1,8 @@
+- action_id: ksp.stage
+  action_label: Stage
+  context: flight
+  device: keyboard
+  binding: { key: Space, mods: [] }
+  action_class: irreversible
+  source: default
+  confidence: 1.0

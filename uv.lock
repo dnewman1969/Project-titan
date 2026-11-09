@@ -9,6 +9,11 @@ members = [
     "titan-capture",
     "titan-core",
     "titan-db",
+    "titan-game-ats",
+    "titan-game-ets2",
+    "titan-game-ksp",
+    "titan-game-scs-common",
+    "titan-game-testgame",
     "titan-memory",
     "titan-models",
     "titan-orchestrator",
@@ -1638,7 +1643,11 @@ dependencies = [
     { name = "fastapi" },
     { name = "titan-core" },
     { name = "titan-db" },
+    { name = "titan-game-ats" },
+    { name = "titan-game-ets2" },
+    { name = "titan-game-ksp" },
     { name = "titan-models" },
+    { name = "titan-sdk-games" },
     { name = "uvicorn" },
 ]
 
@@ -1647,7 +1656,11 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "titan-core", editable = "packages/py/titan-core" },
     { name = "titan-db", editable = "packages/py/titan-db" },
+    { name = "titan-game-ats", editable = "games/ats" },
+    { name = "titan-game-ets2", editable = "games/ets2" },
+    { name = "titan-game-ksp", editable = "games/ksp" },
     { name = "titan-models", editable = "packages/py/titan-models" },
+    { name = "titan-sdk-games", editable = "packages/py/titan-sdk-games" },
     { name = "uvicorn", specifier = ">=0.32" },
 ]
 
@@ -1709,6 +1722,85 @@ requires-dist = [
 ]
 
 [[package]]
+name = "titan-game-ats"
+version = "0.1.0"
+source = { editable = "games/ats" }
+dependencies = [
+    { name = "titan-core" },
+    { name = "titan-game-scs-common" },
+    { name = "titan-sdk-games" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "titan-core", editable = "packages/py/titan-core" },
+    { name = "titan-game-scs-common", editable = "games/scs-common" },
+    { name = "titan-sdk-games", editable = "packages/py/titan-sdk-games" },
+]
+
+[[package]]
+name = "titan-game-ets2"
+version = "0.1.0"
+source = { editable = "games/ets2" }
+dependencies = [
+    { name = "titan-core" },
+    { name = "titan-game-scs-common" },
+    { name = "titan-sdk-games" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "titan-core", editable = "packages/py/titan-core" },
+    { name = "titan-game-scs-common", editable = "games/scs-common" },
+    { name = "titan-sdk-games", editable = "packages/py/titan-sdk-games" },
+]
+
+[[package]]
+name = "titan-game-ksp"
+version = "0.1.0"
+source = { editable = "games/ksp" }
+dependencies = [
+    { name = "titan-core" },
+    { name = "titan-sdk-games" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "titan-core", editable = "packages/py/titan-core" },
+    { name = "titan-sdk-games", editable = "packages/py/titan-sdk-games" },
+]
+
+[[package]]
+name = "titan-game-scs-common"
+version = "0.1.0"
+source = { editable = "games/scs-common" }
+dependencies = [
+    { name = "titan-core" },
+    { name = "titan-sdk-games" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "titan-core", editable = "packages/py/titan-core" },
+    { name = "titan-sdk-games", editable = "packages/py/titan-sdk-games" },
+]
+
+[[package]]
+name = "titan-game-testgame"
+version = "0.1.0"
+source = { editable = "games/_testgame" }
+dependencies = [
+    { name = "titan-core" },
+    { name = "titan-sdk-games" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "titan-core", editable = "packages/py/titan-core" },
+    { name = "titan-sdk-games", editable = "packages/py/titan-sdk-games" },
+]
+
+[[package]]
 name = "titan-memory"
 version = "0.1.0"
 source = { editable = "packages/py/titan-memory" }
@@ -1763,11 +1855,15 @@ name = "titan-sdk-games"
 version = "0.1.0"
 source = { editable = "packages/py/titan-sdk-games" }
 dependencies = [
+    { name = "pyyaml" },
     { name = "titan-core" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "titan-core", editable = "packages/py/titan-core" }]
+requires-dist = [
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "titan-core", editable = "packages/py/titan-core" },
+]
 
 [[package]]
 name = "titan-supervisor"
@@ -1841,6 +1937,9 @@ dependencies = [
     { name = "titan-capture" },
     { name = "titan-core" },
     { name = "titan-db" },
+    { name = "titan-game-ats" },
+    { name = "titan-game-ets2" },
+    { name = "titan-game-ksp" },
     { name = "titan-memory" },
     { name = "titan-models" },
     { name = "titan-orchestrator" },
@@ -1878,6 +1977,9 @@ requires-dist = [
     { name = "titan-capture", editable = "services/capture" },
     { name = "titan-core", editable = "packages/py/titan-core" },
     { name = "titan-db", editable = "packages/py/titan-db" },
+    { name = "titan-game-ats", editable = "games/ats" },
+    { name = "titan-game-ets2", editable = "games/ets2" },
+    { name = "titan-game-ksp", editable = "games/ksp" },
     { name = "titan-memory", editable = "packages/py/titan-memory" },
     { name = "titan-models", editable = "packages/py/titan-models" },
     { name = "titan-orchestrator", editable = "services/orchestrator" },

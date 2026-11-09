@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Project Titan gameadapter abc, manifest model, discovery scanners, rule engine types and adapter test harness"
 requires-python = ">=3.12,<3.13"
 license = "Apache-2.0"
-dependencies = ["titan-core"]
+dependencies = ["titan-core", "pyyaml>=6.0"]
 
 [build-system]
 requires = ["hatchling>=1.25"]

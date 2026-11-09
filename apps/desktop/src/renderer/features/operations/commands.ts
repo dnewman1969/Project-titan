@@ -13,6 +13,10 @@ export function handleMenuCommand(id: string, dispatch: AppDispatch): void {
     dispatch(setAboutOpen(true));
     return;
   }
+  if (item.id === "tools.gameDiscovery") {
+    dispatch(togglePanel("games"));
+    return;
+  }
   dispatch(
     showNotice(
       item.milestone ? `${item.label} arrives in ${item.milestone}.` : `${item.label} is not available yet.`,

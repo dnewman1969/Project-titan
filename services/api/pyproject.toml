@@ -8,6 +8,10 @@ dependencies = [
   "titan-core",
   "titan-db",
   "titan-models",
+  "titan-sdk-games",
+  "titan-game-ksp",
+  "titan-game-ets2",
+  "titan-game-ats",
   "fastapi>=0.115",
   "uvicorn>=0.32",
 ]
@@ -26,3 +30,7 @@ packages = ["titan_api"]
 titan-core = { workspace = true }
 titan-db = { workspace = true }
 titan-models = { workspace = true }
+titan-sdk-games = { workspace = true }
+titan-game-ksp = { workspace = true }
+titan-game-ets2 = { workspace = true }
+titan-game-ats = { workspace = true }

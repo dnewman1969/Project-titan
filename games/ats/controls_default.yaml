@@ -1,0 +1,8 @@
+- action_id: scs.cruise_control
+  action_label: Cruise control
+  context: driving
+  device: keyboard
+  binding: { key: C, mods: [] }
+  action_class: discrete
+  source: default
+  confidence: 1.0

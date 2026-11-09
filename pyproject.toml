@@ -9,6 +9,9 @@ dependencies = [
   "titan-memory",
   "titan-models",
   "titan-sdk-games",
+  "titan-game-ksp",
+  "titan-game-ets2",
+  "titan-game-ats",
   "titan-testing",
   "titan-api",
   "titan-supervisor",
@@ -43,7 +46,15 @@ dev = [
 package = false
 
 [tool.uv.workspace]
-members = ["packages/py/*", "services/*"]
+members = [
+  "packages/py/*",
+  "services/*",
+  "games/ksp",
+  "games/ets2",
+  "games/ats",
+  "games/scs-common",
+  "games/_testgame",
+]
 
 [tool.uv.sources]
 titan-core = { workspace = true }
@@ -51,6 +62,11 @@ titan-db = { workspace = true }
 titan-memory = { workspace = true }
 titan-models = { workspace = true }
 titan-sdk-games = { workspace = true }
+titan-game-ksp = { workspace = true }
+titan-game-ets2 = { workspace = true }
+titan-game-ats = { workspace = true }
+titan-game-scs-common = { workspace = true }
+titan-game-testgame = { workspace = true }
 titan-testing = { workspace = true }
 titan-api = { workspace = true }
 titan-supervisor = { workspace = true }

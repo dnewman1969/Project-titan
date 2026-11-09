@@ -5,6 +5,7 @@ import type { ApiStatus } from "../../app/useApiStatus";
 import { AgentsPanel } from "../agents/AgentsPanel";
 import { EventLog } from "../events/EventLog";
 import { TelemetryBar } from "../telemetry/TelemetryBar";
+import { GamesDiscoveryPanel } from "../games/GamesDiscoveryPanel";
 import { WebcamPanel } from "../webcam/WebcamPanel";
 import { GameWindow } from "./GameWindow";
 import type { LayoutState } from "./layoutSlice";
@@ -26,6 +27,7 @@ export function gridTemplate(panels: LayoutState["panels"]): {
     rows.push([`${left} ${right}`, "minmax(220px, 36%)"]);
   }
   if (panels.telemetry) rows.push(["telemetry telemetry", "auto"]);
+  if (panels.games) rows.push(["games games", "minmax(140px, 22%)"]);
   if (panels.events) rows.push(["events events", "minmax(110px, 20%)"]);
   const columns = panels.agents && panels.webcam ? "minmax(0, 1.25fr) minmax(0, 1fr)" : "minmax(0, 1fr) 0px";
   return {
@@ -58,6 +60,7 @@ export function OperationsCenter({ status }: { status: ApiStatus }) {
       {panels.agents && <AgentsPanel />}
       {panels.webcam && <WebcamPanel />}
       {panels.telemetry && <TelemetryBar />}
+      {panels.games && <GamesDiscoveryPanel />}
       {panels.events && <EventLog />}
     </Box>
   );

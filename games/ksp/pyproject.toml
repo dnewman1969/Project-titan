@@ -1,0 +1,21 @@
+[project]
+name = "titan-game-ksp"
+version = "0.1.0"
+description = "Kerbal Space Program adapter for Project Titan"
+requires-python = ">=3.12,<3.13"
+license = "Apache-2.0"
+dependencies = ["titan-sdk-games", "titan-core"]
+
+[project.entry-points."titan.games"]
+ksp = "titan_game_ksp.adapter:KspAdapter"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["titan_game_ksp"]
+
+[tool.uv.sources]
+titan-sdk-games = { workspace = true }
+titan-core = { workspace = true }

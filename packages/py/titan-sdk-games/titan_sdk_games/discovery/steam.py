@@ -46,6 +46,10 @@ class SteamScanner(StoreScanner):
 
         for lib in ctx.steam_libraries:
             add(lib)
+        for raw in ctx.extra_paths:
+            root = _steam_library_root_from_common(raw)
+            if root is not None:
+                add(root)
         if not roots and ctx.platform == "windows":
             steam_path = ctx.env.get("STEAM_PATH")
             if steam_path:
@@ -56,6 +60,9 @@ class SteamScanner(StoreScanner):
             lib = roots[idx]
             idx += 1
             folders_vdf = lib / "steamapps" / "libraryfolders.vdf"
+            if not folders_vdf.is_file():
+                alt = lib / "config" / "libraryfolders.vdf"
+                folders_vdf = alt if alt.is_file() else folders_vdf
             if not folders_vdf.is_file():
                 continue
             for extra in self._extra_libraries(folders_vdf):
@@ -116,6 +123,16 @@ class SteamScanner(StoreScanner):
         )
 
     def _guess_executable(self, install_path: Path) -> Path | None:
+        for preferred in ("KSP_x64.exe", "KSP.exe", "eurotrucks2.exe", "amtrucks.exe"):
+            hit = install_path / preferred
+            if hit.is_file():
+                return hit
+        nested = install_path / "bin" / "win_x64"
+        if nested.is_dir():
+            for preferred in ("eurotrucks2.exe", "amtrucks.exe"):
+                hit = nested / preferred
+                if hit.is_file():
+                    return hit
         candidates = sorted(install_path.glob("*.exe"))
         if candidates:
             return candidates[0]
@@ -127,3 +144,9 @@ def _normalize_steam_path(path: str) -> str:
     if "\\" in trimmed or (len(trimmed) > 1 and trimmed[1] == ":"):
         return trimmed.replace("/", "\\")
     return trimmed
+
+
+def _steam_library_root_from_common(path: Path) -> Path | None:
+    if path.name.lower() == "common" and path.parent.name.lower() == "steamapps":
+        return path.parent.parent
+    return None

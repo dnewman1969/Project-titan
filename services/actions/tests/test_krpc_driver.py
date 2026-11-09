@@ -211,6 +211,115 @@ def test_krpc_fly_without_autopilot_still_sets_throttle() -> None:
     assert control.sas is True
 
 
+def test_krpc_accepts_and_finishes_contracts_without_a_live_server() -> None:
+    class _Param:
+        def __init__(self, title: str, *, completed: bool = False) -> None:
+            self.title = title
+            self.notes = ""
+            self.completed = completed
+            self.failed = False
+            self.optional = False
+            self.children: list[object] = []
+
+    class _Offer:
+        def __init__(self) -> None:
+            self.type = "AltitudeRecord"
+            self.title = "Reach an altitude of 5,000m"
+            self.state = "offered"
+            self.seen = False
+            self.accepted = False
+            self.parameters = [_Param(self.title)]
+
+        def accept(self) -> None:
+            self.accepted = True
+            self.state = "active"
+
+    class _Done:
+        def __init__(self) -> None:
+            self.type = "AltitudeRecord"
+            self.title = "Reach an altitude of 11,000m"
+            self.state = "active"
+            self.parameters = [_Param(self.title, completed=True)]
+            self.completed_called = False
+
+        def complete(self) -> None:
+            self.completed_called = True
+            self.state = "completed"
+
+    class _RecoverContract:
+        def __init__(self) -> None:
+            self.type = "PartTest"
+            self.title = "Test and recover"
+            self.state = "active"
+            self.parameters = [_Param("Recover the vessel")]
+
+    class _Situation:
+        name = "landed"
+
+    class _RecoverVessel:
+        def __init__(self) -> None:
+            self.situation = _Situation()
+            self.recovered = False
+
+        def recover(self) -> None:
+            self.recovered = True
+
+    offer = _Offer()
+    done = _Done()
+    recover_contract = _RecoverContract()
+    vessel = _RecoverVessel()
+
+    class _Manager:
+        @property
+        def offered_contracts(self) -> list[object]:
+            return [offer] if offer.state == "offered" else []
+
+        @property
+        def active_contracts(self) -> list[object]:
+            return [item for item in (offer, done, recover_contract) if item.state == "active"]
+
+        @property
+        def completed_contracts(self) -> list[object]:
+            return [done] if done.state == "completed" else []
+
+    class _Center:
+        contract_manager = _Manager()
+        active_vessel = vessel
+
+    class _Local:
+        space_center = _Center()
+
+    conn = _Local()
+    driver = KrpcDriver(
+        host="127.0.0.1",
+        rpc_port=1,
+        stream_port=2,
+        connect_fn=lambda *_args: conn,
+    )
+    ok, err = driver.execute(
+        "ksp.contract.accept",
+        {"type": "AltitudeRecord", "title": "Reach an altitude of 5,000m"},
+    )
+    assert (ok, err) == (True, None)
+    assert offer.accepted is True
+    assert offer.seen is True
+
+    ok, err = driver.execute(
+        "ksp.contract.finish",
+        {"type": "AltitudeRecord", "title": "Reach an altitude of 11,000m"},
+    )
+    assert (ok, err) == (True, None)
+    assert done.completed_called is True
+
+    ok, err = driver.execute("ksp.contract.finish", {"type": "PartTest", "title": "Test and recover"})
+    assert (ok, err) == (True, None)
+    assert vessel.recovered is True
+
+    ok, err = driver.execute("ksp.contract.accept", {"type": "Nope", "title": "Missing"})
+    assert ok is False
+    assert err is not None and "not found" in err
+
+
 def test_krpc_no_active_vessel() -> None:
     _Conn.space_center.active_vessel = None  # type: ignore[assignment]
     ok, err = _driver().execute("ksp.throttle", {"throttle": 0.5})

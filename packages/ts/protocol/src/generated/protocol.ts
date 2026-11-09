@@ -131,6 +131,52 @@ export const BBWrittenSchema = z.object({
 }).strict();
 export type BBWritten = z.infer<typeof BBWrittenSchema>;
 
+/** One kRPC contract parameter. Nested parameters are flattened before they are sent. */
+export const CareerParameterSchema = z.object({
+  title: z.string(),
+  notes: z.string().nullable().optional(),
+  completed: z.boolean().optional(),
+  failed: z.boolean().optional(),
+  optional: z.boolean().optional(),
+}).strict();
+export type CareerParameter = z.infer<typeof CareerParameterSchema>;
+
+/** One offered, active, or recently failed contract from kRPC's ContractManager. */
+export const CareerContractSchema = z.object({
+  type: z.string(),
+  title: z.string(),
+  state: z.string(),
+  description: z.string().nullable().optional(),
+  synopsis: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  funds_advance: z.number().nullable().optional(),
+  funds_completion: z.number().nullable().optional(),
+  funds_failure: z.number().nullable().optional(),
+  reputation_completion: z.number().nullable().optional(),
+  reputation_failure: z.number().nullable().optional(),
+  science_completion: z.number().nullable().optional(),
+  parameters: z.array(CareerParameterSchema).optional(),
+}).strict();
+export type CareerContract = z.infer<typeof CareerContractSchema>;
+
+/** Game mode plus the contracts kRPC will actually list. Sandbox leaves ``available`` false. */
+export const CareerSnapshotSchema = z.object({
+  mode: z.string().nullable().optional(),
+  available: z.boolean().optional(),
+  reason: z.string().nullable().optional(),
+  funds: z.number().nullable().optional(),
+  science: z.number().nullable().optional(),
+  reputation: z.number().nullable().optional(),
+  offered: z.array(CareerContractSchema).optional(),
+  active: z.array(CareerContractSchema).optional(),
+  failed: z.array(CareerContractSchema).optional(),
+  vessel_parts: z.array(z.string()).optional(),
+  liquid_fuel: z.number().nullable().optional(),
+  oxidizer: z.number().nullable().optional(),
+  solid_fuel: z.number().nullable().optional(),
+}).strict();
+export type CareerSnapshot = z.infer<typeof CareerSnapshotSchema>;
+
 export const ChatCancelledDataSchema = z.object({
   message_id: z.string().uuid(),
   reason: z.string(),
@@ -796,6 +842,7 @@ export const TelemetryFrameSchema = z.object({
   environment: EnvironmentSchema.nullable(),
   job: JobSchema.nullable(),
   economy: EconomySchema.nullable(),
+  career: CareerSnapshotSchema.nullable().optional(),
   /** Adapter-defined, documented in the game package README */
   game_specific: z.record(z.string(), z.unknown()),
 }).strict();
@@ -823,6 +870,7 @@ export const TelemetryFrameUISchema = z.object({
   environment: EnvironmentSchema.nullable(),
   job: JobSchema.nullable(),
   economy: EconomySchema.nullable(),
+  career: CareerSnapshotSchema.nullable().optional(),
 }).strict();
 export type TelemetryFrameUI = z.infer<typeof TelemetryFrameUISchema>;
 

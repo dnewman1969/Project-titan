@@ -155,6 +155,52 @@ class Economy(ProtocolModel):
     currency: str | None
 
 
+class CareerParameter(ProtocolModel):
+    """One kRPC contract parameter. Nested parameters are flattened before they are sent."""
+
+    title: str
+    notes: str | None = None
+    completed: bool = False
+    failed: bool = False
+    optional: bool = False
+
+
+class CareerContract(ProtocolModel):
+    """One offered, active, or recently failed contract from kRPC's ContractManager."""
+
+    type: str
+    title: str
+    state: str
+    description: str | None = None
+    synopsis: str | None = None
+    notes: str | None = None
+    funds_advance: float | None = None
+    funds_completion: float | None = None
+    funds_failure: float | None = None
+    reputation_completion: float | None = None
+    reputation_failure: float | None = None
+    science_completion: float | None = None
+    parameters: list[CareerParameter] = Field(default_factory=list)
+
+
+class CareerSnapshot(ProtocolModel):
+    """Game mode plus the contracts kRPC will actually list. Sandbox leaves ``available`` false."""
+
+    mode: str | None = None
+    available: bool = False
+    reason: str | None = None
+    funds: float | None = None
+    science: float | None = None
+    reputation: float | None = None
+    offered: list[CareerContract] = Field(default_factory=list)
+    active: list[CareerContract] = Field(default_factory=list)
+    failed: list[CareerContract] = Field(default_factory=list)
+    vessel_parts: list[str] = Field(default_factory=list)
+    liquid_fuel: float | None = None
+    oxidizer: float | None = None
+    solid_fuel: float | None = None
+
+
 class TelemetryFrameUI(ProtocolModel):
     """`TelemetryFrame` without `game_specific`: what the UI receives on the telemetry channel."""
 
@@ -176,6 +222,7 @@ class TelemetryFrameUI(ProtocolModel):
     environment: Environment | None
     job: Job | None
     economy: Economy | None
+    career: CareerSnapshot | None = None
 
 
 class TelemetryFrame(TelemetryFrameUI):

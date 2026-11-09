@@ -43,6 +43,8 @@ class HilDriver:
             "ksp.yaw",
             "ksp.roll",
             "ksp.fly",
+            "ksp.contract.accept",
+            "ksp.contract.finish",
             "scs.brake",
             "scs.throttle",
         }
@@ -98,6 +100,14 @@ class HilDriver:
                     ksp["heading_deg"] = float(params["heading_deg"]) % 360.0
                 if params.get("stage"):
                     ksp["stage_count"] = int(ksp.get("stage_count", 0)) + 1
+            elif action_id == "ksp.contract.accept":
+                accepted = list(ksp.get("accepted_contracts") or [])
+                accepted.append({"type": params.get("type"), "title": params.get("title")})
+                ksp["accepted_contracts"] = accepted
+            elif action_id == "ksp.contract.finish":
+                finished = list(ksp.get("finished_contracts") or [])
+                finished.append({"type": params.get("type"), "title": params.get("title")})
+                ksp["finished_contracts"] = finished
         if action_id.startswith("scs."):
             scs = _STATE.setdefault("scs", {})
             if not isinstance(scs, dict):

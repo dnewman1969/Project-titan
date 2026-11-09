@@ -181,6 +181,294 @@
       "title": "BBUpdateData",
       "type": "object"
     },
+    "CareerContract": {
+      "additionalProperties": false,
+      "description": "One offered, active, or recently failed contract from kRPC's ContractManager.",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "synopsis": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "funds_advance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "funds_completion": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "funds_failure": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reputation_completion": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reputation_failure": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "science_completion": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/CareerParameter"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "title",
+        "state"
+      ],
+      "title": "CareerContract",
+      "type": "object"
+    },
+    "CareerParameter": {
+      "additionalProperties": false,
+      "description": "One kRPC contract parameter. Nested parameters are flattened before they are sent.",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "completed": {
+          "default": false,
+          "type": "boolean"
+        },
+        "failed": {
+          "default": false,
+          "type": "boolean"
+        },
+        "optional": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "title": "CareerParameter",
+      "type": "object"
+    },
+    "CareerSnapshot": {
+      "additionalProperties": false,
+      "description": "Game mode plus the contracts kRPC will actually list. Sandbox leaves ``available`` false.",
+      "properties": {
+        "mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "available": {
+          "default": false,
+          "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "funds": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "science": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reputation": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "offered": {
+          "items": {
+            "$ref": "#/$defs/CareerContract"
+          },
+          "type": "array"
+        },
+        "active": {
+          "items": {
+            "$ref": "#/$defs/CareerContract"
+          },
+          "type": "array"
+        },
+        "failed": {
+          "items": {
+            "$ref": "#/$defs/CareerContract"
+          },
+          "type": "array"
+        },
+        "vessel_parts": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "liquid_fuel": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "oxidizer": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "solid_fuel": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "CareerSnapshot",
+      "type": "object"
+    },
     "ChatCancelledData": {
       "additionalProperties": false,
       "properties": {
@@ -1981,6 +2269,17 @@
               "type": "null"
             }
           ]
+        },
+        "career": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CareerSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [

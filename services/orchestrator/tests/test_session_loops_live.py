@@ -271,3 +271,80 @@ async def test_flight_loop_reports_missing_vessel() -> None:
     note = next(p for p in runtime.bb.puts if p.get("key") == "flight.decision")
     assert "not steering" in str(note["value"]["text"])
     assert note["value"]["action_id"] is None
+
+
+def _action_ids(runtime: LoopRuntime) -> list[str]:
+    found: list[str] = []
+    for envelope in runtime.bus.published:
+        payload = getattr(envelope, "payload", None)
+        if isinstance(payload, dict) and isinstance(payload.get("action_id"), str):
+            found.append(payload["action_id"])
+    return found
+
+
+@pytest.mark.asyncio
+async def test_flight_loop_accepts_a_contract_and_records_why() -> None:
+    sid = UUID(int=79)
+    payload = json.dumps(
+        {
+            "scene": "flight",
+            "paused": False,
+            "environment": {"body": "Kerbin"},
+            "vehicle": {
+                "name": "Explorer",
+                "situation": "pre_launch",
+                "geo": {"lat_deg": 0.0, "lon_deg": 0.0, "alt_m": 70.0},
+                "velocity": {"vertical_mps": 0.0},
+            },
+            "career": {
+                "mode": "career",
+                "available": True,
+                "reason": None,
+                "funds": 10000,
+                "science": 0,
+                "reputation": 0,
+                "offered": [
+                    {
+                        "type": "AltitudeRecord",
+                        "title": "Reach an altitude of 5,000m",
+                        "state": "offered",
+                        "funds_advance": 1000,
+                        "funds_completion": 5000,
+                        "science_completion": 1,
+                        "reputation_completion": 1,
+                        "parameters": [
+                            {
+                                "title": "Reach an altitude of 5,000m",
+                                "notes": "",
+                                "completed": False,
+                                "failed": False,
+                                "optional": False,
+                            }
+                        ],
+                    }
+                ],
+                "active": [],
+                "failed": [],
+                "vessel_parts": ["LV-T30 Liquid Fuel Engine", "FL-T400 Fuel Tank"],
+                "liquid_fuel": 400,
+                "oxidizer": 480,
+                "solid_fuel": 0,
+            },
+        }
+    )
+    runtime = LoopRuntime(session_id=sid, redis=_LatestRedis(sid, payload))  # type: ignore[arg-type]
+    await _run_flight(
+        runtime,
+        until=lambda: "ksp.contract.accept" in _action_ids(runtime),
+    )
+    assert "ksp.contract.accept" in _action_ids(runtime)
+    why = next(
+        put
+        for put in runtime.bb.puts
+        if put.get("section") == "lessons" and str(put.get("key", "")).startswith("career.accept.")
+    )
+    assert "Accepted" in str(why["value"]["text"])
+    assert "Reach an altitude of 5,000m" in str(why["value"]["text"])
+    board = next(put for put in runtime.bb.puts if put.get("key") == "career.board")
+    assert "Offered:" in str(board["value"]["text"])
+    assert "Active:" in str(board["value"]["text"])

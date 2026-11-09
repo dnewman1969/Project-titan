@@ -18,6 +18,10 @@ only the single pre-launch light-the-engine pulse.
 MechJeb and kOS are not required. The inputs are the telemetry frame the kRPC
 sampler already publishes (situation, altitude, speed, throttle, attitude,
 angular rate, prograde, part temperature).
+
+A career ``FlightGoal`` replaces that generic climb. The setpoint then follows
+the contract step (altitude, orbit, part test, or recovery) instead of
+coasting at 80 km because the vessel left the pad.
 """
 
 from __future__ import annotations
@@ -25,6 +29,8 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from typing import Any
+
+from titan_orchestrator.career import FlightGoal
 
 LAUNCH_HEADING_DEG = 90.0
 TURN_START_M = 250.0
@@ -53,8 +59,14 @@ _EFFECT_HOLD = "Autopilot holds pitch and heading; throttle follows the ascent."
 _EFFECT_SAS = "SAS holds the current attitude; autopilot released."
 
 
-def decide_flight(frame: Mapping[str, Any]) -> FlightDecision:
-    """Choose the next KSP setpoint from a telemetry frame dict."""
+def decide_flight(frame: Mapping[str, Any], *, goal: FlightGoal | None = None) -> FlightDecision:
+    """Choose the next KSP setpoint from a telemetry frame dict.
+
+    When ``goal`` is set, the setpoint follows that contract step. The generic
+    ascent is only used when no contract is in play.
+    """
+    if goal is not None:
+        return _decide_goal(frame, goal)
     scene = str(frame.get("scene") or "").strip()
     if scene != "flight":
         shown = scene or "unknown"
@@ -456,10 +468,18 @@ def _speed(vehicle: Mapping[str, Any]) -> float | None:
 
 
 def _apoapsis(vehicle: Mapping[str, Any]) -> float | None:
+    return _orbit_alt(vehicle, "apoapsis_m")
+
+
+def _periapsis(vehicle: Mapping[str, Any]) -> float | None:
+    return _orbit_alt(vehicle, "periapsis_m")
+
+
+def _orbit_alt(vehicle: Mapping[str, Any], name: str) -> float | None:
     orbit = vehicle.get("orbit")
     if not isinstance(orbit, dict):
         return None
-    return _as_float(orbit.get("apoapsis_m"))
+    return _as_float(orbit.get(name))
 
 
 def _dynamic_pressure(frame: Mapping[str, Any]) -> float | None:
@@ -519,3 +539,456 @@ def _as_float(value: object) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     return None
+
+
+_ORBIT_M = 70_000.0
+_APO_TARGET_M = 80_000.0
+
+
+def _decide_goal(frame: Mapping[str, Any], goal: FlightGoal) -> FlightDecision:
+    """Fly one contract step. Does not fall through to the generic 80 km climb."""
+    scene = str(frame.get("scene") or "").strip()
+    if scene != "flight":
+        shown = scene or "unknown"
+        return FlightDecision(
+            status="no_vessel",
+            message=f"No active flight scene (scene={shown}). Load a vessel and launch — not steering.",
+        )
+    if bool(frame.get("paused")):
+        return FlightDecision(status="paused", message="Flight is paused — not sending controls.")
+    vehicle = frame.get("vehicle")
+    if not isinstance(vehicle, dict):
+        return FlightDecision(
+            status="no_vessel",
+            message="No active vessel in the flight scene — not steering.",
+        )
+    name = vehicle.get("name")
+    named = isinstance(name, str) and bool(name.strip())
+    alt = _alt(vehicle)
+    situation = _situation(vehicle)
+    if not named and alt is None:
+        return FlightDecision(
+            status="no_vessel",
+            message="Flight scene has no active vessel — not steering.",
+        )
+    alt_m = 0.0 if alt is None else alt
+    vspeed = _vspeed(vehicle)
+    apo = _apoapsis(vehicle)
+    peri = _periapsis(vehicle)
+    pre_launch = situation == "pre_launch" or (
+        situation is None and alt_m < TURN_START_M and (vspeed or 0) <= 0
+    )
+    return _goal_setpoint(
+        goal,
+        alt_m=alt_m,
+        vspeed=vspeed,
+        apo=apo,
+        peri=peri,
+        situation=situation,
+        pre_launch=pre_launch,
+    )
+
+
+def _goal_setpoint(
+    goal: FlightGoal,
+    *,
+    alt_m: float,
+    vspeed: float | None,
+    apo: float | None,
+    peri: float | None,
+    situation: str | None,
+    pre_launch: bool,
+) -> FlightDecision:
+    if goal.kind == "hold":
+        return _goal_decision(
+            "contract_hold",
+            goal.summary or "Holding. Not launching until a contract step needs it.",
+            throttle=0.0,
+            sas=True,
+            situation=situation,
+        )
+    if goal.kind == "part_test" and goal.situation in {"landed", "splashed"}:
+        if situation in {"landed", "splashed", "pre_launch", None}:
+            return _goal_decision(
+                "contract_hold",
+                _goal_text(goal, "Holding on the ground so the part test can complete. Not launching."),
+                throttle=0.0,
+                sas=True,
+                situation=situation,
+            )
+        return _recover_setpoint(goal, alt_m=alt_m, vspeed=vspeed, apo=apo, peri=peri, situation=situation)
+    if goal.kind == "recover" or (goal.kind == "part_test" and goal.situation == "escaping"):
+        return _recover_setpoint(goal, alt_m=alt_m, vspeed=vspeed, apo=apo, peri=peri, situation=situation)
+    if goal.kind == "orbit" or (goal.kind == "part_test" and goal.situation == "orbiting"):
+        return _orbit_setpoint(
+            goal,
+            alt_m=alt_m,
+            vspeed=vspeed,
+            apo=apo,
+            peri=peri,
+            situation=situation,
+            pre_launch=pre_launch,
+        )
+    if goal.kind == "suborbital" or (goal.kind == "part_test" and goal.situation == "sub_orbital"):
+        return _suborbital_setpoint(
+            goal,
+            alt_m=alt_m,
+            vspeed=vspeed,
+            apo=apo,
+            situation=situation,
+            pre_launch=pre_launch,
+        )
+    if _has_band(goal) and goal.kind in {"altitude", "part_test"}:
+        return _band_setpoint(
+            goal,
+            alt_m=alt_m,
+            vspeed=vspeed,
+            situation=situation,
+            pre_launch=pre_launch,
+        )
+    if goal.kind == "part_test":
+        return _flight_test_setpoint(
+            goal,
+            alt_m=alt_m,
+            vspeed=vspeed,
+            situation=situation,
+            pre_launch=pre_launch,
+        )
+    return _altitude_setpoint(
+        goal,
+        alt_m=alt_m,
+        vspeed=vspeed,
+        apo=apo,
+        situation=situation,
+        pre_launch=pre_launch,
+    )
+
+
+def _altitude_setpoint(
+    goal: FlightGoal,
+    *,
+    alt_m: float,
+    vspeed: float | None,
+    apo: float | None,
+    situation: str | None,
+    pre_launch: bool,
+) -> FlightDecision:
+    target = goal.altitude_m if goal.altitude_m is not None else 5_000.0
+    if alt_m >= target:
+        return _goal_decision(
+            "contract_hold",
+            _goal_text(
+                goal,
+                f"Altitude {target:.0f} m is met — throttle idle until the parameter completes.",
+            ),
+            throttle=0.0,
+            sas=True,
+            situation=situation,
+        )
+    if pre_launch:
+        return _goal_decision(
+            "contract_launch",
+            _goal_text(goal, f"Launching for {target:.0f} m. Throttle full, pitch 90°, heading 90° east."),
+            throttle=1.0,
+            pitch=90.0,
+            heading=LAUNCH_HEADING_DEG,
+            stage_once=True,
+            situation=situation or "pre_launch",
+        )
+    if apo is not None and apo >= target and (vspeed or 0.0) > 0:
+        return _goal_decision(
+            "contract_coast",
+            _goal_text(goal, "Apoapsis already clears the contract altitude — coasting up to it."),
+            throttle=0.0,
+            pitch=_ascent_pitch(alt_m),
+            heading=LAUNCH_HEADING_DEG,
+            situation=situation,
+        )
+    pitch = _ascent_pitch(alt_m)
+    return _goal_decision(
+        "contract_ascent",
+        _goal_text(goal, f"Climbing to {target:.0f} m, pitch {pitch:.0f}°, heading 90° east."),
+        throttle=1.0,
+        pitch=pitch,
+        heading=LAUNCH_HEADING_DEG,
+        situation=situation,
+    )
+
+
+def _orbit_setpoint(
+    goal: FlightGoal,
+    *,
+    alt_m: float,
+    vspeed: float | None,
+    apo: float | None,
+    peri: float | None,
+    situation: str | None,
+    pre_launch: bool,
+) -> FlightDecision:
+    if peri is not None and apo is not None and peri >= _ORBIT_M and apo >= _ORBIT_M:
+        return _goal_decision(
+            "contract_hold",
+            _goal_text(goal, "Periapsis and apoapsis are above the atmosphere — orbit step met."),
+            throttle=0.0,
+            sas=True,
+            situation=situation,
+        )
+    if pre_launch:
+        return _goal_decision(
+            "contract_launch",
+            _goal_text(goal, "Launching for orbit. Throttle full, pitch 90°, heading 90° east."),
+            throttle=1.0,
+            pitch=90.0,
+            heading=LAUNCH_HEADING_DEG,
+            stage_once=True,
+            situation=situation or "pre_launch",
+        )
+    if apo is None or apo < _APO_TARGET_M:
+        pitch = _ascent_pitch(alt_m)
+        return _goal_decision(
+            "contract_ascent",
+            _goal_text(goal, f"Raising apoapsis toward {_APO_TARGET_M / 1000:.0f} km, pitch {pitch:.0f}°."),
+            throttle=1.0,
+            pitch=pitch,
+            heading=LAUNCH_HEADING_DEG,
+            situation=situation,
+        )
+    near_apo = (vspeed is not None and abs(vspeed) < 40.0) or alt_m >= apo - 2_500.0
+    if (peri is None or peri < _ORBIT_M) and near_apo and alt_m >= 60_000.0:
+        return _goal_decision(
+            "contract_circularize",
+            _goal_text(goal, "Circularizing at apoapsis until periapsis clears the atmosphere."),
+            throttle=1.0,
+            pitch=5.0,
+            heading=LAUNCH_HEADING_DEG,
+            situation=situation,
+        )
+    pitch = _ascent_pitch(alt_m)
+    return _goal_decision(
+        "contract_coast",
+        _goal_text(goal, "Coasting to apoapsis before the circularization burn."),
+        throttle=0.0,
+        pitch=pitch,
+        heading=LAUNCH_HEADING_DEG,
+        situation=situation,
+    )
+
+
+def _suborbital_setpoint(
+    goal: FlightGoal,
+    *,
+    alt_m: float,
+    vspeed: float | None,
+    apo: float | None,
+    situation: str | None,
+    pre_launch: bool,
+) -> FlightDecision:
+    del vspeed
+    if apo is not None and apo >= _ORBIT_M:
+        return _goal_decision(
+            "contract_coast",
+            _goal_text(goal, "Apoapsis is above the atmosphere — coasting the sub-orbital arc."),
+            throttle=0.0,
+            pitch=_ascent_pitch(alt_m),
+            heading=LAUNCH_HEADING_DEG,
+            situation=situation,
+        )
+    if pre_launch:
+        return _goal_decision(
+            "contract_launch",
+            _goal_text(goal, "Launching onto a sub-orbital arc. Throttle full, pitch 90°."),
+            throttle=1.0,
+            pitch=90.0,
+            heading=LAUNCH_HEADING_DEG,
+            stage_once=True,
+            situation=situation or "pre_launch",
+        )
+    pitch = _ascent_pitch(alt_m)
+    return _goal_decision(
+        "contract_ascent",
+        _goal_text(goal, f"Climbing for a sub-orbital arc, pitch {pitch:.0f}°."),
+        throttle=1.0,
+        pitch=pitch,
+        heading=LAUNCH_HEADING_DEG,
+        situation=situation,
+    )
+
+
+def _band_setpoint(
+    goal: FlightGoal,
+    *,
+    alt_m: float,
+    vspeed: float | None,
+    situation: str | None,
+    pre_launch: bool,
+) -> FlightDecision:
+    lo = goal.altitude_min_m if goal.altitude_min_m is not None else 0.0
+    hi = goal.altitude_max_m if goal.altitude_max_m is not None else lo
+    if pre_launch and alt_m < lo:
+        return _goal_decision(
+            "contract_launch",
+            _goal_text(goal, f"Launching into the {lo:.0f}-{hi:.0f} m band."),
+            throttle=1.0,
+            pitch=90.0,
+            heading=LAUNCH_HEADING_DEG,
+            stage_once=True,
+            situation=situation or "pre_launch",
+        )
+    if alt_m < lo:
+        pitch = _ascent_pitch(alt_m)
+        return _goal_decision(
+            "contract_ascent",
+            _goal_text(goal, f"Climbing to the {lo:.0f}-{hi:.0f} m band, pitch {pitch:.0f}°."),
+            throttle=1.0,
+            pitch=pitch,
+            heading=LAUNCH_HEADING_DEG,
+            situation=situation,
+        )
+    if alt_m > hi:
+        return _goal_decision(
+            "contract_coast",
+            _goal_text(
+                goal,
+                "Above the contract band — throttle idle so the vessel can settle back into it.",
+            ),
+            throttle=0.0,
+            pitch=15.0,
+            heading=LAUNCH_HEADING_DEG,
+            situation=situation,
+        )
+    climbing = vspeed is not None and vspeed < 0
+    return _goal_decision(
+        "contract_hold",
+        _goal_text(goal, f"Inside {lo:.0f}-{hi:.0f} m. Holding the band for the contract."),
+        throttle=0.85 if climbing else 0.4,
+        pitch=55.0 if climbing else 25.0,
+        heading=LAUNCH_HEADING_DEG,
+        situation=situation,
+    )
+
+
+def _flight_test_setpoint(
+    goal: FlightGoal,
+    *,
+    alt_m: float,
+    vspeed: float | None,
+    situation: str | None,
+    pre_launch: bool,
+) -> FlightDecision:
+    if pre_launch:
+        return _goal_decision(
+            "contract_launch",
+            _goal_text(goal, "Launching so the part test is in flight."),
+            throttle=1.0,
+            pitch=90.0,
+            heading=LAUNCH_HEADING_DEG,
+            stage_once=True,
+            situation=situation or "pre_launch",
+        )
+    if situation in {"flying", "sub_orbital", "orbiting"} and alt_m > 250:
+        dropping = vspeed is not None and vspeed < 0
+        return _goal_decision(
+            "contract_hold",
+            _goal_text(goal, "In flight for the part test — keeping the engine running."),
+            throttle=0.8 if dropping else 0.45,
+            pitch=60.0 if dropping else 35.0,
+            heading=LAUNCH_HEADING_DEG,
+            situation=situation,
+        )
+    pitch = _ascent_pitch(alt_m)
+    return _goal_decision(
+        "contract_ascent",
+        _goal_text(goal, f"Climbing into flight for the part test, pitch {pitch:.0f}°."),
+        throttle=1.0,
+        pitch=pitch,
+        heading=LAUNCH_HEADING_DEG,
+        situation=situation,
+    )
+
+
+def _recover_setpoint(
+    goal: FlightGoal,
+    *,
+    alt_m: float,
+    vspeed: float | None,
+    apo: float | None,
+    peri: float | None,
+    situation: str | None,
+) -> FlightDecision:
+    if situation in {"landed", "splashed", "pre_launch"}:
+        return _goal_decision(
+            "contract_recover",
+            _goal_text(goal, "On the ground. Recover the vessel to finish this step."),
+            throttle=0.0,
+            sas=True,
+            situation=situation,
+        )
+    if peri is not None and peri >= 60_000 and (apo or 0.0) >= 60_000:
+        return _goal_decision(
+            "contract_deorbit",
+            _goal_text(goal, "Deorbit burn, heading west, so the vessel can be recovered."),
+            throttle=1.0,
+            pitch=0.0,
+            heading=270.0,
+            situation=situation,
+        )
+    if alt_m > 2_500:
+        return _goal_decision(
+            "contract_descend",
+            _goal_text(goal, "Coasting down to recover the vessel."),
+            throttle=0.0,
+            pitch=20.0,
+            heading=LAUNCH_HEADING_DEG,
+            situation=situation,
+        )
+    if vspeed is not None and vspeed < RECOVER_VS_MPS:
+        return _goal_decision(
+            "contract_recover",
+            _goal_text(goal, "Low and fast — pitching up so the recovery does not hit hard."),
+            throttle=1.0,
+            pitch=75.0,
+            heading=LAUNCH_HEADING_DEG,
+            situation=situation,
+        )
+    return _goal_decision(
+        "contract_descend",
+        _goal_text(goal, "Final descent for recovery."),
+        throttle=0.0,
+        pitch=45.0,
+        heading=LAUNCH_HEADING_DEG,
+        situation=situation,
+    )
+
+
+def _has_band(goal: FlightGoal) -> bool:
+    return goal.altitude_min_m is not None and goal.altitude_max_m is not None
+
+
+def _goal_text(goal: FlightGoal, detail: str) -> str:
+    if not goal.contract_title:
+        return detail
+    return f"{goal.contract_title}: {detail}"
+
+
+def _goal_decision(
+    status: str,
+    message: str,
+    *,
+    throttle: float,
+    situation: str | None,
+    pitch: float | None = None,
+    heading: float | None = None,
+    sas: bool = False,
+    stage_once: bool = False,
+) -> FlightDecision:
+    if pitch is None or heading is None:
+        proposal = _sas_only(throttle, message)
+    else:
+        proposal = _guided(throttle, pitch, heading, message, _EFFECT_HOLD)
+    return FlightDecision(
+        status=status,
+        message=message,
+        proposal=proposal,
+        stage_once=stage_once,
+        situation=situation,
+    )

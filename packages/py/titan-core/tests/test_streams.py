@@ -38,6 +38,8 @@ def test_session_stream_names_roundtrip() -> None:
     assert streams.parse_session_stream(bus, tail=":bus") == sid
     events = streams.session_events_stream(sid)
     assert streams.parse_session_stream(events, tail=":events") == sid
+    telemetry = streams.session_telemetry_stream(sid)
+    assert telemetry == f"titan:s:{sid}:telemetry"
 
 
 async def test_redis_client_uses_the_configured_password() -> None:

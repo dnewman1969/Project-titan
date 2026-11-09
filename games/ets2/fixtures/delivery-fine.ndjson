@@ -1,0 +1,4 @@
+{"t_mono_ns":3000000000,"t_session_ms":0,"scene":"driving","paused":false,"fuel_l":180,"fuel_capacity_l":400,"speed_mps":22,"gear":8,"game_time_min":120,"job_active":false,"nav_distance_m":50000,"speed_limit_mps":25}
+{"t_mono_ns":3010000000,"t_session_ms":2000,"scene":"driving","paused":false,"fuel_l":170,"fuel_capacity_l":400,"speed_mps":24,"gear":8,"game_time_min":122,"job_active":true,"nav_distance_m":45000,"speed_limit_mps":25}
+{"t_mono_ns":3020000000,"t_session_ms":4000,"scene":"driving","paused":false,"fuel_l":160,"fuel_capacity_l":400,"speed_mps":20,"gear":7,"game_time_min":124,"job_active":true,"job_delivered":true,"nav_distance_m":1000,"speed_limit_mps":25}
+{"t_mono_ns":3030000000,"t_session_ms":6000,"scene":"driving","paused":false,"fuel_l":155,"fuel_capacity_l":400,"speed_mps":18,"gear":6,"game_time_min":125,"job_active":false,"player_fined":true,"fine_amount":250,"nav_distance_m":0,"speed_limit_mps":25}

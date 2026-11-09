@@ -4,6 +4,7 @@ import { eventsSlice } from "../features/events/eventsSlice";
 import { layoutSlice } from "../features/operations/layoutSlice";
 import { safetySlice } from "../features/safety/safetySlice";
 import { supervisorSlice } from "../features/system/supervisorSlice";
+import { gameTelemetrySlice } from "../features/telemetry/gameTelemetrySlice";
 import { systemSlice } from "../features/telemetry/systemSlice";
 import { titanApi } from "./api";
 
@@ -13,6 +14,7 @@ const rootReducer = combineReducers({
   safety: safetySlice.reducer,
   events: eventsSlice.reducer,
   system: systemSlice.reducer,
+  gameTelemetry: gameTelemetrySlice.reducer,
   supervisor: supervisorSlice.reducer,
 });
 

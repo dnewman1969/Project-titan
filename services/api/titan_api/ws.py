@@ -1,7 +1,7 @@
 """WebSocket gateway (Section 5.3).
 
-M1 serves `system.metrics` (from the `titan:sys:metrics` stream) and `system.safety`. `jobs` is
-accepted but has no producers yet. Session channels answer `NOT_FOUND` until sessions exist (M2).
+M1 serves `system.metrics` and `system.safety`. M5 adds `session.{sid}.telemetry` and
+`session.{sid}.events` when the session Redis streams exist.
 """
 
 from __future__ import annotations
@@ -25,6 +25,8 @@ from titan_api.safety import SafetyController
 from titan_core.clock import utc_now
 from titan_core.logging import get_logger
 from titan_core.protocol.common import ProtocolModel
+from titan_core.protocol.events import GameEvent
+from titan_core.protocol.telemetry import TelemetryFrameUI
 from titan_core.protocol.ws import (
     AUTH_TIMEOUT_S,
     CLOSE_BACKPRESSURE,
@@ -42,7 +44,13 @@ from titan_core.protocol.ws import (
     SystemMetrics,
     UnsubscribeFrame,
 )
-from titan_core.streams import SYS_METRICS, entry_data, latest_entry
+from titan_core.streams import (
+    SYS_METRICS,
+    entry_data,
+    latest_entry,
+    session_events_stream,
+    session_telemetry_stream,
+)
 
 log = get_logger(__name__)
 
@@ -110,6 +118,14 @@ class SendBuffer:
 def _seq_now() -> str:
     """A stream-id-shaped seq for frames that do not come from a stream (`system.safety`)."""
     return f"{time.time_ns() // 1_000_000}-0"
+
+
+def _session_id_from_channel(channel: str, suffix: str) -> str | None:
+    prefix = "session."
+    if not channel.startswith(prefix) or not channel.endswith(suffix):
+        return None
+    body = channel[len(prefix) : -len(suffix)]
+    return body or None
 
 
 def _req_id(raw: str) -> str:
@@ -195,7 +211,7 @@ class Connection:
             if isinstance(frame, PingFrame):
                 self.send(PongFrame(op="pong", req_id=frame.req_id))
             elif isinstance(frame, SubscribeFrame):
-                self._subscribe(frame)
+                await self._subscribe(frame)
             elif isinstance(frame, UnsubscribeFrame):
                 cancel = self._subscriptions.pop(frame.channel, None)
                 if cancel is not None:
@@ -204,7 +220,7 @@ class Connection:
             elif isinstance(frame, AuthFrame):
                 self.ack(AUTH_ACK_ID)
 
-    def _subscribe(self, frame: SubscribeFrame) -> None:
+    async def _subscribe(self, frame: SubscribeFrame) -> None:
         channel = frame.channel
         if channel in self._subscriptions:
             self.ack(frame.req_id)
@@ -219,6 +235,33 @@ class Connection:
         elif channel == JOBS:
             self.ack(frame.req_id)
             self._subscriptions[channel] = lambda: None
+        elif channel.endswith(".telemetry"):
+            sid = _session_id_from_channel(channel, ".telemetry")
+            if sid is None or not await self._session_stream_ready(sid):
+                self.ack(frame.req_id, ("NOT_FOUND", "unknown session"))
+                return
+            self.ack(frame.req_id)
+            task = asyncio.create_task(
+                self._follow_session(
+                    channel,
+                    session_telemetry_stream(sid),
+                    frame.since_seq,
+                    kind="telemetry",
+                ),
+                name="ws-telemetry",
+            )
+            self._subscriptions[channel] = task.cancel
+        elif channel.endswith(".events"):
+            sid = _session_id_from_channel(channel, ".events")
+            if sid is None or not await self._session_stream_ready(sid):
+                self.ack(frame.req_id, ("NOT_FOUND", "unknown session"))
+                return
+            self.ack(frame.req_id)
+            task = asyncio.create_task(
+                self._follow_session(channel, session_events_stream(sid), frame.since_seq, kind="events"),
+                name="ws-events",
+            )
+            self._subscriptions[channel] = task.cancel
         elif SESSION_CHANNEL.match(channel):
             self.ack(frame.req_id, ("NOT_FOUND", "unknown session"))
         else:
@@ -240,6 +283,89 @@ class Connection:
             log.warning("ws_metrics_entry_invalid", seq=entry_id)
             return
         self.send(self._msg(SYSTEM_METRICS, entry_id, "system.metrics", metrics), coalesce=SYSTEM_METRICS)
+
+    async def _session_stream_ready(self, session_id: str) -> bool:
+        telemetry = session_telemetry_stream(session_id)
+        events = session_events_stream(session_id)
+        try:
+            exists = await self.redis.exists(telemetry, events)
+            return bool(exists)
+        except (redis.exceptions.RedisError, OSError):
+            return False
+
+    async def _follow_session(
+        self,
+        channel: str,
+        stream: str,
+        since_seq: str | None,
+        *,
+        kind: str,
+    ) -> None:
+        last: str | None = since_seq
+        failing = False
+        coalesce = channel if kind == "telemetry" else None
+        while True:
+            try:
+                if last is None:
+                    latest = await latest_entry(self.redis, stream)
+                    if latest is not None:
+                        self._send_session_entry(channel, latest[0], latest[1], kind=kind, coalesce=coalesce)
+                    last = latest[0] if latest is not None else "$"
+                reply = await self.redis.xread({stream: last}, block=XREAD_BLOCK_MS, count=10)
+                response = cast(StreamReply, reply)
+            except (redis.exceptions.RedisError, OSError) as exc:
+                if not failing:
+                    log.warning("ws_session_redis_unavailable", channel=channel, error=type(exc).__name__)
+                    failing = True
+                await asyncio.sleep(1)
+                continue
+            failing = False
+            for _stream, entries in response or []:
+                for entry_id, fields in entries:
+                    with contextlib.suppress(ValueError, ValidationError):
+                        self._send_session_entry(
+                            channel,
+                            str(entry_id),
+                            entry_data(fields),
+                            kind=kind,
+                            coalesce=coalesce,
+                        )
+                    last = str(entry_id)
+
+    def _send_session_entry(
+        self,
+        channel: str,
+        entry_id: str,
+        raw: str,
+        *,
+        kind: str,
+        coalesce: str | None,
+    ) -> None:
+        if kind == "telemetry":
+            frame = TelemetryFrameUI.model_validate_json(raw)
+            self.send(
+                MsgFrame(
+                    op="msg",
+                    channel=channel,
+                    seq=entry_id,
+                    ts=utc_now(),
+                    type="telemetry.frame",
+                    data=frame.model_dump(mode="json", by_alias=True),
+                ),
+                coalesce=coalesce,
+            )
+            return
+        event = GameEvent.model_validate_json(raw)
+        self.send(
+            MsgFrame(
+                op="msg",
+                channel=channel,
+                seq=entry_id,
+                ts=event.occurred_at,
+                type="game.event",
+                data=event.model_dump(mode="json", by_alias=True),
+            )
+        )
 
     async def _follow_metrics(self, since_seq: str | None) -> None:
         """Latest sample first (metrics are latest-wins, so older ones are skipped), then live."""

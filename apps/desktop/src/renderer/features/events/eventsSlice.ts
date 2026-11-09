@@ -2,7 +2,7 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { GameEvent } from "@titan/protocol";
 
 /**
- * Event log entries. Until the WS `events` channel lands (M5.T6) the log shows shell-level events
+ * Event log entries. Game events arrive on the WS `events` channel (M5.T6); shell-level events
  * (API connectivity, kill switch) using the protocol's category and severity vocabulary.
  */
 export interface LogEntry extends Pick<GameEvent, "type" | "category" | "severity"> {

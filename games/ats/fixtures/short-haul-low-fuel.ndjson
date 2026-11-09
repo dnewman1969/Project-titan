@@ -1,0 +1,7 @@
+{"t_mono_ns":4000000000,"t_session_ms":0,"scene":"driving","paused":false,"fuel_l":80,"fuel_capacity_l":400,"speed_mps":24,"gear":10,"game_time_min":30,"job_active":true,"nav_distance_m":80000,"speed_limit_mps":29}
+{"t_mono_ns":4010000000,"t_session_ms":2000,"scene":"driving","paused":false,"fuel_l":70,"fuel_capacity_l":400,"speed_mps":24,"gear":10,"game_time_min":32,"job_active":true,"nav_distance_m":75000,"speed_limit_mps":29}
+{"t_mono_ns":4020000000,"t_session_ms":4000,"scene":"driving","paused":false,"fuel_l":55,"fuel_capacity_l":400,"speed_mps":23,"gear":10,"game_time_min":34,"job_active":true,"nav_distance_m":70000,"speed_limit_mps":29}
+{"t_mono_ns":4030000000,"t_session_ms":6000,"scene":"driving","paused":false,"fuel_l":50,"fuel_capacity_l":400,"speed_mps":22,"gear":9,"game_time_min":35,"job_active":true,"nav_distance_m":68000,"speed_limit_mps":29}
+{"t_mono_ns":4040000000,"t_session_ms":8000,"scene":"driving","paused":false,"fuel_l":45,"fuel_capacity_l":400,"speed_mps":22,"gear":9,"game_time_min":36,"job_active":true,"nav_distance_m":66000,"speed_limit_mps":29}
+{"t_mono_ns":4050000000,"t_session_ms":10000,"scene":"driving","paused":false,"fuel_l":40,"fuel_capacity_l":400,"speed_mps":21,"gear":9,"game_time_min":37,"job_active":true,"nav_distance_m":64000,"speed_limit_mps":29}
+{"t_mono_ns":4060000000,"t_session_ms":12000,"scene":"driving","paused":false,"fuel_l":55,"fuel_capacity_l":400,"speed_mps":0,"gear":0,"game_time_min":38,"job_active":true,"nav_distance_m":62000,"speed_limit_mps":29,"paused":true}

@@ -185,10 +185,15 @@ def probe_scs() -> PlayAttach:
         backend="scs",
         ready=True,
         message=(
-            "SCS telemetry active. Play uses ViGEm (preferred) or keyboard brake — "
-            "keep the truck sim focused."
+            "SCS telemetry active. Play uses ViGEm virtual pad (preferred) or keyboard "
+            "W/S throttle/brake — no physical gamepad required; keep the truck sim focused."
         ),
-        detail={"platform": "win32", "telemetry_shm": True},
+        detail={
+            "platform": "win32",
+            "telemetry_shm": True,
+            "control_modes": ["vgamepad", "keyboard"],
+            "physical_pad_required": False,
+        },
     )
 
 

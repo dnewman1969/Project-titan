@@ -26,7 +26,7 @@ def build_driver(settings: PlaySettings, *, session_id: UUID, data_dir: Path | N
             stream_port=settings.krpc_stream_port,
         )
     if settings.backend in {"scs", "keyboard"} or (settings.backend == "auto" and slug in {"ets2", "ats"}):
-        return ScsDriver()
+        return ScsDriver(prefer_keyboard=settings.backend == "keyboard")
 
     return KrpcDriver(
         host=settings.krpc_host,

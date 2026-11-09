@@ -42,4 +42,11 @@ Later milestones (game discovery, telemetry, recording clap test, soak tests) ad
 ### Learn-and-play beta (software HIL vs this checklist)
 
 - **Software HIL (CI / no game):** `uv run pytest tests/integration/test_learn_play_smoke.py` — New session → learn → play closed loop with mocked HIL (fixture attach). See [docs/learn-and-play-beta.md](../docs/learn-and-play-beta.md).
+- **ViGEm / padless SCS (CI mocks):** `uv run pytest services/actions/tests/test_scs_driver.py` — FakeVX360 + injected keyboard; no physical pad.
 - **Reference PC happy path (after cloud smoke is green):** File → New session → agent play on → fixture/HIL or registered install → watch learn strip + Agent play attach → confirm throttle/brake changes in-game for live attach. Record install paths and kRPC/SCS readiness; do not treat software HIL as a substitute for these rows.
+
+#### Windows ViGEm / keyboard (sign off on reference PC)
+
+- [ ] ViGEmBus installed; ETS2/ATS focused; agent `scs.throttle` / `scs.brake` moves the truck with **no physical gamepad** plugged in.
+- [ ] With ViGEmBus uninstalled (or driver forced keyboard), `S`/`W` SendInput still brakes/throttles while the sim is focused.
+- [ ] `/api/v1/play/readiness?game_slug=ets2&source=live` reports telemetry ready and does not require a physical pad.

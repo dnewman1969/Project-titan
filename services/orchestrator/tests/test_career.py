@@ -400,6 +400,263 @@ def test_stored_failure_loads_as_the_skip_list() -> None:
     assert "already failed" in idle
 
 
+class _Enum:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+class _Param:
+    def __init__(self, title: str, *, completed: bool = False) -> None:
+        self.title = title
+        self.notes = ""
+        self.completed = completed
+        self.failed = False
+        self.optional = False
+
+
+class _Offer:
+    def __init__(
+        self,
+        title: str,
+        parameters: list[_Param],
+        *,
+        contract_type: str = "AltitudeRecord",
+        state: str = "offered",
+    ) -> None:
+        self.type = contract_type
+        self.title = title
+        self.state = _Enum(state)
+        self.description = ""
+        self.synopsis = ""
+        self.notes = ""
+        self.funds_advance = 1000.0
+        self.funds_completion = 5000.0
+        self.funds_failure = 0.0
+        self.reputation_completion = 1.0
+        self.reputation_failure = 0.0
+        self.science_completion = 2.0
+        self.parameters = parameters
+
+
+class _Manager:
+    """kRPC-shaped ContractManager. Tests move contracts between its lists."""
+
+    def __init__(self) -> None:
+        self.offered_contracts: list[_Offer] = []
+        self.active_contracts: list[_Offer] = []
+        self.failed_contracts: list[_Offer] = []
+
+
+class _Resources:
+    def __init__(self) -> None:
+        self.amounts = {"LiquidFuel": 400.0, "Oxidizer": 480.0, "SolidFuel": 0.0}
+
+    def amount(self, name: str) -> float:
+        return self.amounts.get(name, 0.0)
+
+
+class _Part:
+    def __init__(self, title: str) -> None:
+        self.title = title
+        self.name = title
+
+
+class _Vessel:
+    def __init__(self) -> None:
+        self.parts = type("Parts", (), {})()
+        self.parts.all = [
+            _Part('LV-T30 "Reliant" Liquid Fuel Engine'),
+            _Part("FL-T400 Fuel Tank"),
+            _Part("Mk1 Command Pod"),
+        ]
+        self.resources = _Resources()
+
+
+class _Center:
+    def __init__(self, manager: _Manager) -> None:
+        self.game_mode = _Enum("career")
+        self.funds = 12000.0
+        self.science = 8.0
+        self.reputation = 5.0
+        self.contract_manager = manager
+        self.active_vessel = _Vessel()
+
+
+class _Conn:
+    def __init__(self, center: _Center) -> None:
+        self.space_center = center
+
+
+def _sampled(
+    conn: _Conn, *, situation: str = "pre_launch", alt_m: float = 70, vertical: float = 0
+) -> dict[str, object]:
+    from titan_game_ksp.career_sample import sample_career
+
+    frame = _frame(situation=situation, alt_m=alt_m, vertical=vertical)
+    frame["career"] = sample_career(conn)
+    return frame
+
+
+_NEXT = "Reach an altitude of 11,000m"
+
+
+def test_after_turn_in_reads_krpc_economy_and_flies_the_next_contract() -> None:
+    """Fake ContractManager. No live KSP. The next goal is the normal altitude path."""
+    manager = _Manager()
+    done = _Offer(_ALTITUDE, [_Param(_ALTITUDE, completed=True)], state="active")
+    skipped = _Offer(_PART, [_Param(_PART)], contract_type="PartTest")
+    nxt = _Offer(_NEXT, [_Param(_NEXT)])
+    manager.active_contracts = [done]
+    manager.offered_contracts = [skipped, nxt]
+    center = _Center(manager)
+    conn = _Conn(center)
+    memory = CareerMemory(failed_keys={contract_key("PartTest", _PART)}, loaded_failures=True)
+
+    holding = _sampled(conn)
+    first = advance_career(memory, holding)
+    assert [action.action_id for action in first.actions] == ["ksp.contract.finish"]
+    assert not any(note.key.startswith("career.payout.") for note in first.notes)
+
+    still = advance_career(memory, holding)
+    assert all(action.action_id != "ksp.contract.accept" for action in still.actions)
+    assert not any(note.key.startswith("career.payout.") for note in still.notes)
+
+    manager.active_contracts = []
+    center.funds = 18450.5
+    center.science = 6.25
+    center.reputation = 3.0
+    turned_in = _sampled(conn)
+    paid = advance_career(memory, turned_in)
+    payout = next(note for note in paid.notes if note.key.startswith("career.payout."))
+    assert payout.value["funds"] == 18450.5
+    assert payout.value["science"] == 6.25
+    assert payout.value["reputation"] == 3.0
+    assert "18450.5" in str(payout.value["text"])
+    assert "6.25" in str(payout.value["text"])
+    assert _ALTITUDE in str(payout.value["text"])
+    assert [action.action_id for action in paid.actions] == ["ksp.contract.accept"]
+    assert paid.actions[0].params["title"] == _NEXT
+    assert "already failed" in paid.actions[0].rationale
+    assert _PART in paid.actions[0].rationale
+
+    waiting = advance_career(memory, turned_in)
+    assert all(action.action_id != "ksp.contract.accept" for action in waiting.actions)
+
+    manager.offered_contracts = [skipped]
+    manager.active_contracts = [nxt]
+    nxt.state = _Enum("active")
+    flying_frame = _sampled(conn, situation="pre_launch")
+    flying = advance_career(memory, flying_frame)
+    assert flying.goal is not None
+    assert flying.goal.kind == "altitude"
+    assert flying.goal.altitude_m == 11000.0
+    assert flying.goal.contract_title == _NEXT
+    decision = decide_flight(flying_frame, goal=flying.goal)
+    assert decision.status == "contract_launch"
+    assert decision.proposal is not None
+    assert decision.proposal["params"]["throttle"] == 1.0
+    assert decision.proposal["params"]["pitch_deg"] == 90.0
+    assert decision.proposal["params"]["heading_deg"] == 90.0
+
+
+def test_a_miss_stops_the_chain_before_another_contract() -> None:
+    manager = _Manager()
+    active = _Offer(_ALTITUDE, [_Param(_ALTITUDE)], state="active")
+    landed = _Offer(_PART, [_Param(_PART)], contract_type="PartTest")
+    manager.active_contracts = [active]
+    manager.offered_contracts = [landed]
+    center = _Center(manager)
+    center.active_vessel.resources.amounts = {"LiquidFuel": 0.0, "Oxidizer": 0.0, "SolidFuel": 0.0}
+    conn = _Conn(center)
+    memory = CareerMemory()
+    frame = _sampled(conn, situation="flying", alt_m=2200, vertical=-30)
+
+    missed = advance_career(memory, frame)
+    lessons = [note for note in missed.notes if note.section == "lessons"]
+    assert lessons and lessons[0].value["ok"] is False
+    assert "out of fuel" in str(lessons[0].value["text"])
+    assert missed.actions == ()
+    assert memory.chain_stopped is True
+
+    followups = [advance_career(memory, frame) for _ in range(3)]
+    assert all(item.actions == () for item in followups)
+    idle = next(note.value["text"] for item in followups for note in item.notes if note.key == "career.idle")
+    assert "Stopped after a miss" in str(idle)
+    assert "Not accepting" in str(idle)
+    assert _PART in str(idle)
+
+
+def test_accept_that_never_activates_is_a_miss_and_stops_the_chain() -> None:
+    manager = _Manager()
+    stuck = _Offer(_PART, [_Param(_PART)], contract_type="PartTest")
+    other = _Offer(_NEXT, [_Param(_NEXT)])
+    manager.offered_contracts = [stuck, other]
+    conn = _Conn(_Center(manager))
+    memory = CareerMemory()
+    frame = _sampled(conn)
+
+    first = advance_career(memory, frame)
+    assert [action.action_id for action in first.actions] == ["ksp.contract.accept"]
+    assert first.actions[0].params["title"] == _PART
+
+    for _ in range(4):
+        waiting = advance_career(memory, frame)
+        assert waiting.actions == ()
+        assert memory.chain_stopped is False
+
+    missed = advance_career(memory, frame)
+    assert memory.chain_stopped is True
+    assert missed.actions == ()
+    assert any(note.section == "lessons" and note.value.get("ok") is False for note in missed.notes)
+    later = advance_career(memory, frame)
+    assert later.actions == ()
+    assert all(action.params.get("title") != _NEXT for action in later.actions)
+
+
+def test_unflyable_offers_do_not_spin_and_a_later_contract_is_accepted() -> None:
+    manager = _Manager()
+    done = _Offer(_ALTITUDE, [_Param(_ALTITUDE, completed=True)], state="active")
+    mun = _Offer("Fly by the Mun", [_Param("Fly by the Mun")], contract_type="Flyby")
+    manager.active_contracts = [done]
+    manager.offered_contracts = [mun]
+    center = _Center(manager)
+    conn = _Conn(center)
+    memory = CareerMemory()
+
+    advance_career(memory, _sampled(conn))
+    manager.active_contracts = []
+    manager.offered_contracts = [done, mun]
+    done.state = _Enum("offered")
+    center.funds = 20000.0
+    center.science = 9.0
+    center.reputation = 6.0
+    frame = _sampled(conn)
+    payouts: list[str] = []
+    accepts: list[str] = []
+    idle_lines: list[str] = []
+    for _ in range(6):
+        directive = advance_career(memory, frame)
+        payouts.extend(note.key for note in directive.notes if note.key.startswith("career.payout."))
+        accepts.extend(
+            action.action_id for action in directive.actions if action.action_id == "ksp.contract.accept"
+        )
+        idle_lines.extend(str(note.value["text"]) for note in directive.notes if note.key == "career.idle")
+    assert len(payouts) == 1
+    assert accepts == []
+    assert len(idle_lines) == 1
+    assert memory.chain_stopped is False
+    assert "already complete" in idle_lines[0]
+    assert "Not accepting" in idle_lines[0]
+
+    nxt = _Offer(_NEXT, [_Param(_NEXT)])
+    manager.offered_contracts = [done, mun, nxt]
+    opened = advance_career(memory, _sampled(conn))
+    assert [action.action_id for action in opened.actions] == ["ksp.contract.accept"]
+    assert opened.actions[0].params["title"] == _NEXT
+    again = advance_career(memory, _sampled(conn))
+    assert all(action.action_id != "ksp.contract.accept" for action in again.actions)
+
+
 def test_missing_career_field_keeps_the_generic_ascent() -> None:
     decision = decide_flight(
         {

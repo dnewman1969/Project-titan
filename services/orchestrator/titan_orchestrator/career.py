@@ -1,8 +1,15 @@
-"""KSP career: read contracts, pick one the vessel can finish, fly its steps.
+"""KSP career: read contracts, fly one the vessel can finish, then the next.
 
 A human in career opens Mission Control, reads offered contracts (altitude,
 orbit, part test, recover, and the ones that are obviously out of reach),
 accepts one the current rocket can do, then flies each parameter in order.
+When that contract has been turned in, the funds, science, and reputation on
+the telemetry snapshot — the kRPC SpaceCenter reading — are written on the
+blackboard, and the next offered contract this vessel can finish is accepted.
+Its parameters become the fly goal through the same path. A miss, or no
+acceptable contract, stops the chain. Failed ids and ones already turned in
+are not accepted again.
+
 Stock kRPC exposes that same ContractManager. This module is the decision
 half: it does not open a socket. Telemetry carries the snapshot; actions
 call ``accept`` and, when the API allows it, finish or recover.
@@ -195,6 +202,9 @@ class CareerMemory:
     saw_airborne: bool = False
     finish_for: str = ""
     finish_ticks: int = 0
+    completed_titles: dict[str, str] = field(default_factory=dict)
+    payout_noted: set[str] = field(default_factory=set)
+    chain_stopped: bool = False
 
 
 def contract_key(contract_type: str, title: str) -> str:
@@ -295,20 +305,40 @@ def advance_career(memory: CareerMemory, frame: Mapping[str, Any]) -> CareerDire
             )
         )
     body = frame_body(frame)
+    for failed in view.failed:
+        memory.failed_keys.add(failed.key)
     _mark_game_failures(memory, notes, view)
-    plan, contract = _select_active(view, memory, body, notes)
-    if plan is not None and contract is not None:
-        _track(memory, plan.key, frame)
-        failure = _flight_failure(frame, contract, plan, memory)
-        if failure is not None:
-            _remember_failure(memory, notes, contract, failure)
-            plan = None
-            contract = None
-            _reset_track(memory)
-        else:
+    if not memory.chain_stopped:
+        plan, contract = _select_active(view, memory, body, notes)
+        if plan is not None and contract is not None:
+            _track(memory, plan.key, frame)
+            failure = _flight_failure(frame, contract, plan, memory)
+            if failure is not None:
+                _remember_failure(memory, notes, contract, failure)
+                _reset_track(memory)
+                return CareerDirective(
+                    use_generic_fly=False,
+                    goal=_hold(
+                        f"Stopping after a miss on {contract.title}. Not accepting another contract.",
+                        key=contract.key,
+                        title=contract.title,
+                    ),
+                    notes=tuple(notes),
+                )
             return _fly_plan(memory, notes, frame, plan, contract)
+        pending = _awaiting_turn_in(view, memory)
+        if pending is not None:
+            return _turn_in_hold(memory, notes, pending)
 
-    if _waiting_on_accept(memory, view, notes):
+    # One payout per turned-in contract. The next tick cannot accept it again.
+    _record_payouts(memory, notes, view)
+    if memory.chain_stopped:
+        return _idle_directive(memory, notes, view, body, stopped=True)
+
+    waiting = _waiting_on_accept(memory, view, notes)
+    if waiting == "miss":
+        return _idle_directive(memory, notes, view, body, stopped=True)
+    if waiting == "wait":
         title = _title_for(view, memory.accepted_key) or "the contract"
         summary = f"Waiting for {title} to become active before launching."
         return CareerDirective(
@@ -317,21 +347,9 @@ def advance_career(memory: CareerMemory, frame: Mapping[str, Any]) -> CareerDire
             notes=tuple(notes),
         )
 
-    choice = _choose(view, failed=memory.failed_keys, body=body)
+    choice = _choose(view, failed=memory.failed_keys, completed=memory.completed_keys, body=body)
     if choice is None:
-        idle = _idle_line(view, memory.failed_keys, body)
-        if memory.idle_text != idle:
-            memory.idle_text = idle
-            notes.append(
-                _note(
-                    "discoveries",
-                    "career.idle",
-                    {"text": idle, "action_id": None},
-                    "agent",
-                    "flight_engineer",
-                )
-            )
-        return CareerDirective(use_generic_fly=False, goal=_hold(idle), notes=tuple(notes))
+        return _idle_directive(memory, notes, view, body, stopped=False)
 
     memory.accepted_key = choice.plan.key
     memory.accept_waits = 0
@@ -370,6 +388,116 @@ def advance_career(memory: CareerMemory, frame: Mapping[str, Any]) -> CareerDire
         ),
         notes=tuple(notes),
     )
+
+
+def _idle_directive(
+    memory: CareerMemory,
+    notes: list[BoardNote],
+    view: CareerView,
+    body: str,
+    *,
+    stopped: bool,
+) -> CareerDirective:
+    if stopped:
+        idle = _standdown_line(view, memory, body)
+    else:
+        idle = _idle_line(view, memory.failed_keys, memory.completed_keys, body)
+    if memory.idle_text != idle:
+        memory.idle_text = idle
+        notes.append(
+            _note(
+                "discoveries",
+                "career.idle",
+                {"text": idle, "action_id": None},
+                "agent",
+                "flight_engineer",
+            )
+        )
+    return CareerDirective(use_generic_fly=False, goal=_hold(idle), notes=tuple(notes))
+
+
+def _standdown_line(view: CareerView, memory: CareerMemory, body: str) -> str:
+    """Miss ends the chain even when another offered contract is flyable."""
+    choice = _choose(view, failed=memory.failed_keys, completed=memory.completed_keys, body=body)
+    if choice is None:
+        return _idle_line(view, memory.failed_keys, memory.completed_keys, body)
+    return f"Stopped after a miss. Not accepting {choice.plan.title!r} or any other contract."
+
+
+def _awaiting_turn_in(view: CareerView, memory: CareerMemory) -> ContractView | None:
+    """The contract whose parameters are done and that is still active."""
+    for contract in view.active:
+        if contract.key not in memory.completed_keys or contract.key in memory.failed_keys:
+            continue
+        if contract.state == "completed":
+            continue
+        return contract
+    return None
+
+
+def _turn_in_hold(memory: CareerMemory, notes: list[BoardNote], contract: ContractView) -> CareerDirective:
+    memory.completed_titles.setdefault(contract.key, contract.title)
+    goal_line = f"Complete {contract.title}"
+    if memory.goal_text != goal_line:
+        memory.goal_text = goal_line
+        notes.append(_goal_note(goal_line, contract.key))
+    return CareerDirective(
+        use_generic_fly=False,
+        goal=_hold(
+            f"{contract.title} is complete. Holding for turn-in.",
+            key=contract.key,
+            title=contract.title,
+        ),
+        actions=_finish_actions(memory, contract, "Parameters are complete."),
+        notes=tuple(notes),
+    )
+
+
+def _record_payouts(memory: CareerMemory, notes: list[BoardNote], view: CareerView) -> None:
+    """Write funds, science, and reputation once the contract has left the active list.
+
+    The snapshot is the kRPC ``SpaceCenter`` reading (``funds``, ``science``,
+    ``reputation``). One note per contract, so a later tick does not write it again.
+    """
+    for key in sorted(memory.completed_keys):
+        if key in memory.payout_noted or key in memory.failed_keys:
+            continue
+        if _still_active(view, key):
+            continue
+        memory.payout_noted.add(key)
+        title = memory.completed_titles.get(key) or _title_for(view, key) or key
+        notes.append(
+            _note(
+                "discoveries",
+                f"career.payout.{_slug(key)}",
+                {
+                    "text": (
+                        f"Turned in {title!r}. "
+                        f"Funds {_num_text(view.funds)}, science {_num_text(view.science)}, "
+                        f"reputation {_num_text(view.reputation)}."
+                    ),
+                    "funds": view.funds,
+                    "science": view.science,
+                    "reputation": view.reputation,
+                    "contract_key": key,
+                    "contract_title": title,
+                    "action_id": None,
+                },
+                "agent",
+                "flight_engineer",
+            )
+        )
+
+
+def _still_active(view: CareerView, key: str) -> bool:
+    return any(contract.key == key and contract.state != "completed" for contract in view.active)
+
+
+def _num_text(value: float | None) -> str:
+    if value is None:
+        return "unknown"
+    rendered = f"{value:.2f}".rstrip("0").rstrip(".")
+    return rendered or "0"
 
 
 def format_board(view: CareerView) -> str:
@@ -455,12 +583,21 @@ class _Choice:
     step_line: str
 
 
-def _choose(view: CareerView, *, failed: set[str], body: str) -> _Choice | None:
+def _choose(
+    view: CareerView,
+    *,
+    failed: set[str],
+    completed: set[str],
+    body: str,
+) -> _Choice | None:
     ranked: list[tuple[float, ContractPlan, ContractView]] = []
     skipped: list[tuple[ContractView, str]] = []
     for contract in view.offered:
         if contract.key in failed:
             skipped.append((contract, "it already failed and will not be accepted again"))
+            continue
+        if contract.key in completed:
+            skipped.append((contract, "it is already complete"))
             continue
         plan, reason = _assess(contract, view, body=body, committed=False)
         if plan is None:
@@ -702,6 +839,8 @@ def _fly_plan(
     if _required_done(contract):
         if contract.key not in memory.completed_keys:
             memory.completed_keys.add(contract.key)
+            memory.completed_titles[contract.key] = contract.title
+            _reset_track(memory)
             done = (
                 f"Contract {contract.title!r} is complete ({_step_line(plan)}). "
                 "Turning it in where kRPC allows."
@@ -846,6 +985,8 @@ def _remember_failure(
     contract: ContractView,
     reason: str,
 ) -> None:
+    if contract.key == memory.accepted_key or contract.key == memory.goal_key:
+        memory.chain_stopped = True
     if contract.key in memory.noted_failures:
         memory.failed_keys.add(contract.key)
         return
@@ -873,23 +1014,30 @@ def _remember_failure(
     )
 
 
-def _waiting_on_accept(memory: CareerMemory, view: CareerView, notes: list[BoardNote]) -> bool:
+def _waiting_on_accept(
+    memory: CareerMemory, view: CareerView, notes: list[BoardNote]
+) -> Literal["wait", "miss", "ready"]:
+    """``wait`` until the accepted contract is active. ``miss`` stops the chain."""
     key = memory.accepted_key
     if not key:
-        return False
+        return "ready"
+    if key in memory.completed_keys:
+        memory.accepted_key = None
+        memory.accept_waits = 0
+        return "ready"
     if any(contract.key == key for contract in view.active):
         memory.accept_waits = 0
-        return False
+        return "ready"
     offered = next((contract for contract in view.offered if contract.key == key), None)
     if offered is None:
         memory.accepted_key = None
         memory.accept_waits = 0
-        return False
+        return "ready"
     memory.accept_waits += 1
     if memory.accept_waits < _ACCEPT_WAIT_LIMIT:
-        return True
+        return "wait"
     _remember_failure(memory, notes, offered, "accepting it did not move it to active")
-    return False
+    return "miss"
 
 
 def _finish_actions(memory: CareerMemory, contract: ContractView, why: str) -> tuple[CareerAction, ...]:
@@ -911,13 +1059,16 @@ def _finish_actions(memory: CareerMemory, contract: ContractView, why: str) -> t
     )
 
 
-def _idle_line(view: CareerView, failed: set[str], body: str) -> str:
+def _idle_line(view: CareerView, failed: set[str], completed: set[str], body: str) -> str:
     if not view.offered and not view.active:
         return "No offered or active contracts. Not inventing a goal and not launching for one."
     reasons: list[str] = []
     for contract in view.offered:
         if contract.key in failed:
             reasons.append(f"{contract.title} (already failed)")
+            continue
+        if contract.key in completed:
+            reasons.append(f"{contract.title} (already complete)")
             continue
         _plan, reason = _assess(contract, view, body=body, committed=False)
         reasons.append(f"{contract.title} ({reason})")

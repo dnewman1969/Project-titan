@@ -98,7 +98,12 @@ def probe_krpc(
     timeout_s: float | None = None,
 ) -> PlayAttach:
     timeout = attach_probe_timeout_s() if timeout_s is None else timeout_s
-    detail: dict[str, Any] = {"host": host, "rpc_port": rpc_port, "stream_port": stream_port, "timeout_s": timeout}
+    detail: dict[str, Any] = {
+        "host": host,
+        "rpc_port": rpc_port,
+        "stream_port": stream_port,
+        "timeout_s": timeout,
+    }
     rpc_ok, rpc_err = _tcp_port_open(host, rpc_port, timeout_s=timeout)
     if not rpc_ok and rpc_err is not None:
         hint = _friendly_socket_error(rpc_err)
@@ -180,7 +185,8 @@ def probe_scs() -> PlayAttach:
         backend="scs",
         ready=True,
         message=(
-            "SCS telemetry active. Play uses ViGEm (preferred) or keyboard brake — keep the truck sim focused."
+            "SCS telemetry active. Play uses ViGEm (preferred) or keyboard brake — "
+            "keep the truck sim focused."
         ),
         detail={"platform": "win32", "telemetry_shm": True},
     )

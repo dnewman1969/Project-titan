@@ -129,3 +129,53 @@ def test_youtube_stub_auth_and_draft_upload(api_client: TestClient, game_slug: s
     disconnected = api_client.post("/api/v1/accounts/youtube/disconnect", headers=AUTH)
     assert disconnected.status_code == 200
     assert disconnected.json()["connected"] is False
+
+    # Second disconnect is a no-op once revoked (account still present, not connected).
+    again_disc = api_client.post("/api/v1/accounts/youtube/disconnect", headers=AUTH)
+    assert again_disc.status_code == 200
+    assert again_disc.json()["connected"] is False
+
+
+def test_youtube_stub_error_paths(api_client: TestClient) -> None:
+    missing = api_client.post("/api/v1/accounts/youtube/disconnect", headers=AUTH)
+    assert missing.status_code == 200
+    assert missing.json()["account"] is None
+
+    api_client.post("/api/v1/accounts/youtube/connect", headers=AUTH)
+    bad_session = api_client.post(
+        "/api/v1/upload-jobs",
+        headers=AUTH,
+        json={"title": "Missing session", "session_id": "00000000-0000-4000-8000-000000000099"},
+    )
+    assert bad_session.status_code == 404
+
+    draft = api_client.post(
+        "/api/v1/upload-jobs",
+        headers=AUTH,
+        json={"title": "Standalone draft", "privacy": "unlisted"},
+    )
+    assert draft.status_code == 201, draft.text
+    assert draft.json()["privacy"] == "unlisted"
+    job_id = draft.json()["id"]
+
+    approved = api_client.post(f"/api/v1/upload-jobs/{job_id}/approve", headers=AUTH)
+    assert approved.status_code == 200
+    # Re-approve after approved should conflict.
+    again = api_client.post(f"/api/v1/upload-jobs/{job_id}/approve", headers=AUTH)
+    assert again.status_code == 409
+
+    missing_job = api_client.post(
+        "/api/v1/upload-jobs/00000000-0000-4000-8000-000000000088/approve",
+        headers=AUTH,
+    )
+    assert missing_job.status_code == 404
+
+    missing_upload = api_client.post(
+        "/api/v1/upload-jobs/00000000-0000-4000-8000-000000000088/upload",
+        headers=AUTH,
+    )
+    assert missing_upload.status_code == 404
+
+    uploaded = api_client.post(f"/api/v1/upload-jobs/{job_id}/upload", headers=AUTH)
+    assert uploaded.status_code == 200
+    assert uploaded.json()["status"] == "published"

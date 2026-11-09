@@ -7,12 +7,14 @@ from titan_core.play_attach import (
     PlayAttach,
     PlayBackend,
     SessionSource,
-    probe_attach as _probe_attach,
     probe_hil,
     probe_krpc,
     probe_scs,
     resolve_backend,
     resolve_session_source,
+)
+from titan_core.play_attach import (
+    probe_attach as _probe_attach,
 )
 
 __all__ = [

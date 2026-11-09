@@ -6,7 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { Provider } from "react-redux";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
-import type { KillSwitchEvent, SupervisorUpdate, TitanBridge } from "../../src/shared/ipc";
+import type { GameViewStatus, KillSwitchEvent, SupervisorUpdate, TitanBridge } from "../../src/shared/ipc";
 import { App } from "../../src/renderer/app/App";
 import { markFirstRunComplete } from "../../src/renderer/features/first-run/FirstRunWizard";
 import { makeStore } from "../../src/renderer/app/store";
@@ -17,6 +17,15 @@ import { summarizeServices } from "../../src/renderer/app/useApiStatus";
 import { LiveConnection, wsUrl } from "../../src/renderer/app/ws";
 
 const SINCE = "2026-11-08T12:00:00Z";
+
+const IDLE_GAME_VIEW: GameViewStatus = {
+  attached: false,
+  mode: null,
+  title: null,
+  exe: null,
+  pid: null,
+  reason: null,
+};
 
 const STATUS_BODY = {
   services: [
@@ -153,6 +162,12 @@ function fakeBridge(snapshot: SupervisorUpdate | null = null): FakeBridge {
       openPath: () => Promise.resolve(""),
       pickExecutable: () => Promise.resolve(null),
       openExternal: () => Promise.resolve(),
+      gameViewSync: () => undefined,
+      gameViewConfigure: () => undefined,
+      gameViewHold: () => undefined,
+      gameViewFocus: () => undefined,
+      onGameViewStatus: () => () => undefined,
+      getGameViewStatus: () => Promise.resolve(IDLE_GAME_VIEW),
     },
     kill: (e) => {
       kills.forEach((l) => {
@@ -249,6 +264,10 @@ describe("Operations Center", () => {
     expect(screen.getAllByRole("listitem").length).toBeGreaterThanOrEqual(5);
     expect(screen.getByRole("textbox", { name: "Message the crew" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Brag" })).toBeInTheDocument();
+    const game = screen.getByRole("region", { name: "Game window" });
+    expect(game).toHaveTextContent(/locks into this rectangle/i);
+    expect(game).not.toHaveTextContent(/desktop capture/i);
+    expect(game.querySelector("[data-testid='game-viewport']")).toBeTruthy();
   });
 
   it("shows API and database health from the backend, sending the launch token", async () => {
@@ -581,7 +600,7 @@ describe("formatMetrics", () => {
 });
 
 describe("gridTemplate", () => {
-  it("lays out all panels", () => {
+  it("makes the game the only flexible row between the agents column and the side rail", () => {
     const t = gridTemplate({
       agents: true,
       webcam: true,
@@ -589,18 +608,28 @@ describe("gridTemplate", () => {
       events: true,
       games: false,
     });
-    expect(t.areas).toBe('"top top" "game game" "agents webcam" "telemetry telemetry" "events events"');
+    expect(t.areas).toBe('"top top top" "agents game rail"');
+    expect(t.rows).toBe("auto minmax(0, 1fr)");
+    expect(t.columns).toBe("minmax(240px, 280px) minmax(0, 1fr) minmax(208px, 240px)");
   });
 
-  it("collapses hidden panels", () => {
-    const t = gridTemplate({
+  it("keeps a rail when only the webcam is open and spans the game when both side columns are hidden", () => {
+    const rail = gridTemplate({
       agents: false,
       webcam: true,
       telemetry: false,
       events: false,
       games: false,
     });
-    expect(t.areas).toBe('"top top" "game game" "webcam webcam"');
-    expect(t.rows.split(" ").length).toBeGreaterThanOrEqual(3);
+    expect(rail.areas).toBe('"top top top" "game game rail"');
+    const full = gridTemplate({
+      agents: false,
+      webcam: false,
+      telemetry: false,
+      events: false,
+      games: false,
+    });
+    expect(full.areas).toBe('"top top top" "game game game"');
+    expect(full.columns).toBe("minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)");
   });
 });

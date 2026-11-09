@@ -61,10 +61,11 @@ export function TelemetryBar() {
         gridArea: "telemetry",
         display: "flex",
         alignItems: "center",
+        flexWrap: "wrap",
+        flex: "0 0 auto",
         px: 1,
         py: 0.5,
         gap: 0.5,
-        overflowX: "auto",
       }}
     >
       {cells.map((cell, index) => (

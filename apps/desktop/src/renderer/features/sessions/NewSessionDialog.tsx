@@ -209,11 +209,15 @@ export function NewSessionDialog() {
       const backend = (attach?.backend as PlayBackendKind | undefined) ?? null;
       const attachReady = typeof attach?.ready === "boolean" ? attach.ready : null;
       const playActions = Reflect.get(started, "play_actions") === true;
+      const gamePidRaw = Reflect.get(started, "game_pid");
+      const gamePid =
+        typeof gamePidRaw === "number" && Number.isInteger(gamePidRaw) && gamePidRaw > 0 ? gamePidRaw : null;
       dispatch(
         setActiveSession({
           id: started.id,
           title: liveTitle,
           gameSlug,
+          gamePid,
           recordingActive,
           recordingRootDir: recordingRoot,
           sessionSource: resolvedSource,

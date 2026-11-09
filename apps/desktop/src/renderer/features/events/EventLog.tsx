@@ -45,6 +45,7 @@ export function EventLog() {
       title="Event Log"
       subtitle={`${entries.length} event${entries.length === 1 ? "" : "s"}`}
       gridArea="events"
+      frame="fill"
       flush
       actions={
         <>

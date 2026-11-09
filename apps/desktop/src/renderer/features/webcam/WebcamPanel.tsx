@@ -61,13 +61,18 @@ export function WebcamPanel() {
   }, [devices.cameraStream]);
 
   return (
-    <Panel title="Webcam" subtitle={obsSubtitle(obs, isLoading && !isError)} gridArea="webcam">
+    <Panel
+      title="Webcam"
+      subtitle={obsSubtitle(obs, isLoading && !isError)}
+      gridArea="webcam"
+      frame="content"
+    >
       <Box
         sx={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)",
-          gap: 1.5,
-          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          gap: 1.25,
+          minWidth: 0,
         }}
       >
         <Box

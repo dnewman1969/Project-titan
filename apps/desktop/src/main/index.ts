@@ -21,6 +21,9 @@ import {
 } from "electron";
 
 import { IPC, type KillSwitchEvent, type SupervisorUpdate, type TitanRuntime } from "../shared/ipc";
+import { bindGameView } from "./gameEmbed/bindGameView";
+import type { GameViewController } from "./gameEmbed/controller";
+import { blankStatus, parseGameViewHold, parseGameViewRect, parseGameViewTarget } from "./gameEmbed/protocol";
 import { DOCS_URL } from "../shared/menu";
 import { resolveMainConfig } from "./config";
 import { allowCapturePermission } from "./permissions";
@@ -44,6 +47,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let mainWindow: BrowserWindow | null = null;
+let gameView: GameViewController | null = null;
 let supervisorProcess: ChildProcess | null = null;
 let supervisorStopped = false;
 let quitting = false;
@@ -151,6 +155,37 @@ ipcMain.handle(IPC.openExternal, (event, url: unknown) => {
   void shell.openExternal(url);
 });
 
+ipcMain.on(IPC.gameViewSync, (event, payload: unknown) => {
+  if (!isAppUrl(event.senderFrame?.url, devServerUrl)) return;
+  const rect = parseGameViewRect(payload);
+  if (!rect) return;
+  gameView?.setViewport(rect);
+});
+
+ipcMain.on(IPC.gameViewConfigure, (event, payload: unknown) => {
+  if (!isAppUrl(event.senderFrame?.url, devServerUrl)) return;
+  const target = parseGameViewTarget(payload);
+  if (!target) return;
+  gameView?.setTarget(target);
+});
+
+ipcMain.on(IPC.gameViewHold, (event, payload: unknown) => {
+  if (!isAppUrl(event.senderFrame?.url, devServerUrl)) return;
+  const hold = parseGameViewHold(payload);
+  if (!hold) return;
+  gameView?.setHold("modal", hold.on);
+});
+
+ipcMain.on(IPC.gameViewFocus, (event) => {
+  if (!isAppUrl(event.senderFrame?.url, devServerUrl)) return;
+  gameView?.focus();
+});
+
+ipcMain.handle(IPC.gameViewSnapshot, (event) => {
+  if (!isAppUrl(event.senderFrame?.url, devServerUrl)) return blankStatus(null);
+  return gameView?.currentStatus() ?? blankStatus(null);
+});
+
 ipcMain.handle(IPC.pickExecutable, async (event) => {
   if (!isAppUrl(event.senderFrame?.url, devServerUrl)) return null;
   const parent =
@@ -235,8 +270,13 @@ if (!app.requestSingleInstanceLock()) {
     }
 
     mainWindow = createWindow();
+    const bound = bindGameView(mainWindow, (status) => {
+      sendToRenderer(IPC.gameViewStatus, status);
+    });
+    gameView = bound.controller;
     mainWindow.on("closed", () => {
       mainWindow = null;
+      gameView = null;
     });
   });
 

@@ -16,6 +16,8 @@ interface SessionsState {
   playBackend: PlayBackendKind;
   playReady: boolean | null;
   playAttachMessage: string | null;
+  /** Pid of the game process Titan launched for this session, when the API reported one. */
+  gamePid: number | null;
   recordingActive: boolean;
   recordingMenuRequest: "start" | "stop" | null;
   recordingRootDir: string | null;
@@ -31,6 +33,7 @@ const initialState: SessionsState = {
   playBackend: null,
   playReady: null,
   playAttachMessage: null,
+  gamePid: null,
   recordingActive: false,
   recordingMenuRequest: null,
   recordingRootDir: null,
@@ -62,11 +65,13 @@ export const sessionsSlice = createSlice({
         playReady?: boolean | null;
         playAttachMessage?: string | null;
         gameSlug?: string | null;
+        gamePid?: number | null;
       }>,
     ) {
       state.activeSessionId = action.payload.id;
       state.activeTitle = action.payload.title;
       state.activeGameSlug = action.payload.gameSlug ?? null;
+      state.gamePid = action.payload.gamePid ?? null;
       state.recordingActive = action.payload.recordingActive ?? false;
       state.recordingRootDir = action.payload.recordingRootDir ?? null;
       state.sessionSource = action.payload.sessionSource ?? null;
@@ -117,6 +122,7 @@ export const sessionsSlice = createSlice({
       state.playBackend = null;
       state.playReady = null;
       state.playAttachMessage = null;
+      state.gamePid = null;
       state.recordingActive = false;
       state.recordingMenuRequest = null;
       state.recordingRootDir = null;

@@ -17,6 +17,7 @@ from sqlalchemy.orm import selectinload
 
 from titan_api.auth import Authenticated
 from titan_api.deps import db_session
+from titan_api.game_launch import game_process_argv
 from titan_api.games_sync import sync_games_from_catalog
 from titan_core.clock import utc_now
 from titan_core.errors import ErrorCode, TitanError
@@ -347,7 +348,7 @@ async def launch_profile(
     method = "steam_uri" if manifest.launch.steam_uri else "executable"
     pid: int | None = None
     if _platform() == "windows" and method == "executable" and Path(profile.executable_path).is_file():  # noqa: ASYNC240
-        proc = subprocess.Popen([profile.executable_path])  # noqa: ASYNC220, S603
+        proc = subprocess.Popen(game_process_argv(profile.executable_path))  # noqa: ASYNC220, S603
         pid = proc.pid
     return {"pid": pid, "method": method}
 

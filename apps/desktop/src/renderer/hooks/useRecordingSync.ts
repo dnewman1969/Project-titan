@@ -18,7 +18,8 @@ export function useRecordingSync(): void {
   useEffect(() => {
     if (!sessionId || data === undefined) return;
     const item = data.item;
-    const active = item !== null && (item.state === "recording" || item.state === "starting" || item.state === "stopping");
+    const active =
+      item !== null && (item.state === "recording" || item.state === "starting" || item.state === "stopping");
     if (active !== recordingActive) {
       dispatch(setRecordingActive(active));
     }

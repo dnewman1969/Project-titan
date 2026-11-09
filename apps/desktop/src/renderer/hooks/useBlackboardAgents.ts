@@ -90,18 +90,17 @@ export function useBlackboardAgents(): void {
       const roster = DEMO_ROSTER.find((a) => a.persona_slug === slug) ?? DEMO_ROSTER[0];
       if (!roster) continue;
       const commentary = isCommentary(row.value) || row.key.startsWith("commentary.");
-      const prefix =
-        commentary
-          ? "[banter] "
-          : learnKind === "outcome"
-            ? valueOk(row.value) === false
-              ? "[outcome fail] "
-              : "[outcome] "
-            : learnKind === "lesson"
-              ? "[lesson] "
-              : learnKind === "discovery"
-                ? "[discovery] "
-                : "";
+      const prefix = commentary
+        ? "[banter] "
+        : learnKind === "outcome"
+          ? valueOk(row.value) === false
+            ? "[outcome fail] "
+            : "[outcome] "
+          : learnKind === "lesson"
+            ? "[lesson] "
+            : learnKind === "discovery"
+              ? "[discovery] "
+              : "";
       dispatch(
         agentSaid({
           persona_slug: roster.persona_slug,

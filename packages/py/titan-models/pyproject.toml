@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Project Titan modelprovider protocol with ollama, openai-compatible, sentencetransformers and fake providers"
 requires-python = ">=3.12,<3.13"
 license = "Apache-2.0"
-dependencies = ["titan-core"]
+dependencies = ["titan-core", "titan-db", "pyyaml>=6.0"]
+
+[project.optional-dependencies]
+embeddings = ["sentence-transformers>=3.0"]
 
 [build-system]
 requires = ["hatchling>=1.25"]
@@ -15,3 +18,4 @@ packages = ["titan_models"]
 
 [tool.uv.sources]
 titan-core = { workspace = true }
+titan-db = { workspace = true }

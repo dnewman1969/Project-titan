@@ -139,35 +139,37 @@ def test_channels(client: TestClient) -> None:
 def test_system_metrics_sends_latest_then_live(client: TestClient, sync_redis: fakeredis.FakeRedis) -> None:
     sync_redis.xadd(SYS_METRICS, {"data": metrics(1.0).model_dump_json()})
     latest_id = sync_redis.xadd(SYS_METRICS, {"data": metrics(2.0).model_dump_json()})
-    session, conn = authed(client)
-    conn.send_json({"op": "subscribe", "req_id": "m1", "channel": "system.metrics"})
-    assert conn.receive_json()["ok"] is True
-    first = conn.receive_json()
-    assert first["op"] == "msg"
-    assert first["channel"] == "system.metrics"
-    assert first["type"] == "system.metrics"
-    assert first["seq"] == latest_id
-    assert first["data"]["cpu_pct"] == 2.0
-    live_id = sync_redis.xadd(SYS_METRICS, {"data": metrics(3.0).model_dump_json()})
-    live = conn.receive_json()
-    assert live["seq"] == live_id
-    assert live["data"]["cpu_pct"] == 3.0
-    assert live["data"]["game_fps"] is None
-    session.__exit__(None, None, None)
+    with client.websocket_connect("/api/v1/ws") as conn:
+        conn.send_json({"op": "auth", "token": TOKEN, "client": "test/1.0"})
+        assert conn.receive_json() == {"op": "ack", "req_id": "auth", "ok": True, "error": None}
+        conn.send_json({"op": "subscribe", "req_id": "m1", "channel": "system.metrics"})
+        assert conn.receive_json()["ok"] is True
+        first = conn.receive_json()
+        assert first["op"] == "msg"
+        assert first["channel"] == "system.metrics"
+        assert first["type"] == "system.metrics"
+        assert first["seq"] == latest_id
+        assert first["data"]["cpu_pct"] == 2.0
+        live_id = sync_redis.xadd(SYS_METRICS, {"data": metrics(3.0).model_dump_json()})
+        live = conn.receive_json()
+        assert live["seq"] == live_id
+        assert live["data"]["cpu_pct"] == 3.0
+        assert live["data"]["game_fps"] is None
 
 
 def test_system_safety_pushes_changes(client: TestClient) -> None:
-    session, conn = authed(client)
-    conn.send_json({"op": "subscribe", "req_id": "k1", "channel": "system.safety"})
-    assert conn.receive_json()["ok"] is True
-    initial = conn.receive_json()
-    assert initial["type"] == "safety.state"
-    assert initial["data"]["killed"] is False
-    client.post("/api/v1/safety/kill", json={"source": "hotkey"}, headers=AUTH)
-    killed = conn.receive_json()
-    assert killed["data"]["killed"] is True
-    assert killed["data"]["last_kill_source"] == "hotkey"
-    session.__exit__(None, None, None)
+    with client.websocket_connect("/api/v1/ws") as conn:
+        conn.send_json({"op": "auth", "token": TOKEN, "client": "test/1.0"})
+        assert conn.receive_json() == {"op": "ack", "req_id": "auth", "ok": True, "error": None}
+        conn.send_json({"op": "subscribe", "req_id": "k1", "channel": "system.safety"})
+        assert conn.receive_json()["ok"] is True
+        initial = conn.receive_json()
+        assert initial["type"] == "safety.state"
+        assert initial["data"]["killed"] is False
+        client.post("/api/v1/safety/kill", json={"source": "hotkey"}, headers=AUTH)
+        killed = conn.receive_json()
+        assert killed["data"]["killed"] is True
+        assert killed["data"]["last_kill_source"] == "hotkey"
 
 
 def test_metrics_rest_endpoint(client: TestClient, sync_redis: fakeredis.FakeRedis) -> None:

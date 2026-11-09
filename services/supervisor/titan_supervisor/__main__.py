@@ -20,6 +20,7 @@ from titan_core.logging import configure_logging, get_logger
 from titan_core.protocol.ws import SystemMetrics
 from titan_core.secrets import generate_password
 from titan_core.streams import SYS_METRICS, SYS_METRICS_MAXLEN, redis_client, xadd_model
+from titan_models.resource_guard import ResourceGuard
 from titan_supervisor import procutil
 from titan_supervisor.catalog import ChildEnv, build_units
 from titan_supervisor.core import Supervisor, Timing
@@ -95,9 +96,12 @@ async def run(cfg: TitanConfig, *, token: str, parent_pid: int | None, metrics: 
         tasks.append(asyncio.create_task(watch_parent(parent_pid, stop), name="parent"))
     redis = redis_client(cfg.redis)
     if sampler is not None:
+        guard = ResourceGuard()
 
         async def publish(sample: SystemMetrics) -> None:
-            await xadd_model(redis, SYS_METRICS, sample, maxlen=SYS_METRICS_MAXLEN)
+            level = guard.update(sample)
+            enriched = sample.model_copy(update={"resource_guard_level": level})
+            await xadd_model(redis, SYS_METRICS, enriched, maxlen=SYS_METRICS_MAXLEN)
 
         tasks.append(asyncio.create_task(sampler.run(publish, stop), name="metrics"))
     log.info("supervisor_listening", port=cfg.supervisor.port, processes=supervisor.names)

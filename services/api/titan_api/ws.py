@@ -102,6 +102,10 @@ class SendBuffer:
             await self._ready.wait()
         return self._frames.popleft()[1]
 
+    def wake(self) -> None:
+        """Unblock `get()` during shutdown (no frame queued)."""
+        self._ready.set()
+
 
 def _seq_now() -> str:
     """A stream-id-shaped seq for frames that do not come from a stream (`system.safety`)."""
@@ -162,7 +166,19 @@ class Connection:
             self._subscriptions.clear()
             for task in tasks:
                 task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
+            self.buffer.wake()
+            _done, pending = await asyncio.wait(tasks, timeout=2.0)
+            if pending:
+                for task in pending:
+                    task.cancel()
+                await asyncio.wait(pending, timeout=1.0)
+            for task in tasks:
+                if task.cancelled():
+                    continue
+                with contextlib.suppress(WebSocketDisconnect, RuntimeError):
+                    exc = task.exception()
+                    if exc is not None:
+                        log.warning("ws_task_failed", task=task.get_name(), error=type(exc).__name__)
 
     async def _write(self) -> None:
         while True:

@@ -7,6 +7,7 @@ license = "Apache-2.0"
 dependencies = [
   "titan-core",
   "titan-db",
+  "titan-models",
   "fastapi>=0.115",
   "uvicorn>=0.32",
 ]
@@ -24,3 +25,4 @@ packages = ["titan_api"]
 [tool.uv.sources]
 titan-core = { workspace = true }
 titan-db = { workspace = true }
+titan-models = { workspace = true }

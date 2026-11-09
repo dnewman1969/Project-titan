@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 
@@ -14,7 +16,7 @@ from titan_api import API_PREFIX
 from titan_api.auth import launch_token_from_env
 from titan_api.errors import install_error_handlers
 from titan_api.persister import StreamPersister
-from titan_api.routers import safety, settings, system
+from titan_api.routers import models, safety, settings, system
 from titan_api.safety import SafetyController
 from titan_api.supervisor_client import SupervisorProbe, supervisor_probe
 from titan_api.ws import router as ws_router
@@ -25,6 +27,8 @@ from titan_core.logging import get_logger
 from titan_core.protocol.system import DependencyState
 from titan_core.streams import redis_client
 from titan_db.session import create_engine, create_session_factory
+from titan_models.jobs import PullJobRunner
+from titan_models.registry import ModelsRegistry
 
 log = get_logger(__name__)
 
@@ -64,6 +68,7 @@ def create_app(
     session_factory: async_sessionmaker[AsyncSession] | None = None,
     start_persister: bool = True,
     enable_database: bool = True,
+    models_registry: ModelsRegistry | None = None,
 ) -> FastAPI:
     cfg = config if config is not None else load_config()
     token = launch_token if launch_token is not None else launch_token_from_env()
@@ -85,6 +90,14 @@ def create_app(
     persister = (
         StreamPersister(client, session_maker) if start_persister and session_maker is not None else None
     )
+    registry = models_registry
+    if registry is None:
+        try:
+            registry = ModelsRegistry.from_yaml()
+        except (OSError, ValueError) as exc:
+            log.warning("models_registry_unavailable", error=type(exc).__name__)
+            registry = None
+    pull_jobs = PullJobRunner(registry, redis=client) if registry is not None else None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -93,6 +106,15 @@ def create_app(
             await persister.start()
         log.info("api_started", host=cfg.api.host, port=cfg.api.port)
         yield
+        if pull_jobs is not None:
+            tasks = list(pull_jobs._tasks.values())
+            for task in tasks:
+                task.cancel()
+            if tasks:
+                await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+                for task in tasks:
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await task
         if persister is not None:
             await persister.stop()
         await controller.drain()
@@ -122,6 +144,8 @@ def create_app(
     app.state.engine = db_engine
     app.state.session_factory = session_maker
     app.state.persister = persister
+    app.state.models_registry = registry
+    app.state.pull_jobs = pull_jobs
 
     # The renderer runs on a different origin. Auth is the bearer token, never cookies.
     app.add_middleware(
@@ -137,5 +161,6 @@ def create_app(
     app.include_router(system.router, prefix=API_PREFIX)
     app.include_router(safety.router, prefix=API_PREFIX)
     app.include_router(settings.router, prefix=API_PREFIX)
+    app.include_router(models.router, prefix=API_PREFIX)
     app.include_router(ws_router, prefix=API_PREFIX)
     return app

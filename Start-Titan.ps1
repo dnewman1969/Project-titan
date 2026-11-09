@@ -165,20 +165,34 @@ function Ensure-Pnpm {
     }
 }
 
-function Find-ElectronPackageRoot {
-    $candidates = @(
+function Get-ElectronInstallDirs {
+    return @(
         (Join-Path $RepoRoot "node_modules\electron"),
         (Join-Path $RepoRoot "apps\desktop\node_modules\electron")
     )
-    foreach ($dir in $candidates) {
-        if (Test-Path (Join-Path $dir "install.js")) { return $dir }
+}
+
+function Find-ElectronPackageRoot {
+    foreach ($dir in (Get-ElectronInstallDirs)) {
+        if ((Test-Path (Join-Path $dir "install.js")) -and (Test-Path (Join-Path $dir "cli.js"))) {
+            return $dir
+        }
     }
     return $null
 }
 
-function Test-ElectronBinaryReady {
+function Test-ElectronPackageIntact {
     $root = Find-ElectronPackageRoot
     if (-not $root) { return $false }
+    foreach ($name in @("install.js", "cli.js", "index.js", "package.json")) {
+        if (-not (Test-Path (Join-Path $root $name))) { return $false }
+    }
+    return $true
+}
+
+function Test-ElectronBinaryReady {
+    if (-not (Test-ElectronPackageIntact)) { return $false }
+    $root = Find-ElectronPackageRoot
     $pathFile = Join-Path $root "path.txt"
     if (-not (Test-Path $pathFile)) { return $false }
     $rel = (Get-Content $pathFile -Raw).Trim()
@@ -187,10 +201,27 @@ function Test-ElectronBinaryReady {
     return (Test-Path $exe)
 }
 
+function Repair-ElectronPackage {
+    Write-Host "Reinstalling electron npm package (broken or partially removed)..." -ForegroundColor Yellow
+    foreach ($dir in (Get-ElectronInstallDirs)) {
+        if (Test-Path $dir) {
+            Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+    Invoke-Pnpm install --frozen-lockfile
+}
+
 function Ensure-ElectronBinary {
     if (Test-ElectronBinaryReady) { return }
+    if (-not (Test-ElectronPackageIntact)) {
+        Repair-ElectronPackage
+    }
     Write-Host "Downloading Electron binary for the desktop shell (~110 MB, one-time)..." -ForegroundColor Cyan
     $root = Find-ElectronPackageRoot
+    if (-not $root) {
+        Repair-ElectronPackage
+        $root = Find-ElectronPackageRoot
+    }
     if ($root) {
         $installJs = Join-Path $root "install.js"
         $prev = $ErrorActionPreference
@@ -204,9 +235,10 @@ function Ensure-ElectronBinary {
     Invoke-Pnpm --filter @titan/desktop exec install-electron
     if (-not (Test-ElectronBinaryReady)) {
         Show-Error @"
-Electron binary is missing (electron-vite needs node_modules/electron/dist).
+Electron binary is missing (electron-vite needs node_modules/electron/dist and cli.js).
 
 From the repo root run:
+  pnpm install --frozen-lockfile
   pnpm --filter @titan/desktop exec install-electron
 Then re-run Start-Titan.bat.
 "@
@@ -416,11 +448,11 @@ function Get-MemuraiServiceState {
 function Ensure-Redis {
     if (Test-RedisUp) { return }
     $memuraiState = Get-MemuraiServiceState
-    Write-Host "Redis not on 127.0.0.1:63790 — starting portable Redis (Titan default; Memurai is optional)." -ForegroundColor Cyan
+    Write-Host "Redis not on 127.0.0.1:63790 - starting portable Redis (Titan default; Memurai is optional)." -ForegroundColor Cyan
     if ($memuraiState -eq "Stopped") {
-        Write-Host "Memurai service is stopped; using portable Redis instead of Memurai." -ForegroundColor DarkGray
+        Write-Host "Memurai service is stopped; will start portable Redis instead of Memurai." -ForegroundColor DarkGray
     } elseif ($memuraiState -eq "Running") {
-        Write-Host "Memurai is running but not on 63790 with Titan password — portable Redis will be tried first." -ForegroundColor DarkGray
+        Write-Host "Memurai is running but not on 63790 with Titan password - portable Redis will be tried first." -ForegroundColor DarkGray
     }
     if (Start-PortableRedis) { return }
     Write-Host "Portable Redis unavailable; trying Docker redis..." -ForegroundColor DarkYellow

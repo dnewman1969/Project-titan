@@ -177,7 +177,7 @@ export const titanApi = createApi({
     }),
     scanGames: build.mutation<
       { detected: Array<{ game_slug: string; install_path: string; profile_id: string }> },
-      { extra_paths?: string[] } | void
+      { extra_paths?: string[] } | undefined
     >({
       query: (body) => ({
         url: "/games/scan",

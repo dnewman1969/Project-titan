@@ -97,10 +97,19 @@ def test_kill_and_resume_release_live_session(api_client: TestClient, game_id: s
     created = api_client.post(
         "/api/v1/sessions",
         headers=AUTH,
-        json={"game_id": game_id, "title": "sticky", "settings": {"agents_enabled": False, "demo_telemetry": True}},
+        json={
+            "game_id": game_id,
+            "title": "sticky",
+            "settings": {"agents_enabled": False, "demo_telemetry": True},
+        },
     )
     sid = created.json()["id"]
-    assert api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False}).status_code == 202
+    assert (
+        api_client.post(
+            f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False}
+        ).status_code
+        == 202
+    )
 
     assert api_client.post("/api/v1/safety/kill", headers=AUTH, json={"source": "hotkey"}).status_code == 200
     assert api_client.get(f"/api/v1/sessions/{sid}", headers=AUTH).json()["state"] == "ended"
@@ -122,7 +131,11 @@ def test_start_supersedes_prior_live_session(api_client: TestClient, game_id: st
     first = api_client.post(
         "/api/v1/sessions",
         headers=AUTH,
-        json={"game_id": game_id, "title": "auto demo", "settings": {"agents_enabled": False, "demo_telemetry": True}},
+        json={
+            "game_id": game_id,
+            "title": "auto demo",
+            "settings": {"agents_enabled": False, "demo_telemetry": True},
+        },
     )
     assert first.status_code == 201
     sid_a = first.json()["id"]

@@ -120,7 +120,7 @@ export function GamesDiscoveryPanel() {
           <List dense>
             {lastDetected.map((hit) => (
               <ListItem key={hit.profile_id}>
-                <ListItemText primary={`${hit.game_slug}`} secondary={hit.install_path} />
+                <ListItemText primary={hit.game_slug} secondary={hit.install_path} />
               </ListItem>
             ))}
           </List>

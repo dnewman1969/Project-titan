@@ -52,9 +52,7 @@ def test_enrich_windows_epic_manifest_and_common_scan_paths(tmp_path: Path) -> N
         extra_paths=[],
         env={"STEAM_PATH": str(steam), "PROGRAMDATA": str(programdata)},
     )
-    assert ctx.epic_manifest_dirs == [
-        programdata / "Epic" / "EpicGamesLauncher" / "Data" / "Manifests"
-    ]
+    assert ctx.epic_manifest_dirs == [programdata / "Epic" / "EpicGamesLauncher" / "Data" / "Manifests"]
     assert common in ctx.extra_paths
 
 

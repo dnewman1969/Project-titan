@@ -404,6 +404,7 @@ export const {
   useCreateGameProfileMutation,
   useGetBlackboardQuery,
   useGetPlayReadinessQuery,
+  useLazyGetPlayReadinessQuery,
   useKillMutation,
   useResumeMutation,
 } = titanApi;

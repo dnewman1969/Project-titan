@@ -5,6 +5,8 @@ Shared by titan-api (session start / readiness) and titan-actions (PlayExecutor)
 
 from __future__ import annotations
 
+import errno
+import mmap
 import os
 import socket
 import sys
@@ -13,6 +15,9 @@ from typing import Any, Literal
 
 PlayBackend = Literal["auto", "krpc", "scs", "hil", "keyboard"]
 SessionSource = Literal["live", "fixture"]
+
+SCS_TELEMETRY_MMAP_BYTES = 512
+SCS_TELEMETRY_TAG = "Local\\SCSTelemetry"
 
 
 @dataclass(frozen=True)
@@ -27,6 +32,14 @@ class PlayAttach:
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def attach_probe_timeout_s() -> float:
+    raw = os.environ.get("TITAN_PLAY_ATTACH_TIMEOUT_S", "0.6")
+    try:
+        return max(0.05, min(5.0, float(raw)))
+    except ValueError:
+        return 0.6
 
 
 def resolve_backend(game_slug: str, *, source: SessionSource) -> PlayBackend:
@@ -55,51 +68,127 @@ def resolve_session_source(
     return "live"
 
 
-def probe_krpc(*, host: str, rpc_port: int, stream_port: int, timeout_s: float = 0.4) -> PlayAttach:
-    detail: dict[str, Any] = {"host": host, "rpc_port": rpc_port, "stream_port": stream_port}
+def _friendly_socket_error(exc: OSError) -> str:
+    refused = isinstance(exc, ConnectionRefusedError) or exc.errno in {
+        errno.ECONNREFUSED,
+        10061,  # WSAECONNREFUSED
+    }
+    if refused:
+        return "Nothing is listening on that port yet."
+    timed_out = exc.errno in {errno.ETIMEDOUT, 10060, 110}
+    if timed_out:
+        return "Timed out waiting for the port."
+    return str(exc)
+
+
+def _tcp_port_open(host: str, port: int, *, timeout_s: float) -> tuple[bool, OSError | None]:
     try:
-        with socket.create_connection((host, rpc_port), timeout=timeout_s):
+        with socket.create_connection((host, port), timeout=timeout_s):
             pass
+        return True, None
     except OSError as exc:
+        return False, exc
+
+
+def probe_krpc(
+    *,
+    host: str,
+    rpc_port: int,
+    stream_port: int,
+    timeout_s: float | None = None,
+) -> PlayAttach:
+    timeout = attach_probe_timeout_s() if timeout_s is None else timeout_s
+    detail: dict[str, Any] = {
+        "host": host,
+        "rpc_port": rpc_port,
+        "stream_port": stream_port,
+        "timeout_s": timeout,
+    }
+    rpc_ok, rpc_err = _tcp_port_open(host, rpc_port, timeout_s=timeout)
+    if not rpc_ok and rpc_err is not None:
+        hint = _friendly_socket_error(rpc_err)
         return PlayAttach(
             source="live",
             backend="krpc",
             ready=False,
             message=(
-                f"kRPC not reachable at {host}:{rpc_port} "
-                f"(start KSP with the kRPC mod; stream port {stream_port}). {exc}"
+                f"kRPC is not running — install the kRPC mod in GameData, start KSP, and confirm "
+                f"RPC {host}:{rpc_port} and stream {stream_port} are listening. {hint}"
             ),
-            detail={**detail, "error": str(exc)},
+            detail={**detail, "rpc_reachable": False, "error": str(rpc_err)},
+        )
+    stream_ok, stream_err = _tcp_port_open(host, stream_port, timeout_s=timeout)
+    if not stream_ok and stream_err is not None:
+        hint = _friendly_socket_error(stream_err)
+        return PlayAttach(
+            source="live",
+            backend="krpc",
+            ready=False,
+            message=(
+                f"kRPC RPC port is open but the stream port {host}:{stream_port} is not ready. "
+                f"Restart KSP/kRPC or check firewall. {hint}"
+            ),
+            detail={**detail, "rpc_reachable": True, "stream_reachable": False, "error": str(stream_err)},
         )
     return PlayAttach(
         source="live",
         backend="krpc",
         ready=True,
-        message=f"kRPC RPC port open at {host}:{rpc_port} - play will attach when a vessel is active.",
-        detail=detail,
+        message=(
+            f"kRPC listening on {host}:{rpc_port} (stream {stream_port}). "
+            "Load a vessel with an active flight scene for play proposals."
+        ),
+        detail={**detail, "rpc_reachable": True, "stream_reachable": True},
     )
+
+
+def _scs_telemetry_shm_open() -> bool:
+    if os.name != "nt":
+        return False
+    try:
+        mapping = mmap.mmap(  # type: ignore[call-arg]
+            -1,
+            SCS_TELEMETRY_MMAP_BYTES,
+            tagname=SCS_TELEMETRY_TAG,
+            access=mmap.ACCESS_READ,
+        )
+        mapping.close()
+        return True
+    except OSError:
+        return False
 
 
 def probe_scs() -> PlayAttach:
     platform_tag = sys.platform
-    if platform_tag != "win32":
+    if platform_tag != "win32" and os.name != "nt":
         return PlayAttach(
             source="live",
             backend="scs",
             ready=False,
-            message="SCS play needs Windows (ViGEm or keyboard). Use fixture/HIL on this host.",
+            message="SCS live play needs Windows (ViGEm or keyboard). Use fixture/HIL on this host.",
             detail={"platform": platform_tag},
         )
-    # Do not import vgamepad here (input libs are titan-actions-only); ScsDriver probes at execute.
+    telemetry = _scs_telemetry_shm_open()
+    if not telemetry:
+        return PlayAttach(
+            source="live",
+            backend="scs",
+            ready=False,
+            message=(
+                "SCS telemetry shared memory (Local\\SCSTelemetry) not found. "
+                "Start ETS2/ATS with the scs-telemetry plugin installed, then retry."
+            ),
+            detail={"platform": "win32", "telemetry_shm": False},
+        )
     return PlayAttach(
         source="live",
         backend="scs",
         ready=True,
         message=(
-            "SCS attach ready on Windows (ViGEm preferred; keyboard brake fallback). "
-            "Keep the truck sim focused while agents play."
+            "SCS telemetry active. Play uses ViGEm (preferred) or keyboard brake — "
+            "keep the truck sim focused."
         ),
-        detail={"platform": "win32"},
+        detail={"platform": "win32", "telemetry_shm": True},
     )
 
 
@@ -120,6 +209,7 @@ def probe_attach(
     krpc_host: str | None = None,
     krpc_rpc_port: int | None = None,
     krpc_stream_port: int | None = None,
+    timeout_s: float | None = None,
 ) -> PlayAttach:
     """Resolve backend and probe whether play can attach now."""
     backend = resolve_backend(game_slug, source=source)
@@ -137,7 +227,7 @@ def probe_attach(
             if krpc_stream_port is not None
             else int(os.environ.get("TITAN_KRPC_STREAM_PORT", "50001"))
         )
-        return probe_krpc(host=host, rpc_port=rpc_port, stream_port=stream_port)
+        return probe_krpc(host=host, rpc_port=rpc_port, stream_port=stream_port, timeout_s=timeout_s)
     if backend in {"scs", "keyboard"}:
         attach = probe_scs()
         if backend == "keyboard":

@@ -2193,6 +2193,7 @@ director:   { tick_s: 15, report_interval_s: 300, can_spawn: false }
 floor:      { min_gap_ms: 1500, max_words: 30, idle_invite_s: 45, arbitration_ms: 300 }
 llm:        { max_tokens_per_minute: 12000, stale_drop_ms: 3000 }
 recording:  { default_preset: "1080p60", min_free_gb: 20 }
+obs:        { host: 127.0.0.1, port: 4455, timeout_s: 5.0 }  # password via TITAN__OBS__PASSWORD only
 safety:     { kill_hotkey: "Ctrl+Shift+F12" }        # actions disabled in P1 regardless
 logging:    { level: INFO, llm_prompts: false }
 network:    { offline_mode: false, allowlist_file: "config/egress.yaml" }
@@ -2201,7 +2202,7 @@ metrics:    { sample_hz: 1, presentmon_path: null, nvml: true }
 otel:       { enabled: false }
 features:   { research: false, factory: false, actions: false, tts: false, video: false, publish: false }
 ```
-Feature flags gate later-phase code paths. They stay `false` until the phase's exit criteria pass. Passwords never appear in YAML: `postgres.password` comes from Credential Manager in production and from `TITAN__POSTGRES__PASSWORD` in development and CI.
+Feature flags gate later-phase code paths. They stay `false` until the phase's exit criteria pass. Passwords never appear in YAML: `postgres.password` comes from Credential Manager in production and from `TITAN__POSTGRES__PASSWORD` in development and CI. `obs.password` (obs-websocket) is likewise env/keyring-only (`TITAN__OBS__PASSWORD`).
 
 ### 9.6 Security
 - **Local-only surface.** Every listener binds `127.0.0.1`. The API requires the per-launch bearer token. Redis uses `requirepass` and Postgres uses a password and `pg_hba` limited to `host all all 127.0.0.1/32 scram-sha-256`. Chroma 1.x has no authentication, so it relies on its loopback bind (R16). These secrets are random and stored in Windows Credential Manager (`keyring`, service `titan`, entries `postgres` and `redis`): the supervisor generates the Postgres password at `initdb`, and the first-run wizard sets the Redis one when it configures Memurai. Development and CI pass them as `TITAN__POSTGRES__PASSWORD` and `TITAN__REDIS__PASSWORD` instead, and the dev Redis also runs with `requirepass`. The supervisor hands them to its children through the environment only, never argv.

@@ -10,6 +10,9 @@ schemas/
 packages/ts/protocol/src/generated/
 docs/titan-architecture-spec.md
 *.py
+*.bat
+*.ps1
+.env.example
 
 # Keep the spec's column-aligned flow style (Section 9.5 excerpt)
 config/**/*.yaml

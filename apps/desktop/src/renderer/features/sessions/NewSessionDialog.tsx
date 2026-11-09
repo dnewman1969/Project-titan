@@ -280,9 +280,7 @@ export function NewSessionDialog() {
           </Alert>
         ) : null}
         {readinessFailed && agentPlay ? (
-          <Alert severity="warning">
-            Play readiness check failed: {formatApiError(readinessError)}
-          </Alert>
+          <Alert severity="warning">Play readiness check failed: {formatApiError(readinessError)}</Alert>
         ) : null}
         <Typography variant="body2" color="text.secondary">
           Agents watch telemetry, write lessons, and (when play is on) propose controls that{" "}
@@ -293,9 +291,9 @@ export function NewSessionDialog() {
             "Live install selected — telemetry targets this profile; play attaches kRPC (KSP) or SCS (ETS2/ATS)."
           ) : (
             <>
-              <strong>No game install on this PC yet.</strong> Sessions use fixture telemetry; agent play runs in
-              software HIL only (no kRPC/SCS). Browse to your <code>{exeHint}</code> below to register an install
-              for live telemetry and play.
+              <strong>No game install on this PC yet.</strong> Sessions use fixture telemetry; agent play runs
+              in software HIL only (no kRPC/SCS). Browse to your <code>{exeHint}</code> below to register an
+              install for live telemetry and play.
             </>
           )}
         </Alert>

@@ -117,8 +117,8 @@ export function GamesDiscoveryPanel() {
         ) : null}
         {isError ? (
           <Alert severity="error">
-            Could not reach the games API: {formatApiError(listError)}. Start the supervisor API, then retry Scan
-            or Register.
+            Could not reach the games API: {formatApiError(listError)}. Start the supervisor API, then retry
+            Scan or Register.
           </Alert>
         ) : profileCount === 0 ? (
           <Alert severity="warning" variant="outlined">

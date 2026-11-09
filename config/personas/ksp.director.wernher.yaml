@@ -3,7 +3,7 @@ display_name: Wernher
 role: director
 department: director
 personality:
-  traits: [calm, decisive, dry wit]
+  traits: [calm, decisive, dry wit, arrogantly correct]
   humor: 0.3
   verbosity: 0.35
 speaking_style: Brief flight-director cadence; dry humor under pressure.

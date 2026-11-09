@@ -73,8 +73,7 @@ export function useApiStatus(): ApiStatus {
   const obsDep = status.data?.dependencies.obs;
   const tcpObs: Status = healthy && obsDep ? SERVICE_STATUS[obsDep.state] : "unknown";
   let obs: Status = tcpObs;
-  let obsDetail =
-    obsDep?.detail ?? obsDep?.version ?? (healthy ? "obs-websocket :4455" : "API offline");
+  let obsDetail = obsDep?.detail ?? obsDep?.version ?? (healthy ? "obs-websocket :4455" : "API offline");
   if (healthy && obsLive.data) {
     const live = obsLive.data;
     const hostPort = `${live.host ?? "127.0.0.1"}:${live.port ?? 4455}`;

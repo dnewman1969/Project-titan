@@ -215,4 +215,6 @@ def test_recording_start_with_fake_obs(
     assert stop_body["obs"]["status"]["stopped"] is True
     assert stop_body["obs"]["status"]["active"] is False
     timeline = api_client.get(f"/api/v1/sessions/{sid}/recordings/timeline", headers=AUTH).json()
-    assert any(ev.get("kind") == "recording.stop" and ev.get("obs_stopped") is True for ev in timeline["events"])
+    assert any(
+        ev.get("kind") == "recording.stop" and ev.get("obs_stopped") is True for ev in timeline["events"]
+    )

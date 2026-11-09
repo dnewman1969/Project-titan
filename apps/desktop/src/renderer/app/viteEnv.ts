@@ -7,5 +7,5 @@ export function viteEnvEnabled(raw: string | boolean | undefined): boolean {
 }
 
 export function autoDemoEnabled(): boolean {
-  return viteEnvEnabled(import.meta.env.VITE_TITAN_AUTO_DEMO as string | undefined);
+  return viteEnvEnabled(import.meta.env.VITE_TITAN_AUTO_DEMO);
 }

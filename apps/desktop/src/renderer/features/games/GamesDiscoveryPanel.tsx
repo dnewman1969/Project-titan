@@ -106,7 +106,12 @@ export function GamesDiscoveryPanel() {
           enable <strong>agent play</strong>, and start.
         </Typography>
         {panelError ? (
-          <Alert severity="error" onClose={() => setPanelError(null)}>
+          <Alert
+            severity="error"
+            onClose={() => {
+              setPanelError(null);
+            }}
+          >
             {panelError}
           </Alert>
         ) : null}

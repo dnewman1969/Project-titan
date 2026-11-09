@@ -37,3 +37,11 @@ def test_list_games_syncs_from_entry_points(games_client: TestClient) -> None:
     assert response.status_code == 200
     slugs = {item["slug"] for item in response.json()["items"]}
     assert {"ksp", "ets2", "ats"}.issubset(slugs)
+
+
+def test_list_games_can_include_profiles(games_client: TestClient) -> None:
+    response = games_client.get("/api/v1/games?include_profiles=true", headers=AUTH)
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert items
+    assert "profiles" in items[0]

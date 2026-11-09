@@ -6,7 +6,7 @@ import platform
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Annotated, Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, status
@@ -143,6 +143,7 @@ def _adapter_for_game(catalog: GameCatalog, game: Game) -> type[GameAdapter]:
 async def list_games(
     request: Request,
     session: AsyncSession = SessionDep,
+    include_profiles: Annotated[bool, Query(alias="include_profiles")] = False,
 ) -> dict[str, Any]:
     catalog = _catalog(request)
     catalog.reload()
@@ -150,7 +151,7 @@ async def list_games(
     rows = (
         await session.scalars(select(Game).options(selectinload(Game.profiles)).order_by(Game.name))
     ).all()
-    return {"items": [_serialize_game(row, include_profiles=False) for row in rows]}
+    return {"items": [_serialize_game(row, include_profiles=include_profiles) for row in rows]}
 
 
 @router.post("/games/scan")

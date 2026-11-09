@@ -26,7 +26,8 @@ export function useBlackboardAgents(): void {
         row.section === "notes" ||
         row.section === "goals" ||
         row.section === "discoveries" ||
-        row.section === "lessons";
+        row.section === "lessons" ||
+        row.section === "hypotheses";
       if (!agentSection) continue;
       if (typeof row.author !== "string" || !row.author.startsWith("agent:")) continue;
       const key = `${row.section}:${row.key}:${JSON.stringify(row.value)}`;

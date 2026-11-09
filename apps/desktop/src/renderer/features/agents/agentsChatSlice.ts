@@ -7,6 +7,8 @@ export interface AgentChatLine {
   role: string;
   text: string;
   at_ms: number;
+  /** Optional live/protocol ComfyUI or CDN portrait URL. */
+  portrait_url?: string | null;
 }
 
 interface AgentsChatState {

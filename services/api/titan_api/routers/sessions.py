@@ -76,6 +76,12 @@ class StopSession(BaseModel):
     outcome: str | None = None
 
 
+class SetSessionPlay(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+
+
 def _session_json(row: Session) -> dict[str, Any]:
     return {
         "id": row.id,
@@ -111,8 +117,11 @@ def _is_one_live_unique_violation(exc: IntegrityError) -> bool:
 
 @router.post("/sessions", status_code=status.HTTP_201_CREATED)
 async def create_session(body: CreateSession, db: AsyncSession = SessionDep) -> dict[str, Any]:
+    # Learn-and-play beta uses observe + settings.play_enabled. Full autonomous mode is Phase 4+.
     if body.mode == "autonomous":
-        raise TitanError(ErrorCode.NOT_IMPLEMENTED_IN_PHASE, "autonomous mode is Phase 4+")
+        if not bool(body.settings.get("play_enabled", False)):
+            raise TitanError(ErrorCode.NOT_IMPLEMENTED_IN_PHASE, "autonomous mode is Phase 4+")
+        body = body.model_copy(update={"mode": "observe"})
     if body.game_id is not None:
         game = await db.scalar(select(Game).where(Game.id == body.game_id))
     else:
@@ -282,6 +291,73 @@ async def _seed_director_demo_line(db: AsyncSession, session_id: UUID) -> None:
         evidence=[],
         bb_version=bb_version,
     )
+
+
+@router.post("/sessions/{session_id}/play", status_code=status.HTTP_202_ACCEPTED)
+async def set_session_play(
+    session_id: UUID,
+    body: SetSessionPlay,
+    request: Request,
+    db: AsyncSession = SessionDep,
+) -> dict[str, Any]:
+    """Enable or disable agent play on a live session (attach/detach titan-actions)."""
+    row = await _session_or_404(db, session_id)
+    if row.state != "live":
+        raise TitanError(ErrorCode.INVALID_STATE_TRANSITION, "play can only toggle on a live session")
+    controller = request.app.state.session_controller
+    game_row = await db.scalar(select(Game).where(Game.id == row.game_id))
+    game_slug = game_row.slug if game_row is not None else "ksp"
+
+    profile: GameProfile | None = None
+    if row.game_profile_id is not None:
+        profile = await db.scalar(select(GameProfile).where(GameProfile.id == row.game_profile_id))
+    default_profile: GameProfile | None = None
+    if profile is None:
+        default_profile = await db.scalar(
+            select(GameProfile)
+            .where(GameProfile.game_id == row.game_id, GameProfile.is_default.is_(True))
+            .limit(1)
+        )
+    has_install = (profile or default_profile) is not None
+    session_source = resolve_session_source(
+        session_source=str(row.settings.get("session_source") or "") or None,
+        demo_telemetry=bool(row.settings.get("demo_telemetry", False)),
+        has_install=has_install,
+    )
+
+    settings = dict(row.settings or {})
+    settings["play_enabled"] = body.enabled
+    settings["session_source"] = session_source
+    play_attach = None
+    if body.enabled:
+        play_attach = probe_attach(game_slug=game_slug, source=session_source)
+        settings["play_attach"] = play_attach.as_dict()
+        # Restart orchestrator so TITAN_SESSION_PLAY=1 wires proposal + feedback loops.
+        if row.settings.get("agents_enabled", True):
+            controller.restart_orchestrator(
+                session_id,
+                game_slug=game_slug,
+                play_enabled=True,
+                data_dir=row.data_dir,
+            )
+        controller.stop_actions(session_id)
+        controller.start_actions(
+            session_id,
+            game_slug=game_slug,
+            data_dir=row.data_dir,
+            play_backend=play_attach.backend,
+        )
+    else:
+        controller.stop_actions(session_id)
+        settings.pop("play_attach", None)
+    row.settings = settings
+    await db.flush()
+    payload = _session_json(row)
+    payload["session_source"] = session_source
+    if play_attach is not None:
+        payload["play_attach"] = play_attach.as_dict()
+    payload["play_enabled"] = body.enabled
+    return payload
 
 
 @router.post("/sessions/{session_id}/stop", status_code=status.HTTP_202_ACCEPTED)

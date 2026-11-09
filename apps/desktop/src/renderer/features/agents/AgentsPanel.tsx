@@ -14,6 +14,7 @@ import { useCallback, useState, type FormEvent } from "react";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { portraitUrl } from "../../services/avatar/portrait";
 import { speakAgentLine } from "../../services/voice/speak";
+import { LearnFeedbackStrip } from "../learn/LearnFeedbackStrip";
 import { Panel } from "../operations/Panel";
 import { agentSaid, setSpeaking } from "./agentsChatSlice";
 import {
@@ -81,6 +82,7 @@ export function AgentsPanel() {
   return (
     <Panel title="AI Agents" subtitle="Mission Control" gridArea="agents" flush>
       <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <LearnFeedbackStrip />
         <Box
           role="list"
           aria-label="Agent roster"

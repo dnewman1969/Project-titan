@@ -4,13 +4,13 @@ Sole input owner for Project Titan (Section 6.9). Learn-and-play beta routes `ac
 
 ## Backends (`TITAN_PLAY_BACKEND`)
 
-| Value | Use |
-| --- | --- |
+| Value            | Use                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------ |
 | `auto` (default) | `ksp` → kRPC (`127.0.0.1:50000/50001`); `ets2`/`ats` → ViGEm virtual gamepad, then keyboard brake on Windows |
-| `krpc` | Force kRPC (KSP) |
-| `scs` | Force SCS path (ViGEm / keyboard) |
-| `hil` | **Honest HIL:** in-memory state + optional `hil.ndjson` trace — no game attached |
-| `keyboard` | SCS keyboard fallback on Windows |
+| `krpc`           | Force kRPC (KSP)                                                                                             |
+| `scs`            | Force SCS path (ViGEm / keyboard)                                                                            |
+| `hil`            | **Honest HIL:** in-memory state + optional `hil.ndjson` trace — no game attached                             |
+| `keyboard`       | SCS keyboard fallback on Windows                                                                             |
 
 Also set `TITAN_PLAY_HIL=1` to force HIL.
 

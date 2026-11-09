@@ -203,7 +203,7 @@ def test_session_start_play_enabled(
         def start_orchestrator(self, session_id: UUID, **kwargs: object) -> None:
             flags["orch"] = True
 
-        def start_actions(self, session_id: UUID) -> None:
+        def start_actions(self, session_id: UUID, **kwargs: object) -> None:
             flags["actions"] = True
 
         def stop_orchestrator(self, session_id: UUID) -> None:

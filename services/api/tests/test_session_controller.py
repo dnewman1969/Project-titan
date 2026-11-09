@@ -23,9 +23,10 @@ def test_start_actions_tracks_child() -> None:
 
     ctl = SessionController(spawn=fake_spawn)
     sid = UUID(int=9)
-    ctl.start_actions(sid)
+    ctl.start_actions(sid, game_slug="ksp")
     assert launched
     assert "-m" in launched[0] and "titan_actions" in launched[0]
+    assert "--game-slug" in launched[0]
     ctl.stop_actions(sid)
 
 

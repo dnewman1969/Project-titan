@@ -59,7 +59,7 @@ export const MENU: readonly MenuSection[] = [
   {
     label: "FILE",
     items: [
-      cmd("file.newSession", "New Session", "M7.T6", "CmdOrCtrl+N"),
+      cmd("file.newSession", "New Session", undefined, "CmdOrCtrl+N"),
       cmd("file.openSession", "Open Session", "M7.T6", "CmdOrCtrl+O"),
       cmd("file.replaySession", "Replay Session", "M7.T6"),
       sep,

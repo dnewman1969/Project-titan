@@ -114,8 +114,8 @@ export class LiveConnection {
       const safety = SafetyStateSchema.safeParse(data.data);
       if (safety.success) this.options.handlers.onSafety(safety.data);
     } else if (data.op === "msg" && data.type === "telemetry.frame") {
-      const frame = TelemetryFrameUISchema.safeParse(data.data);
-      if (frame.success) this.options.handlers.onTelemetryFrame?.(frame.data);
+      const telemetry = TelemetryFrameUISchema.safeParse(data.data);
+      if (telemetry.success) this.options.handlers.onTelemetryFrame?.(telemetry.data);
     } else if (data.op === "msg" && data.type === "game.event") {
       const event = GameEventSchema.safeParse(data.data);
       if (event.success) this.options.handlers.onGameEvent?.(event.data);

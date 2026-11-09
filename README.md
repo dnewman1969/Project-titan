@@ -4,16 +4,15 @@ Project Titan is a local-first, autonomous AI gaming content studio: a desktop a
 
 See [docs/titan-architecture-spec.md](docs/titan-architecture-spec.md) for the architecture specification.
 
-## Quick start
+## Quick start (Windows)
 
-Prerequisites: Node 22 with pnpm 10, uv, and Python 3.12. Docker is optional. Full Windows setup is in
-[docs/dev-setup.md](docs/dev-setup.md).
+**Double-click `Start-Titan.bat` in this folder** (or run `Start-Titan.ps1` in PowerShell).
 
-```powershell
-pnpm i && uv sync && pnpm codegen && pnpm test
-docker compose up -d --wait      # optional: Postgres 16, Redis 7, Chroma on 127.0.0.1
-pnpm dev                         # Electron shell; it starts the API with a per-launch token
-```
+That script checks Node/pnpm/uv, fetches portable PostgreSQL on first run, ensures Redis on `127.0.0.1:63790` (Memurai or one Docker Redis container), then opens the **Operations Center**. No Kerbal install needed for the built-in demo — fixture telemetry and the crew talk on a live session automatically.
+
+Prerequisites once: [Node 22](https://nodejs.org/), [uv](https://docs.astral.sh/uv/), and either **Memurai Developer** (Redis, port **63790**, password **titan-dev**) or Docker Desktop (only for Redis if Memurai is absent). Postgres and Chroma are started by Titan — not by Docker.
+
+For contributor setup and architecture, see [docs/dev-setup.md](docs/dev-setup.md).
 
 ## Repository map
 

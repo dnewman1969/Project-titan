@@ -17,7 +17,12 @@ from titan_core.clock import utc_now
 from titan_core.errors import ErrorCode, TitanError
 from titan_core.ids import uuid7
 from titan_core.obs_ws import ObsClient
-from titan_core.recording_manifest import build_manifest, default_preset, write_manifest
+from titan_core.recording_manifest import (
+    append_timeline_event,
+    build_manifest,
+    default_preset,
+    write_manifest,
+)
 from titan_db.models.recording import Recording
 from titan_db.models.sessions import Session
 
@@ -107,6 +112,22 @@ async def start_recording(session_id: UUID, db: AsyncSession = SessionDep) -> di
         preset=preset,
     )
     await asyncio.to_thread(write_manifest, manifest_path, manifest)
+    await asyncio.to_thread(
+        append_timeline_event,
+        root,
+        {
+            "t": utc_now().isoformat(),
+            "kind": "recording.start",
+            "recording_id": str(rec_id),
+            "obs": obs_status,
+        },
+    )
+    placeholder = root / "tracks" / "game-placeholder.txt"
+    await asyncio.to_thread(
+        _write_placeholder_track,
+        placeholder,
+        "Game video lands when OBS is connected; this session still records metadata and timeline.",
+    )
     row = Recording(
         id=rec_id,
         session_id=session_id,
@@ -149,5 +170,21 @@ async def stop_recording(session_id: UUID, db: AsyncSession = SessionDep) -> dic
         row.duration_ms = int(delta.total_seconds() * 1000)
     if obs_error and row.error is None:
         row.error = obs_error
+    if row.root_dir:
+        await asyncio.to_thread(
+            append_timeline_event,
+            Path(row.root_dir),
+            {
+                "t": utc_now().isoformat(),
+                "kind": "recording.stop",
+                "recording_id": str(row.id),
+                "duration_ms": row.duration_ms,
+            },
+        )
     await db.flush()
     return _recording_json(row)
+
+
+def _write_placeholder_track(path: Path, message: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(message + "\n", encoding="utf-8")

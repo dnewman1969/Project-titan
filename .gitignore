@@ -69,3 +69,4 @@ third_party/cache/
 chroma/
 pgdata/
 .import_linter_cache/
+dump.rdb

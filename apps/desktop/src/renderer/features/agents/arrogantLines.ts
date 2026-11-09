@@ -8,6 +8,15 @@ export interface RosterEntry {
 
 export type BanterKind = "greeting" | "feast" | "insult" | "incredible";
 
+/** Appendix A KSP Mission Control — demo roster until live bus (M7.T2). */
+export const DEMO_ROSTER: readonly RosterEntry[] = [
+  { persona_slug: "wernher", display_name: "Wernher", role: "director" },
+  { persona_slug: "gene", display_name: "Gene", role: "flight_engineer" },
+  { persona_slug: "linus", display_name: "Linus", role: "mission_planner" },
+  { persona_slug: "val", display_name: "Val", role: "navigator" },
+  { persona_slug: "jeb-radio", display_name: "Jeb Radio", role: "commentator.host" },
+];
+
 const SMACK: Record<BanterKind, string[]> = {
   greeting: [
     "Oh. You're here. Try not to touch anything labeled 'staging'—I already optimized it.",

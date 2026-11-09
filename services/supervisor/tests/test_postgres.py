@@ -93,12 +93,15 @@ def test_parse_major() -> None:
     assert parse_major("nonsense") is None
 
 
-def test_titan_conf_is_loopback_tcp_only() -> None:
-    conf = titan_conf(54329)
+def test_titan_conf_is_loopback_tcp_only(tmp_path: Path) -> None:
+    conf = titan_conf(54329, data_dir=tmp_path)
     assert CONF_MARKER in conf
     assert "listen_addresses = '127.0.0.1'" in conf
     assert "port = 54329" in conf
-    assert "unix_socket_directories = ''" in conf
+    if sys.platform == "win32":
+        assert "unix_socket_directories = ''" in conf
+    else:
+        assert f"unix_socket_directories = '{tmp_path}'" in conf
 
 
 def test_postmaster_pid_and_fatal_line(tmp_path: Path) -> None:
@@ -165,7 +168,11 @@ async def test_first_run_initdb_keyring_password_and_restart(
         )
         try:
             assert await conn.fetchval("SHOW listen_addresses") == "127.0.0.1"
-            assert await conn.fetchval("SHOW unix_socket_directories") == ""
+            unix_dirs = await conn.fetchval("SHOW unix_socket_directories")
+            if sys.platform == "win32":
+                assert unix_dirs == ""
+            else:
+                assert str(data) in unix_dirs
             assert await conn.fetchval("SHOW password_encryption") == "scram-sha-256"
         finally:
             await conn.close()

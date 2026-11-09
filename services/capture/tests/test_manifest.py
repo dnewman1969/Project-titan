@@ -2,7 +2,12 @@
 
 from pathlib import Path
 
-from titan_capture.manifest import build_manifest, default_preset, write_manifest
+from titan_core.recording_manifest import (
+    append_timeline_event,
+    build_manifest,
+    default_preset,
+    write_manifest,
+)
 
 
 def test_build_and_write_manifest(tmp_path: Path) -> None:
@@ -19,3 +24,5 @@ def test_build_and_write_manifest(tmp_path: Path) -> None:
     path = tmp_path / "manifest.json"
     write_manifest(path, body)
     assert path.read_text(encoding="utf-8").startswith("{")
+    tl = append_timeline_event(tmp_path, {"kind": "test"})
+    assert tl.is_file()

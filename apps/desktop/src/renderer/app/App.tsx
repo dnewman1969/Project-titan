@@ -24,6 +24,8 @@ import { useApiStatus } from "./useApiStatus";
 import { useLayoutSettings } from "./useLayoutSettings";
 import { useLiveChannels } from "./useLiveChannels";
 import { useShellBridge } from "./useShellBridge";
+import { useBlackboardAgents } from "../hooks/useBlackboardAgents";
+import { usePhase1Demo } from "../hooks/usePhase1Demo";
 import { useSupervisor } from "./useSupervisor";
 
 function AboutDialog() {
@@ -106,6 +108,8 @@ export function App() {
   useSupervisor();
   useLayoutSettings();
   useLiveChannels();
+  usePhase1Demo();
+  useBlackboardAgents();
   const status = useApiStatus();
   const dispatch = useAppDispatch();
   const notice = useAppSelector((s) => s.layout.notice);

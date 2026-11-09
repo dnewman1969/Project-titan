@@ -54,6 +54,25 @@ export const RecordingSchema = z
   .passthrough();
 export type Recording = z.infer<typeof RecordingSchema>;
 
+export const GameListItemSchema = z
+  .object({
+    id: z.string().uuid(),
+    slug: z.string(),
+    name: z.string(),
+    research_status: z.string().optional(),
+  })
+  .passthrough();
+export type GameListItem = z.infer<typeof GameListItemSchema>;
+
+export const BlackboardEntrySchema = z
+  .object({
+    section: z.string(),
+    key: z.string(),
+    value: z.unknown(),
+    author: z.string().optional(),
+  })
+  .passthrough();
+
 const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (args, api, extra) => {
   const { apiBase, token } = getTitan();
   return fetchBaseQuery({
@@ -132,6 +151,29 @@ export const titanApi = createApi({
       }),
       transformResponse: (raw: unknown) => RecordingSchema.parse(raw),
     }),
+    listGames: build.query<{ items: GameListItem[] }, undefined>({
+      query: () => "/games",
+      transformResponse: (raw: unknown) => z.object({ items: z.array(GameListItemSchema) }).parse(raw),
+    }),
+    scanGames: build.mutation<{ detected: unknown[] }, undefined>({
+      query: () => ({ url: "/games/scan", method: "POST", body: { stores: ["steam", "epic", "gog"] } }),
+    }),
+    getBlackboard: build.query<
+      { bb_version: number; entries: Array<z.infer<typeof BlackboardEntrySchema>> },
+      { sessionId: string; sinceVersion?: number }
+    >({
+      query: ({ sessionId, sinceVersion }) =>
+        sinceVersion != null
+          ? `/sessions/${sessionId}/blackboard?since_version=${sinceVersion}`
+          : `/sessions/${sessionId}/blackboard`,
+      transformResponse: (raw: unknown) =>
+        z
+          .object({
+            bb_version: z.number(),
+            entries: z.array(BlackboardEntrySchema),
+          })
+          .parse(raw),
+    }),
   }),
 });
 
@@ -145,6 +187,9 @@ export const {
   useGetActiveRecordingQuery,
   useStartRecordingMutation,
   useStopRecordingMutation,
+  useListGamesQuery,
+  useScanGamesMutation,
+  useGetBlackboardQuery,
   useKillMutation,
   useResumeMutation,
 } = titanApi;

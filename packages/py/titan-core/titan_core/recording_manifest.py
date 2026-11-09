@@ -44,3 +44,13 @@ def build_manifest(
 def write_manifest(path: Path, body: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(body, indent=2), encoding="utf-8")
+
+
+def append_timeline_event(root_dir: Path, event: dict[str, Any]) -> Path:
+    """Append one NDJSON timeline row (Phase 1 REC produces real on-disk artifacts)."""
+    root_dir.mkdir(parents=True, exist_ok=True)
+    path = root_dir / "timeline.ndjson"
+    line = json.dumps(event, ensure_ascii=False)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(line + "\n")
+    return path

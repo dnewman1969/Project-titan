@@ -96,12 +96,13 @@ def last_fatal(log_file: Path) -> str | None:
     return fatal[-1] if fatal else None
 
 
-def titan_conf(port: int) -> str:
+def titan_conf(port: int, *, data_dir: Path) -> str:
+    unix_dirs = str(data_dir) if sys.platform != "win32" else ""
     return (
         f"\n{CONF_MARKER}\n"
         "listen_addresses = '127.0.0.1'\n"
         f"port = {port}\n"
-        "unix_socket_directories = ''\n"
+        f"unix_socket_directories = '{unix_dirs}'\n"
         "password_encryption = 'scram-sha-256'\n"
     )
 
@@ -205,7 +206,7 @@ class PostgresUnit(Unit):
         if code != 0:
             raise UnitError(f"initdb failed: {out[-400:]}")
         with (self.data_dir / "postgresql.conf").open("a", encoding="utf-8") as conf:
-            conf.write(titan_conf(self.cfg.port))
+            conf.write(titan_conf(self.cfg.port, data_dir=self.data_dir))
         (self.data_dir / "pg_hba.conf").write_text(PG_HBA, encoding="utf-8")
         log.info("postgres_initialized", data_dir=str(self.data_dir))
 

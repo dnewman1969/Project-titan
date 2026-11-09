@@ -106,6 +106,17 @@ def create_app(
         await controller.load()
         if persister is not None:
             await persister.start()
+        if session_maker is not None:
+            from titan_db import migrate
+            from titan_db.seed import seed_all
+
+            try:
+                url = migrate.database_url(cfg.postgres)
+                await asyncio.to_thread(migrate.upgrade, url, "head")
+                counts = await seed_all(session_maker)
+                log.info("db_seed_ok", **counts)
+            except Exception as exc:
+                log.warning("db_seed_skipped", error=type(exc).__name__)
         log.info("api_started", host=cfg.api.host, port=cfg.api.port)
         yield
         if pull_jobs is not None:
@@ -119,6 +130,9 @@ def create_app(
                         await task
         if persister is not None:
             await persister.stop()
+        from titan_api.demo_replay import stop_all_demo_replays
+
+        await stop_all_demo_replays()
         await controller.drain()
         if owns_engine and db_engine is not None:
             await db_engine.dispose()

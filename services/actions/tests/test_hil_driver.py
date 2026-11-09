@@ -25,3 +25,14 @@ def test_executor_uses_injected_hil_driver() -> None:
     ok, err, _latency = ex.execute("scs.brake", {"fraction": 0.8})
     assert ok and err is None
     assert hil_state()["scs"]["brake"] == 0.8
+
+
+def test_hil_ksp_steer_and_gear() -> None:
+    driver = HilDriver(session_id=UUID(int=3), trace_path=None, trace=False)
+    ok, err = driver.execute("ksp.steer", {"pitch": -0.35, "yaw": 0.0})
+    assert ok and err is None
+    ok, err = driver.execute("ksp.gear", {"deployed": True})
+    assert ok and err is None
+    state = hil_state()["ksp"]
+    assert state["steer"]["pitch"] == -0.35
+    assert state["gear"] is True

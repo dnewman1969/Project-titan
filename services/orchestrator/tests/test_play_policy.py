@@ -50,10 +50,11 @@ def test_staging_proposal() -> None:
     assert proposal["action_id"] == "ksp.stage"
 
 
-def test_max_q_throttle_cut() -> None:
+def test_max_q_starts_gravity_turn_steer() -> None:
     proposal = play_proposal_for_event(_event("ksp.max_q"))
     assert proposal is not None
-    assert proposal["params"]["throttle"] < 0.5
+    assert proposal["action_id"] == "ksp.steer"
+    assert float(proposal["params"]["pitch"]) < 0
 
 
 def test_orbit_cuts_throttle() -> None:
@@ -61,6 +62,13 @@ def test_orbit_cuts_throttle() -> None:
     assert proposal is not None
     assert proposal["action_id"] == "ksp.throttle"
     assert proposal["params"]["throttle"] == 0.0
+
+
+def test_landing_deploys_gear() -> None:
+    proposal = play_proposal_for_event(_event("ksp.landed"))
+    assert proposal is not None
+    assert proposal["action_id"] == "ksp.gear"
+    assert proposal["params"]["deployed"] is True
 
 
 def test_overspeed_eases_throttle() -> None:

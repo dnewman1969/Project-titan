@@ -86,12 +86,13 @@ def _base_proposal(event: GameEvent) -> dict[str, Any] | None:
             "expected_effect": "Next stage ignites for continued ascent.",
         }
     if event.type == "ksp.max_q":
+        # Pitch toward gravity turn while easing thrust through max-Q.
         return {
-            "action_id": "ksp.throttle",
-            "params": {"throttle": 0.35},
-            "rationale": "Ease through max-Q.",
+            "action_id": "ksp.steer",
+            "params": {"pitch": -0.35},
+            "rationale": "Start the gravity turn - ease pitch while dynamic pressure peaks.",
             "risk": "low",
-            "expected_effect": "Lower dynamic pressure through the critical window.",
+            "expected_effect": "Nose tips east for a smoother ascent.",
         }
     if event.type in {"ksp.apoapsis", "ksp.orbit_achieved"}:
         return {
@@ -101,13 +102,13 @@ def _base_proposal(event: GameEvent) -> dict[str, Any] | None:
             "risk": "low",
             "expected_effect": "Engines idle while the trajectory settles.",
         }
-    if event.type == "ksp.landing":
+    if event.type in {"ksp.landing", "ksp.landed"}:
         return {
-            "action_id": "ksp.brake",
-            "params": {"enabled": True},
-            "rationale": "Deploy brakes / airbrakes for landing.",
+            "action_id": "ksp.gear",
+            "params": {"deployed": True},
+            "rationale": "Deploy landing gear before touchdown.",
             "risk": "low",
-            "expected_effect": "Slower descent for a safer touchdown.",
+            "expected_effect": "Gear down for a safer landing.",
         }
     if event.type in {"ets2.collision", "scs.hard_brake", "ats.collision"}:
         return {

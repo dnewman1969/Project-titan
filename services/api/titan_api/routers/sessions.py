@@ -27,7 +27,7 @@ from titan_core.clock import SessionClock, utc_now
 from titan_core.config import expand_path
 from titan_core.errors import ErrorCode, TitanError
 from titan_core.ids import uuid7
-from titan_core.play_attach import probe_attach, resolve_session_source
+from titan_core.play_attach import probe_attach, resolve_session_source, wait_probe_attach
 from titan_db.models.games import Game, GameProfile
 from titan_db.models.sessions import Session
 from titan_db.repositories.blackboard import BlackboardRepository
@@ -212,11 +212,47 @@ async def start_session(
         demo_telemetry=bool(row.settings.get("demo_telemetry", False)),
         has_install=has_install,
     )
-    play_attach = probe_attach(game_slug=game_slug, source=session_source) if play_enabled else None
-    if play_attach is not None:
+
+    # Launch before attach wait so kRPC/SCS have time to come up with the game.
+    launched_game = False
+    launch_error: str | None = None
+    if body.launch_game and profile is not None:
+        exe = profile.executable_path
+
+        def _launch() -> str | None:
+            path = Path(exe)
+            if not path.is_file():
+                return f"executable not found: {exe}"
+            try:
+                subprocess.Popen([exe])  # noqa: S603
+            except OSError as exc:
+                return f"{type(exc).__name__}: {exc}"
+            return None
+
+        launch_error = await asyncio.to_thread(_launch)
+        launched_game = launch_error is None
+
+    play_attach = None
+    play_actions = False
+    if play_enabled:
+        if session_source == "live":
+            play_attach = await wait_probe_attach(
+                game_slug=game_slug,
+                source=session_source,
+                launched_game=launched_game,
+            )
+        else:
+            play_attach = probe_attach(game_slug=game_slug, source=session_source)
+        # Only start titan-actions when attach is ready; otherwise stay in observe/learn.
+        play_actions = bool(play_attach.ready)
         settings = dict(row.settings or {})
         settings["session_source"] = session_source
         settings["play_attach"] = play_attach.as_dict()
+        settings["play_enabled"] = play_enabled
+        if not play_actions:
+            settings["play_waiting"] = True
+        else:
+            settings.pop("play_waiting", None)
         row.settings = settings
 
     try:
@@ -225,12 +261,11 @@ async def start_session(
             controller.start_orchestrator(
                 session_id,
                 game_slug=game_slug,
-                play_enabled=play_enabled,
+                play_enabled=play_actions,
                 data_dir=row.data_dir,
             )
-        if play_enabled and play_attach is not None:
-            # Always set an explicit backend so a registered install attaches kRPC/SCS
-            # (not silent auto), and fixture sessions stay on honest HIL.
+        if play_actions and play_attach is not None:
+            # Explicit backend: hil for fixture, krpc/scs when an install is attached and ready.
             controller.start_actions(
                 session_id,
                 game_slug=game_slug,
@@ -256,14 +291,6 @@ async def start_session(
         await _seed_director_demo_line(db, session_id)
     if row.settings.get("agents_enabled", True):
         await seed_prior_memories_on_blackboard(db, session_id=session_id, game_slug=game_slug)
-    if body.launch_game and profile is not None:
-        exe = profile.executable_path
-
-        def _launch() -> None:
-            if Path(exe).is_file():
-                subprocess.Popen([exe])  # noqa: S603
-
-        await asyncio.to_thread(_launch)
     recording_payload: dict[str, object] | None = None
     if row.settings.get("record_on_start"):
         from titan_api.recording_ops import start_session_recording
@@ -273,6 +300,10 @@ async def start_session(
     if play_attach is not None:
         payload["play_attach"] = play_attach.as_dict()
     payload["session_source"] = session_source
+    payload["play_enabled"] = play_enabled
+    payload["play_actions"] = play_actions
+    if launch_error is not None:
+        payload["launch_error"] = launch_error
     if recording_payload is not None:
         payload["recording"] = recording_payload
     return payload
@@ -335,27 +366,49 @@ async def set_session_play(
     settings["play_enabled"] = body.enabled
     settings["session_source"] = session_source
     play_attach = None
+    play_actions = False
     if body.enabled:
-        play_attach = probe_attach(game_slug=game_slug, source=session_source)
+        if session_source == "live":
+            play_attach = await wait_probe_attach(
+                game_slug=game_slug,
+                source=session_source,
+                launched_game=False,
+            )
+        else:
+            play_attach = probe_attach(game_slug=game_slug, source=session_source)
         settings["play_attach"] = play_attach.as_dict()
-        # Restart orchestrator so TITAN_SESSION_PLAY=1 wires proposal + feedback loops.
-        if row.settings.get("agents_enabled", True):
-            controller.restart_orchestrator(
+        play_actions = bool(play_attach.ready)
+        if play_actions:
+            settings.pop("play_waiting", None)
+            # Restart orchestrator so TITAN_SESSION_PLAY=1 wires proposal + feedback loops.
+            if row.settings.get("agents_enabled", True):
+                controller.restart_orchestrator(
+                    session_id,
+                    game_slug=game_slug,
+                    play_enabled=True,
+                    data_dir=row.data_dir,
+                )
+            controller.stop_actions(session_id)
+            controller.start_actions(
                 session_id,
                 game_slug=game_slug,
-                play_enabled=True,
                 data_dir=row.data_dir,
+                play_backend=play_attach.backend,
             )
-        controller.stop_actions(session_id)
-        controller.start_actions(
-            session_id,
-            game_slug=game_slug,
-            data_dir=row.data_dir,
-            play_backend=play_attach.backend,
-        )
+        else:
+            settings["play_waiting"] = True
+            controller.stop_actions(session_id)
+            if row.settings.get("agents_enabled", True):
+                controller.restart_orchestrator(
+                    session_id,
+                    game_slug=game_slug,
+                    play_enabled=False,
+                    data_dir=row.data_dir,
+                )
     else:
         controller.stop_actions(session_id)
         settings.pop("play_attach", None)
+        settings.pop("play_waiting", None)
     row.settings = settings
     await db.flush()
     payload = _session_json(row)
@@ -363,6 +416,7 @@ async def set_session_play(
     if play_attach is not None:
         payload["play_attach"] = play_attach.as_dict()
     payload["play_enabled"] = body.enabled
+    payload["play_actions"] = play_actions
     return payload
 
 

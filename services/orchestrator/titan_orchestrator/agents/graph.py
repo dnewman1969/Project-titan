@@ -6,6 +6,7 @@ from typing import TypedDict
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
 from titan_models.fake import FakeProvider
 from titan_models.types import ChatMessage, GenerationParams
@@ -39,7 +40,9 @@ async def _decide(state: AgentGraphState, provider: FakeProvider, model: str) ->
     return {"intent": "speak" if result.text else "none", "reply": result.text}
 
 
-def build_agent_graph(provider: FakeProvider, *, model: str = "fake:small") -> StateGraph:
+def build_agent_graph(
+    provider: FakeProvider, *, model: str = "fake:small"
+) -> StateGraph[AgentGraphState, None, AgentGraphState, AgentGraphState]:
     graph = StateGraph(AgentGraphState)
     graph.add_node("perceive", _perceive)
 
@@ -53,6 +56,8 @@ def build_agent_graph(provider: FakeProvider, *, model: str = "fake:small") -> S
     return graph
 
 
-def compile_agent_runtime(provider: FakeProvider | None = None, *, model: str = "fake:small"):
+def compile_agent_runtime(
+    provider: FakeProvider | None = None, *, model: str = "fake:small"
+) -> CompiledStateGraph[AgentGraphState, None, AgentGraphState, AgentGraphState]:
     fake = provider or FakeProvider(script=["acknowledge"])
     return build_agent_graph(fake, model=model).compile(checkpointer=MemorySaver())

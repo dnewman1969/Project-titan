@@ -42,7 +42,7 @@ async def _run(session_id: UUID, game_slug: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    configure_logging()
+    configure_logging("orchestrator")
     args = parse_args(argv)
     try:
         return asyncio.run(_run(args.session_id, args.game_slug))

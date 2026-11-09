@@ -7,7 +7,7 @@ import time
 from collections import defaultdict
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal, cast
 from uuid import UUID
 
 import redis.asyncio as aioredis
@@ -67,7 +67,7 @@ class BlackboardService:
             payload = json.loads(cached)
             if payload.get("op") == "retract":
                 return None
-            return payload
+            return cast(dict[str, Any], payload)
         row = await self._repo.latest_entry(self._session_id, section, key)
         if row is None or row.op == "retract":
             return None
@@ -230,7 +230,15 @@ class BlackboardService:
     ) -> None:
         if self._emit is None:
             return
-        payload = BBWritten(section=section, key=key, version=version, op=op, bb_version=bb_version)
+        section_lit = cast(Section, section)
+        op_lit = cast(Literal["put", "retract"], op)
+        payload = BBWritten(
+            section=section_lit,
+            key=key,
+            version=version,
+            op=op_lit,
+            bb_version=bb_version,
+        )
         envelope = make_envelope(
             type="bb.written",
             session_id=self._session_id,

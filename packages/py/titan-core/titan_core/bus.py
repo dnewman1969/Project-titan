@@ -109,7 +109,7 @@ class SessionBus:
         block_ms: int = 1000,
         last_id: str = ">",
     ) -> list[tuple[str, Envelope]]:
-        rows = await self._client.xreadgroup(
+        rows: Any = await self._client.xreadgroup(
             group,
             consumer,
             {self._stream: last_id},
@@ -129,7 +129,9 @@ class SessionBus:
         """Blocking tail read without a consumer group (used by the in-process router loop)."""
         cursor = last_id
         while True:
-            rows = await self._client.xread({self._stream: cursor}, count=count, block=block_ms or None)
+            rows: Any = await self._client.xread(
+                {self._stream: cursor}, count=count, block=block_ms or None
+            )
             parsed = _parse_xread(rows, session_id=self._session_id)
             if not parsed:
                 if block_ms <= 0:

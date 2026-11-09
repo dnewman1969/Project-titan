@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from dataclasses import dataclass, field
+from typing import Any
 from uuid import UUID
 
 import redis.asyncio as aioredis
@@ -68,7 +69,7 @@ class SessionRuntime:
         self._tasks.clear()
         await self.redis.aclose()
 
-    async def register_team(self, roster: list[dict[str, object]]) -> None:
+    async def register_team(self, roster: list[dict[str, Any]]) -> None:
         for item in roster:
             instance_id = UUID(str(item["instance_id"]))
             registration = AgentRegistration(
@@ -78,12 +79,13 @@ class SessionRuntime:
                 is_director=bool(item.get("is_director")),
             )
             self.router.register(registration)
-            patterns = list(item.get("event_subscriptions") or [])
+            raw_patterns = item.get("event_subscriptions") or []
+            patterns = [str(p) for p in raw_patterns] if isinstance(raw_patterns, list) else []
             if patterns:
                 self.event_router.subscribe(instance_id, patterns)
 
     def blackboard_service(self, db: AsyncSession, *, emit: bool = True) -> BlackboardService:
-        async def emit_envelope(envelope):
+        async def emit_envelope(envelope: Any) -> None:
             await self.bus.publish(envelope)
 
         return BlackboardService(

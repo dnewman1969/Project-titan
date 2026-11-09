@@ -93,13 +93,19 @@ class WorldStateUpdater:
 
     async def poll_events_stream(self, last_id: str = "$") -> tuple[str, list[GameEvent]]:
         stream = session_events_stream(str(self.session_id))
-        rows = await self.redis.xread({stream: last_id}, count=16, block=1)
+        rows: Any = await self.redis.xread({stream: last_id}, count=16, block=1)
         events: list[GameEvent] = []
         next_id = last_id
-        for _, entries in rows:
+        if not rows:
+            return next_id, events
+        for stream_name, entries in rows:
+            if str(stream_name) != stream:
+                continue
             for entry_id, fields in entries:
                 next_id = str(entry_id)
-                raw = fields.get(DATA_FIELD) if fields else None
+                if not isinstance(fields, dict):
+                    continue
+                raw = fields.get(DATA_FIELD)
                 if not isinstance(raw, str):
                     continue
                 data = json.loads(raw)

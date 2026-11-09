@@ -10,17 +10,20 @@ import Stepper from "@mui/material/Stepper";
 import Typography from "@mui/material/Typography";
 import { useState } from "react";
 
+import { useAppDispatch, useAppSelector } from "../../app/hooks";
+import { setFirstRunOpen } from "../operations/layoutSlice";
+
 const STORAGE_KEY = "titan.firstRunComplete";
 
 const STEPS = [
   {
     title: "Ollama",
-    body: "Install Ollama and pull qwen3:8b. Titan blocks agent start when Ollama is down.",
+    body: "Install Ollama and pull qwen3:8b. Titan blocks agent start when Ollama is down (model pill may show degraded).",
     href: "https://ollama.com/download",
   },
   {
     title: "OBS Studio",
-    body: "Install OBS 30+ and enable obs-websocket v5 on port 4455. Recording is optional until capture is ready.",
+    body: "Install OBS 30+ and enable obs-websocket v5 on port 4455. REC in the top bar writes a manifest always; OBS improves capture when online.",
     href: "https://obsproject.com/",
   },
   {
@@ -47,13 +50,19 @@ export function markFirstRunComplete(): void {
 }
 
 export function FirstRunWizard() {
-  const [open, setOpen] = useState(() => isFirstRunPending());
+  const dispatch = useAppDispatch();
+  const forcedOpen = useAppSelector((s) => s.layout.firstRunOpen);
+  const [dismissed, setDismissed] = useState(false);
   const [active, setActive] = useState(0);
   const step = STEPS[active] ?? STEPS[0];
+  const open = !dismissed && (isFirstRunPending() || forcedOpen);
+
   const finish = () => {
     markFirstRunComplete();
-    setOpen(false);
+    setDismissed(true);
+    dispatch(setFirstRunOpen(false));
   };
+
   if (!open) return null;
   return (
     <Dialog open onClose={finish} aria-labelledby="first-run-title" maxWidth="sm" fullWidth>

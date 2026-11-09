@@ -2,8 +2,10 @@ import { ThemeProvider } from "@mui/material/styles";
 import { createTitanTheme } from "@titan/ui-kit";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Provider } from "react-redux";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { makeStore } from "../../src/renderer/app/store";
 import {
   FirstRunWizard,
   isFirstRunPending,
@@ -18,9 +20,11 @@ describe("FirstRunWizard", () => {
   it("shows until the user finishes", async () => {
     const user = userEvent.setup();
     render(
-      <ThemeProvider theme={createTitanTheme()}>
-        <FirstRunWizard />
-      </ThemeProvider>,
+      <Provider store={makeStore()}>
+        <ThemeProvider theme={createTitanTheme()}>
+          <FirstRunWizard />
+        </ThemeProvider>
+      </Provider>,
     );
     expect(screen.getByText("First-run setup")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Next" }));

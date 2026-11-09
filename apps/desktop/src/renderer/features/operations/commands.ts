@@ -1,7 +1,7 @@
 import { findMenuItem } from "../../../shared/menu";
 import type { AppDispatch } from "../../app/store";
-import { openSessionDialog } from "../sessions/sessionsSlice";
-import { setAboutOpen, showNotice, togglePanel } from "./layoutSlice";
+import { openSessionDialog, requestRecordingFromMenu } from "../sessions/sessionsSlice";
+import { setAboutOpen, setFirstRunOpen, showNotice, togglePanel } from "./layoutSlice";
 
 export function handleMenuCommand(id: string, dispatch: AppDispatch): void {
   const item = findMenuItem(id);
@@ -20,6 +20,18 @@ export function handleMenuCommand(id: string, dispatch: AppDispatch): void {
   }
   if (item.id === "tools.gameDiscovery") {
     dispatch(togglePanel("games"));
+    return;
+  }
+  if (item.id === "help.firstRun") {
+    dispatch(setFirstRunOpen(true));
+    return;
+  }
+  if (item.id === "record.start") {
+    dispatch(requestRecordingFromMenu("start"));
+    return;
+  }
+  if (item.id === "record.stop") {
+    dispatch(requestRecordingFromMenu("stop"));
     return;
   }
   dispatch(

@@ -153,7 +153,7 @@ Open http://127.0.0.1:8765/api/v1/docs in a browser (you need the launch token f
 
 ### Optional: agent voice / portraits
 
-Create `apps/desktop/.env` (or set in the shell before `pnpm dev`):
+Copy `apps/desktop/.env.example` to `.env` (or set in the shell before `pnpm dev`):
 
 ```env
 VITE_OWL_TTS_URL=http://127.0.0.1:8790
@@ -258,10 +258,10 @@ uv run python -m titan_telemetry replay games/ksp/fixtures/launch-to-orbit.ndjso
 
 ### E7 — First-run wizard (M10 stub)
 
-| #   | Pass if                                                               |
-| --- | --------------------------------------------------------------------- |
-| 25  | First-run wizard appears (or can be opened from tools menu if linked) |
-| 26  | Links open (Ollama, Memurai, etc.) without crashing the app           |
+| #   | Pass if                                                         |
+| --- | --------------------------------------------------------------- |
+| 25  | First-run wizard on first launch, or **Help → First-Run Setup** |
+| 26  | Links open (Ollama, Memurai, etc.) without crashing the app     |
 
 ### E8 — Automated smoke (optional but helpful)
 
@@ -315,7 +315,7 @@ E8:
 
 - **No packaged NSIS installer** yet for daily use — dev workflow only unless you build `pnpm --filter @titan/desktop dist` yourself.
 - **OBS** improves M8 capture when obs-websocket v5 is on **4455**; without OBS, REC still writes **manifest.json** (degraded).
-- **Live agent bus chat** (full M7.T2 streaming) is not wired; Agents panel is a **demo** until WS chat lands.
+- **Live agent bus chat** (full M7.T2 streaming) is not wired; Agents panel is a **demo** until WS chat lands. **Record → Start/Stop** and **Help → First-Run Setup** work in the desktop shell.
 - **YouTube publish kit** is documented from FoF research, not yet a button in the UI.
 - **Ollama** optional for this test; missing Ollama may show degraded model pill, not a crash.
 

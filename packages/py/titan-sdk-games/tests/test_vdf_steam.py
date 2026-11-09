@@ -33,6 +33,29 @@ def test_steam_scanner_reads_acf(tmp_path: Path) -> None:
     assert installs[0].build_id == "12345678"
 
 
+def test_steam_libraryfolders_accepts_escaped_windows_paths(tmp_path: Path) -> None:
+    primary = tmp_path / "Steam"
+    secondary = tmp_path / "SteamLibrary"
+    primary_steamapps = primary / "steamapps"
+    primary_steamapps.mkdir(parents=True)
+    secondary_steamapps = secondary / "steamapps"
+    secondary_steamapps.mkdir(parents=True)
+    escaped = str(secondary).replace("\\", "\\\\")
+    (primary_steamapps / "libraryfolders.vdf").write_text(
+        f'"libraryfolders"\n{{\n\t"1"\n\t{{\n\t\t"path"\t\t"{escaped}"\n\t}}\n}}\n',
+        encoding="utf-8",
+    )
+    common = secondary / "common" / "Game"
+    common.mkdir(parents=True)
+    (common / "a.exe").write_bytes(b"MZ")
+    (secondary_steamapps / "appmanifest_99.acf").write_text(
+        '"AppState"\n{\n"appid" "99"\n"installdir" "Game"\n}\n',
+        encoding="utf-8",
+    )
+    ctx = DiscoveryContext(platform="windows", steam_libraries=[primary])
+    assert len(SteamScanner().scan(ctx)) == 1
+
+
 def test_steam_scanner_finds_ets2_on_secondary_library(tmp_path: Path) -> None:
     primary = tmp_path / "C_Steam"
     secondary = tmp_path / "D_SteamLibrary"

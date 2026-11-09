@@ -26,8 +26,10 @@ def format_chroma_rows(body: dict[str, Any]) -> list[dict[str, Any]]:
     ids = body.get("ids")
     if not isinstance(ids, list):
         return []
-    documents = body.get("documents") if isinstance(body.get("documents"), list) else []
-    metadatas = body.get("metadatas") if isinstance(body.get("metadatas"), list) else []
+    documents_raw = body.get("documents")
+    documents: list[Any] = documents_raw if isinstance(documents_raw, list) else []
+    metadatas_raw = body.get("metadatas")
+    metadatas: list[Any] = metadatas_raw if isinstance(metadatas_raw, list) else []
     distances = body.get("distances")
     dist_row = distances[0] if isinstance(distances, list) and distances else []
     items: list[dict[str, Any]] = []

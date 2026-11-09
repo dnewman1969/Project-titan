@@ -7,7 +7,7 @@ import DialogTitle from "@mui/material/DialogTitle";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 
 import { useCreateSessionMutation, useListGamesQuery, useStartSessionMutation } from "../../app/api";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
@@ -48,18 +48,10 @@ export function NewSessionDialog() {
       })),
     })) ?? [...FALLBACK_GAMES];
   const game = games.find((g) => g.slug === gameSlug) ?? games[0];
-  const profiles = useMemo(() => game?.profiles ?? [], [game]);
-
-  useEffect(() => {
-    if (!profiles.length) {
-      setProfileId("");
-      return;
-    }
-    const preferred = profiles.find((p) => p.id === profileId);
-    if (!preferred) {
-      setProfileId(profiles[0]?.id ?? "");
-    }
-  }, [gameSlug, profiles, profileId]);
+  const profiles = game?.profiles ?? [];
+  const effectiveProfileId = profiles.some((p) => p.id === profileId)
+    ? profileId
+    : (profiles[0]?.id ?? "");
 
   const isLoading = creating || starting;
   const onClose = () => {
@@ -71,7 +63,7 @@ export function NewSessionDialog() {
     const sessionTitle = title.trim() || "Observe session";
     const result = await createSession({
       game_slug: game.slug,
-      game_profile_id: profileId || undefined,
+      game_profile_id: effectiveProfileId || undefined,
       title: sessionTitle,
       mode: "observe",
       settings: { agents_enabled: true },
@@ -79,7 +71,7 @@ export function NewSessionDialog() {
     if ("data" in result && result.data) {
       const started = await startSession({
         sessionId: result.data.id,
-        launch_game: launchGame && Boolean(profileId),
+        launch_game: launchGame && Boolean(effectiveProfileId),
       });
       if ("data" in started && started.data) {
         dispatch(
@@ -127,7 +119,11 @@ export function NewSessionDialog() {
           label="Game"
           value={gameSlug}
           onChange={(e) => {
-            setGameSlug(e.target.value);
+            const slug = e.target.value;
+            setGameSlug(slug);
+            const picked = games.find((g) => g.slug === slug);
+            setProfileId(picked?.profiles?.[0]?.id ?? "");
+            setLaunchGame(false);
           }}
           fullWidth
         >
@@ -141,7 +137,7 @@ export function NewSessionDialog() {
           <TextField
             select
             label="Installation"
-            value={profileId}
+            value={effectiveProfileId}
             onChange={(e) => {
               setProfileId(e.target.value);
             }}
@@ -164,7 +160,7 @@ export function NewSessionDialog() {
           control={
             <Checkbox
               checked={launchGame}
-              disabled={!profileId}
+              disabled={!effectiveProfileId}
               onChange={(e) => {
                 setLaunchGame(e.target.checked);
               }}

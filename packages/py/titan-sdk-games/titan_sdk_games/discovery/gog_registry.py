@@ -23,7 +23,7 @@ class GogRegistryInstall:
     build_id: str | None
 
 
-def _query_gog_value(key, name: str) -> str | None:  # noqa: ANN001
+def _query_gog_value(key, name: str) -> str | None:
     try:
         import winreg
 
@@ -72,7 +72,11 @@ def list_gog_registry_installs() -> list[GogRegistryInstall]:
                         candidate = install_path / exe_file
                         exe = candidate if candidate.is_file() else exe
                 name = _query_gog_value(key, "gameName") or _query_gog_value(key, "GAMENAME")
-                build = _query_gog_value(key, "BUILDID") or _query_gog_value(key, "BUILD") or _query_gog_value(key, "ver")
+                build = (
+                    _query_gog_value(key, "BUILDID")
+                    or _query_gog_value(key, "BUILD")
+                    or _query_gog_value(key, "ver")
+                )
                 found.append(
                     GogRegistryInstall(
                         product_id=product_id,

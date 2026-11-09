@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from typing import Literal
 
-BanterKind = Literal["feast", "insult"]
+BanterKind = Literal["feast", "insult", "incredible"]
 
 ROSTER: tuple[tuple[str, str, str], ...] = (
     ("wernher", "Wernher", "director"),
@@ -26,12 +26,30 @@ _LINES: dict[BanterKind, tuple[str, ...]] = {
         "I've seen slower reaction times in wet cement. Listen closely this time.",
         "You call that a plan? Adorable. Watch a professional.",
     ),
+    "incredible": (
+        "That play was clean. Save the replay—you'll need it when someone doubts me.",
+        "Impressive? For you, maybe. For me, Tuesday. Stay out of my burn window.",
+        "Watch the telemetry: perfect. Clap if you must, then don't touch the stick.",
+        "Fine unlocked. I make impossible look routine—get used to it.",
+    ),
 }
 
 
-def pick_play_commentary(*, ok: bool) -> dict[str, str]:
-    """Pick one arrogant line + persona for a play outcome."""
-    kind: BanterKind = "feast" if ok else "insult"
+def pick_play_commentary(*, ok: bool, impressive: bool | None = None) -> dict[str, str]:
+    """Pick one arrogant line + persona for a play outcome.
+
+    Successful / impressive plays get superior smack-talk (incredible or feast).
+    Failures get insults.
+    """
+    if not ok:
+        kind: BanterKind = "insult"
+    elif impressive is True:
+        kind = "incredible"
+    elif impressive is False:
+        kind = "feast"
+    else:
+        # Default: most successes are "impressive" smack-talk.
+        kind = "incredible" if random.random() < 0.65 else "feast"  # noqa: S311
     slug, display_name, role = random.choice(ROSTER)  # noqa: S311 — banter pick
     line = random.choice(_LINES[kind])  # noqa: S311 — banter pick
     return {

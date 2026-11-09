@@ -25,6 +25,7 @@ import { useLayoutSettings } from "./useLayoutSettings";
 import { useLiveChannels } from "./useLiveChannels";
 import { useShellBridge } from "./useShellBridge";
 import { useBlackboardAgents } from "../hooks/useBlackboardAgents";
+import { useLiveAgentVoice } from "../hooks/useLiveAgentVoice";
 import { usePlayAttachSync } from "../hooks/usePlayAttachSync";
 import { useRecordingSync } from "../hooks/useRecordingSync";
 import { YouTubePublishDialog } from "../features/publish/YouTubePublishDialog";
@@ -114,6 +115,7 @@ export function App() {
   useLiveChannels();
   usePhase1Demo();
   useBlackboardAgents();
+  useLiveAgentVoice();
   useRecordingSync();
   usePlayAttachSync();
   const status = useApiStatus();

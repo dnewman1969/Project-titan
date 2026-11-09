@@ -435,8 +435,10 @@ describe("CSP", () => {
       "http://127.0.0.1:8765",
       "ws://127.0.0.1:8765",
       "http://127.0.0.1:8767",
+      "http://127.0.0.1:8790",
     ]);
     expect(d["img-src"]).toEqual(["'self'", "data:", "blob:", "http://127.0.0.1:8767"]);
+    expect(d["media-src"]).toEqual(["'self'", "blob:", "http://127.0.0.1:8767"]);
     expect(buildCsp({ dev: false })).not.toContain("localhost");
   });
 

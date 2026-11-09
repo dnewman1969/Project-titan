@@ -70,9 +70,11 @@ class GameAdapter(ABC):
         for inst in installs:
             if inst.store == "steam" and str(inst.app_id) not in {str(x) for x in detection.steam_app_ids}:
                 continue
-            if inst.store == "epic" and inst.app_id not in detection.epic_catalog_ids:
-                continue
-            if inst.store == "gog" and inst.app_id not in detection.gog_product_ids:
+            if inst.store == "epic":
+                epic_ids = {str(x) for x in detection.epic_catalog_ids}
+                if inst.app_id not in epic_ids and (inst.name or "") not in epic_ids:
+                    continue
+            if inst.store == "gog" and str(inst.app_id) not in {str(x) for x in detection.gog_product_ids}:
                 continue
             if inst.store == "standalone" and not _matches_executable(
                 inst.executable_path, detection.executables

@@ -203,6 +203,11 @@ if (-not (Test-Path $startScript)) {
     Show-Error "Start-Titan.ps1 not found next to Update-Titan.ps1."
 }
 
-$skipArg = if ($needDeps) { @() } else { @("-SkipDependencyInstall") }
-& powershell -NoProfile -ExecutionPolicy Bypass -File $startScript @skipArg
+# Already running under -ExecutionPolicy Bypass from Update-Titan.bat; do not re-exec powershell
+# (nested invocations have tripped cmd with a broken "ecutionPolicy" token on some machines).
+if ($needDeps) {
+    & $startScript
+} else {
+    & $startScript -SkipDependencyInstall
+}
 exit $LASTEXITCODE

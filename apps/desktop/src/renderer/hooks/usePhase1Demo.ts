@@ -10,12 +10,12 @@ import {
   pickBanterLine,
   type RosterEntry,
 } from "../features/agents/arrogantLines";
+import { autoDemoEnabled } from "../app/viteEnv";
 import { showNotice } from "../features/operations/layoutSlice";
 import { setActiveSession } from "../features/sessions/sessionsSlice";
 import { speakAgentLine } from "../services/voice/speak";
 
-const AUTO_DEMO =
-  import.meta.env.VITE_TITAN_AUTO_DEMO === "true" || import.meta.env.VITE_TITAN_AUTO_DEMO === "1";
+const AUTO_DEMO = autoDemoEnabled();
 
 async function deliverGreeting(
   dispatch: ReturnType<typeof useAppDispatch>,

@@ -17,9 +17,30 @@ def test_update_titan_documents_dirty_tree_and_pull_failures() -> None:
     text = (ROOT / "Update-Titan.ps1").read_text(encoding="utf-8")
     assert "Show-PullFailed" in text
     assert "Confirm-DiscardLocalChanges" in text
-    assert "git pull --ff-only" in text
+    assert "--ff-only" in text
     assert "Test-DependencyInstallNeeded" in text
     assert "SkipDependencyInstall" in text
+
+
+def test_update_titan_hardens_git_stderr_under_stop() -> None:
+    """Windows PowerShell Stop + 2>&1 must not treat git progress stderr as terminating."""
+    text = (ROOT / "Update-Titan.ps1").read_text(encoding="utf-8")
+    assert "function Invoke-Git" in text
+    assert "GitLastExitCode" in text
+    assert '$ErrorActionPreference = "Continue"' in text
+    assert "NativeCommandError" in text or "stderr" in text.lower()
+    # Dangerous pattern that failed David's double-click updater on a successful fetch.
+    assert "2>&1 | ForEach-Object" not in text
+    assert "& git fetch origin 2>&1" not in text
+    assert 'Invoke-Git -Arguments @("fetch", "origin")' in text
+    assert 'Invoke-Git -Arguments @("pull", "--ff-only", "origin", "main")' in text
+    assert 'Invoke-Git -Arguments @("reset", "--hard", "origin/main")' in text
+    assert 'Invoke-Git -Arguments @("checkout", "main")' in text
+    assert 'Invoke-Git -Arguments @("status", "--porcelain")' in text
+    assert 'Invoke-Git -Arguments @("rev-parse", "HEAD")' in text
+    # Only Invoke-Git may execute git with redirected stderr.
+    assert text.count("& git @Arguments 2>&1") == 1
+    assert "2>&1 |" not in text
 
 
 def test_start_titan_accepts_skip_dependency_install() -> None:

@@ -33,6 +33,41 @@ What you can try:
 "@
 }
 
+# Run git without treating stderr progress/info as terminating errors under $ErrorActionPreference Stop.
+# Windows PowerShell wraps stderr lines (e.g. "From https://...") as NativeCommandError when 2>&1 is used;
+# with Stop that aborts the script even when git exit code is 0. Scope Continue, stringify, check GitLastExitCode.
+$script:GitLastExitCode = 0
+function Invoke-Git {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+        [switch]$Capture
+    )
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $raw = & git @Arguments 2>&1
+        $script:GitLastExitCode = $LASTEXITCODE
+        $lines = New-Object System.Collections.Generic.List[string]
+        foreach ($item in @($raw)) {
+            if ($null -eq $item) { continue }
+            if ($item -is [System.Management.Automation.ErrorRecord]) {
+                [void]$lines.Add($item.ToString())
+            } else {
+                [void]$lines.Add([string]$item)
+            }
+        }
+        if ($Capture) {
+            return (($lines -join "`n").TrimEnd())
+        }
+        foreach ($text in $lines) {
+            Write-Host $text
+        }
+    } finally {
+        $ErrorActionPreference = $prevEap
+    }
+}
+
 function Test-DependencyInstallNeeded {
     param(
         [string]$BeforeRef,
@@ -49,9 +84,13 @@ function Test-DependencyInstallNeeded {
     if ($BeforeRef -eq $AfterRef) {
         return $false
     }
-    $names = @(& git diff --name-only $BeforeRef $AfterRef 2>&1)
-    if ($LASTEXITCODE -ne 0) {
+    $namesText = Invoke-Git -Arguments @("diff", "--name-only", $BeforeRef, $AfterRef) -Capture
+    if ($script:GitLastExitCode -ne 0) {
         return $true
+    }
+    $names = @()
+    if ($namesText) {
+        $names = $namesText -split "`n"
     }
     foreach ($n in $names) {
         if (-not $n) { continue }
@@ -107,51 +146,55 @@ Write-Host "Project Titan - Update" -ForegroundColor Cyan
 Write-Host "Repository: $RepoRoot" -ForegroundColor DarkGray
 Write-Host ""
 
-$porcelain = @(& git status --porcelain 2>&1)
-if ($LASTEXITCODE -ne 0) {
+$porcelainText = Invoke-Git -Arguments @("status", "--porcelain") -Capture
+if ($script:GitLastExitCode -ne 0) {
     Show-Error "git status failed. Fix git, then try again."
 }
-$hadLocalChanges = [bool]($porcelain | Where-Object { $_ -match '\S' })
+$porcelain = @()
+if ($porcelainText) {
+    $porcelain = @($porcelainText -split "`n" | Where-Object { $_ -match '\S' })
+}
+$hadLocalChanges = [bool]$porcelain
 if ($hadLocalChanges) {
-    Confirm-DiscardLocalChanges @($porcelain | Where-Object { $_ -match '\S' })
+    Confirm-DiscardLocalChanges $porcelain
 }
 
-$beforeRef = (& git rev-parse HEAD 2>&1)
-if ($LASTEXITCODE -ne 0) {
+$beforeRef = Invoke-Git -Arguments @("rev-parse", "HEAD") -Capture
+if ($script:GitLastExitCode -ne 0) {
     Show-Error "git rev-parse HEAD failed. Is this repository corrupted?"
 }
 $beforeRef = $beforeRef.Trim()
 
 Write-Host "Fetching from origin..." -ForegroundColor Cyan
-& git fetch origin 2>&1 | ForEach-Object { Write-Host $_ }
-if ($LASTEXITCODE -ne 0) {
-    Show-PullFailed "git fetch origin failed (exit $LASTEXITCODE)."
+Invoke-Git -Arguments @("fetch", "origin")
+if ($script:GitLastExitCode -ne 0) {
+    Show-PullFailed "git fetch origin failed (exit $($script:GitLastExitCode))."
 }
 
-$originMain = (& git rev-parse origin/main 2>&1)
-if ($LASTEXITCODE -ne 0) {
+$originMain = Invoke-Git -Arguments @("rev-parse", "origin/main") -Capture
+if ($script:GitLastExitCode -ne 0) {
     Show-PullFailed "origin/main not found after fetch. Check git remote (git remote -v)."
 }
 $originMain = $originMain.Trim()
 
 Write-Host "Checking out main..." -ForegroundColor Cyan
-& git checkout main 2>&1 | ForEach-Object { Write-Host $_ }
-if ($LASTEXITCODE -ne 0) {
+Invoke-Git -Arguments @("checkout", "main")
+if ($script:GitLastExitCode -ne 0) {
     Show-PullFailed "git checkout main failed. You may be on another branch with conflicts."
 }
 
 $synced = $false
 if ($hadLocalChanges -or $beforeRef -ne $originMain) {
     Write-Host "Syncing to origin/main ($($originMain.Substring(0, [Math]::Min(8, $originMain.Length))))..." -ForegroundColor Cyan
-    & git reset --hard origin/main 2>&1 | ForEach-Object { Write-Host $_ }
-    if ($LASTEXITCODE -ne 0) {
+    Invoke-Git -Arguments @("reset", "--hard", "origin/main")
+    if ($script:GitLastExitCode -ne 0) {
         Show-PullFailed "git reset --hard origin/main failed."
     }
     $synced = $true
 } else {
     Write-Host "Fast-forwarding main from origin..." -ForegroundColor Cyan
-    & git pull --ff-only origin main 2>&1 | ForEach-Object { Write-Host $_ }
-    if ($LASTEXITCODE -ne 0) {
+    Invoke-Git -Arguments @("pull", "--ff-only", "origin", "main")
+    if ($script:GitLastExitCode -ne 0) {
         Write-Host "Fast-forward pull failed (local main diverged from origin)." -ForegroundColor Yellow
         if (-not $ForceDiscard -and -not $hadLocalChanges) {
             Write-Host "Press Y to reset to origin/main anyway, or N to cancel." -ForegroundColor Yellow
@@ -165,16 +208,22 @@ To match GitHub: git fetch origin && git reset --hard origin/main
 "@
             }
         }
-        & git reset --hard origin/main 2>&1 | ForEach-Object { Write-Host $_ }
-        if ($LASTEXITCODE -ne 0) {
+        Invoke-Git -Arguments @("reset", "--hard", "origin/main")
+        if ($script:GitLastExitCode -ne 0) {
             Show-PullFailed "git reset --hard origin/main failed after pull error."
         }
         $synced = $true
     }
 }
 
-$afterRef = (& git rev-parse HEAD).Trim()
-$headShort = (& git rev-parse --short HEAD).Trim()
+$afterRef = (Invoke-Git -Arguments @("rev-parse", "HEAD") -Capture).Trim()
+if ($script:GitLastExitCode -ne 0) {
+    Show-Error "git rev-parse HEAD failed after sync."
+}
+$headShort = (Invoke-Git -Arguments @("rev-parse", "--short", "HEAD") -Capture).Trim()
+if ($script:GitLastExitCode -ne 0) {
+    Show-Error "git rev-parse --short HEAD failed after sync."
+}
 Write-Host ""
 if ($beforeRef -eq $afterRef) {
     Write-Host "Already on latest main ($headShort)." -ForegroundColor Green

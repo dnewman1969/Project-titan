@@ -1914,6 +1914,7 @@ dependencies = [
     { name = "titan-game-ats" },
     { name = "titan-game-ets2" },
     { name = "titan-game-ksp" },
+    { name = "titan-memory" },
     { name = "titan-models" },
     { name = "titan-sdk-games" },
     { name = "uvicorn" },
@@ -1927,6 +1928,7 @@ requires-dist = [
     { name = "titan-game-ats", editable = "games/ats" },
     { name = "titan-game-ets2", editable = "games/ets2" },
     { name = "titan-game-ksp", editable = "games/ksp" },
+    { name = "titan-memory", editable = "packages/py/titan-memory" },
     { name = "titan-models", editable = "packages/py/titan-models" },
     { name = "titan-sdk-games", editable = "packages/py/titan-sdk-games" },
     { name = "uvicorn", specifier = ">=0.32" },
@@ -1938,14 +1940,10 @@ version = "0.1.0"
 source = { editable = "services/capture" }
 dependencies = [
     { name = "titan-core" },
-    { name = "websockets" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "titan-core", editable = "packages/py/titan-core" },
-    { name = "websockets", specifier = ">=14.0,<16" },
-]
+requires-dist = [{ name = "titan-core", editable = "packages/py/titan-core" }]
 
 [[package]]
 name = "titan-core"
@@ -1960,6 +1958,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "redis" },
     { name = "structlog" },
+    { name = "websockets" },
 ]
 
 [package.metadata]
@@ -1972,6 +1971,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "redis", specifier = ">=5.2" },
     { name = "structlog", specifier = ">=24.4" },
+    { name = "websockets", specifier = ">=14.0,<16" },
 ]
 
 [[package]]

@@ -20,15 +20,15 @@ FoF is a **research → script → ComfyUI clips → FFmpeg timeline → YouTube
 
 Battle-tested patterns documented as “OwlBox engine rewritten in Python”:
 
-| Pattern | Why it matters for Titan |
-|--------|---------------------------|
+| Pattern                                           | Why it matters for Titan                                           |
+| ------------------------------------------------- | ------------------------------------------------------------------ |
 | Render **each shot to its own file**, then concat | Failures name the bad segment (game hilight vs agent VO vs bumper) |
-| **NVENC** with **libx264** fallback | Same GPU story as OBS NVENC (spec D10) |
-| **xfade** transition map | Highlight reels from session markers |
-| **Ken Burns** on stills / depth parallax | Thumbnails, Comfy stills, replay frames |
-| **Music ducking** under narration | Agent voices (track 3) vs bed music (track 4) |
-| **-14 LUFS** loudness target (`loudness_lufs`) | YouTube-normal playback |
-| **AI label overlay** PNG on generated clips | “Altered content” compliance in publish checklist |
+| **NVENC** with **libx264** fallback               | Same GPU story as OBS NVENC (spec D10)                             |
+| **xfade** transition map                          | Highlight reels from session markers                               |
+| **Ken Burns** on stills / depth parallax          | Thumbnails, Comfy stills, replay frames                            |
+| **Music ducking** under narration                 | Agent voices (track 3) vs bed music (track 4)                      |
+| **-14 LUFS** loudness target (`loudness_lufs`)    | YouTube-normal playback                                            |
+| **AI label overlay** PNG on generated clips       | “Altered content” compliance in publish checklist                  |
 
 **Titan fit:** Implement in `titan-worker-media` `tasks/video.py` (Phase 6) using FoF’s `Timeline` / `Segment` / `AudioCue` model as a **reference schema**, fed from Titan’s **`recording_tracks` + markers + session events`** instead of FoF’s `production.json`.
 
@@ -91,15 +91,15 @@ FoF builds a JSON timeline: video track, speech, music cues, SFX, optional **pre
 
 ## Files in FoF worth reading when implementing
 
-| FoF path | Use in Titan |
-|---------|----------------|
-| `fofstudio/engines/render.py` | FFmpeg timeline executor |
-| `fofstudio/publishkit.py` | Publish kit + checklist UI |
-| `fofstudio/youtube.py` | Tag sanitizer, studio URLs |
-| `fofstudio/stages/publish.py` | Metadata/chapters/keywords generation |
-| `fofstudio/stages/captions.py` | SRT from agent audio |
-| `fofstudio/pipeline.py` | Stage invalidation pattern |
-| `fofstudio/comfy.py` | Comfy queue helpers (thumbnails) |
+| FoF path                       | Use in Titan                          |
+| ------------------------------ | ------------------------------------- |
+| `fofstudio/engines/render.py`  | FFmpeg timeline executor              |
+| `fofstudio/publishkit.py`      | Publish kit + checklist UI            |
+| `fofstudio/youtube.py`         | Tag sanitizer, studio URLs            |
+| `fofstudio/stages/publish.py`  | Metadata/chapters/keywords generation |
+| `fofstudio/stages/captions.py` | SRT from agent audio                  |
+| `fofstudio/pipeline.py`        | Stage invalidation pattern            |
+| `fofstudio/comfy.py`           | Comfy queue helpers (thumbnails)      |
 
 ## Licensing note
 

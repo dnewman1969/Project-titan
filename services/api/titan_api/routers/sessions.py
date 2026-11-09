@@ -8,7 +8,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,7 +38,8 @@ class MissionCreate(BaseModel):
 class CreateSession(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    game_id: UUID
+    game_id: UUID | None = None
+    game_slug: str | None = None
     game_profile_id: UUID | None = None
     team_id: UUID | None = None
     title: str | None = None
@@ -46,6 +47,12 @@ class CreateSession(BaseModel):
     settings: dict[str, Any] = Field(default_factory=dict)
     replay_of_session_id: UUID | None = None
     missions: list[MissionCreate] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _game_ref_present(self) -> CreateSession:
+        if self.game_id is None and not self.game_slug:
+            raise ValueError("game_id or game_slug is required")
+        return self
 
 
 class StartSession(BaseModel):
@@ -88,15 +95,19 @@ async def _session_or_404(session: AsyncSession, session_id: UUID) -> Session:
 async def create_session(body: CreateSession, db: AsyncSession = SessionDep) -> dict[str, Any]:
     if body.mode == "autonomous":
         raise TitanError(ErrorCode.NOT_IMPLEMENTED_IN_PHASE, "autonomous mode is Phase 4+")
-    game = await db.scalar(select(Game).where(Game.id == body.game_id))
+    if body.game_id is not None:
+        game = await db.scalar(select(Game).where(Game.id == body.game_id))
+    else:
+        game = await db.scalar(select(Game).where(Game.slug == body.game_slug))
     if game is None:
         raise TitanError(ErrorCode.NOT_FOUND, "game not found")
+    resolved_game_id = game.id
     clock = SessionClock.start()
     data_dir = str(expand_path(f"%LOCALAPPDATA%/Titan/sessions/{uuid7()}"))
     await asyncio.to_thread(Path(data_dir).mkdir, parents=True, exist_ok=True)
     row = Session(
         id=uuid7(),
-        game_id=body.game_id,
+        game_id=resolved_game_id,
         game_profile_id=body.game_profile_id,
         team_id=body.team_id,
         title=body.title,

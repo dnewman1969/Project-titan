@@ -9,6 +9,7 @@ dependencies = [
   "titan-db",
   "titan-models",
   "titan-sdk-games",
+  "titan-memory",
   "titan-game-ksp",
   "titan-game-ets2",
   "titan-game-ats",
@@ -34,3 +35,4 @@ titan-sdk-games = { workspace = true }
 titan-game-ksp = { workspace = true }
 titan-game-ets2 = { workspace = true }
 titan-game-ats = { workspace = true }
+titan-memory = { workspace = true }

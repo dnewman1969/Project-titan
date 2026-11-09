@@ -63,6 +63,35 @@ def game_id(migrated_db: TempDatabase) -> str:
     return asyncio.run(_load())
 
 
+def test_session_create_by_slug(api_client: TestClient, game_slug: str) -> None:
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={"game_slug": game_slug, "title": "slug path", "settings": {"agents_enabled": False}},
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["state"] == "created"
+
+
+@pytest.fixture
+def game_slug(migrated_db: TempDatabase) -> str:
+    import asyncio
+
+    from titan_db.session import create_engine
+
+    async def _load() -> str:
+        engine = create_engine(migrated_db.pg)
+        factory = create_session_factory(engine)
+        await seed_all(factory)
+        async with factory() as session:
+            slug = await session.scalar(select(Game.slug).limit(1))
+        await engine.dispose()
+        assert slug is not None
+        return slug
+
+    return asyncio.run(_load())
+
+
 def test_session_create_start_stop(api_client: TestClient, game_id: str) -> None:
     created = api_client.post(
         "/api/v1/sessions",

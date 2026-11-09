@@ -25,10 +25,10 @@ export type { SystemStatus, SettingsDocument };
 /** Minimal create-session body for the New Session dialog (Section 5.2). */
 export const CreateSessionSchema = z
   .object({
-    game_id: z.string(),
-    game_profile_id: z.string(),
+    game_slug: z.string(),
     title: z.string(),
     mode: z.enum(["observe", "replay", "autonomous"]),
+    settings: z.record(z.unknown()).optional(),
   })
   .strict();
 export type CreateSessionRequest = z.infer<typeof CreateSessionSchema>;
@@ -41,6 +41,17 @@ export const SessionCreatedSchema = z
   })
   .passthrough();
 export type SessionCreated = z.infer<typeof SessionCreatedSchema>;
+
+export const RecordingSchema = z
+  .object({
+    id: z.string().uuid(),
+    session_id: z.string().uuid(),
+    state: z.string(),
+    manifest_path: z.string().nullable().optional(),
+    duration_ms: z.number().nullable().optional(),
+  })
+  .passthrough();
+export type Recording = z.infer<typeof RecordingSchema>;
 
 const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (args, api, extra) => {
   const { apiBase, token } = getTitan();
@@ -91,6 +102,35 @@ export const titanApi = createApi({
       query: (body) => ({ url: "/sessions", method: "POST", body }),
       transformResponse: (raw: unknown) => SessionCreatedSchema.parse(raw),
     }),
+    startSession: build.mutation<SessionCreated, string>({
+      query: (sessionId) => ({
+        url: `/sessions/${sessionId}/start`,
+        method: "POST",
+        body: { launch_game: false },
+      }),
+      transformResponse: (raw: unknown) => SessionCreatedSchema.parse(raw),
+    }),
+    getActiveRecording: build.query<{ item: Recording | null }, string>({
+      query: (sessionId) => `/sessions/${sessionId}/recordings/active`,
+      transformResponse: (raw: unknown) => {
+        const parsed = z.object({ item: RecordingSchema.nullable() }).parse(raw);
+        return parsed;
+      },
+    }),
+    startRecording: build.mutation<Recording, string>({
+      query: (sessionId) => ({
+        url: `/sessions/${sessionId}/recordings/start`,
+        method: "POST",
+      }),
+      transformResponse: (raw: unknown) => RecordingSchema.parse(raw),
+    }),
+    stopRecording: build.mutation<Recording, string>({
+      query: (sessionId) => ({
+        url: `/sessions/${sessionId}/recordings/stop`,
+        method: "POST",
+      }),
+      transformResponse: (raw: unknown) => RecordingSchema.parse(raw),
+    }),
   }),
 });
 
@@ -100,6 +140,10 @@ export const {
   useGetSettingsQuery,
   usePatchSettingsMutation,
   useCreateSessionMutation,
+  useStartSessionMutation,
+  useGetActiveRecordingQuery,
+  useStartRecordingMutation,
+  useStopRecordingMutation,
   useKillMutation,
   useResumeMutation,
 } = titanApi;

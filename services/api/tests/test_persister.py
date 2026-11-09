@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 
 import fakeredis
 import pytest
+import pytest_asyncio
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -16,30 +17,28 @@ from titan_core.clock import utc_now
 from titan_core.protocol.envelope import Address, make_envelope
 from titan_core.protocol.events import GameEvent
 from titan_core.streams import DATA_FIELD, session_bus_stream, session_events_stream
-from titan_db.migrate import upgrade
 from titan_db.models.realtime import AgentMessage, Event
 from titan_db.repositories.events import EventsRepository
 from titan_db.repositories.messages import MessagesRepository
 from titan_db.session import create_engine, create_session_factory
-from titan_testing.db import TempDatabase, pg_server  # noqa: F401
+from titan_testing.db import TempDatabase
 
 pytestmark = pytest.mark.postgres
 
 
-@pytest.fixture
-def db_factory(pg_server, temp_db: TempDatabase) -> Iterator[async_sessionmaker[AsyncSession]]:  # noqa: F811
-    upgrade(temp_db.url)
-    engine = create_engine(temp_db.pg)
+@pytest_asyncio.fixture
+async def db_factory(migrated_db: TempDatabase) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    engine = create_engine(migrated_db.pg)
     factory = create_session_factory(engine)
     try:
         yield factory
     finally:
-        asyncio.run(engine.dispose())
+        await engine.dispose()
 
 
-@pytest.fixture
-async def session_row(temp_db: TempDatabase) -> uuid.UUID:
-    conn = await temp_db.connect()
+@pytest_asyncio.fixture
+async def session_row(migrated_db: TempDatabase) -> uuid.UUID:
+    conn = await migrated_db.connect()
     try:
         sid = uuid.uuid4()
         gid = uuid.uuid4()

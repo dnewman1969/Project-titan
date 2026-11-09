@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Iterator
 
 import fakeredis
@@ -14,9 +13,7 @@ from titan_api.errors import PROBLEM_JSON
 from titan_api.main import create_app
 from titan_core.config import TitanConfig
 from titan_core.protocol.system import SupervisorStatus
-from titan_db.migrate import upgrade
-from titan_db.session import create_engine, create_session_factory
-from titan_testing.db import TempDatabase, pg_server  # noqa: F401
+from titan_testing.db import TempDatabase
 
 TOKEN = "settings-token"
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
@@ -30,26 +27,19 @@ pytestmark = pytest.mark.postgres
 
 
 @pytest.fixture
-def api_client(pg_server, temp_db: TempDatabase, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:  # noqa: F811
+def api_client(migrated_db: TempDatabase, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     monkeypatch.setenv(LAUNCH_TOKEN_ENV, TOKEN)
-    upgrade(temp_db.url)
-    engine = create_engine(temp_db.pg)
-    factory = create_session_factory(engine)
+    cfg = TitanConfig().model_copy(update={"postgres": migrated_db.pg})
     app = create_app(
-        TitanConfig(),
+        cfg,
         launch_token=TOKEN,
         checks={},
         supervisor=no_supervisor,
         redis=fakeredis.FakeAsyncRedis(decode_responses=True),
-        engine=engine,
-        session_factory=factory,
         start_persister=False,
     )
-    try:
-        with TestClient(app, raise_server_exceptions=False) as client:
-            yield client
-    finally:
-        asyncio.run(engine.dispose())
+    with TestClient(app, raise_server_exceptions=False) as client:
+        yield client
 
 
 def test_settings_get_and_patch(api_client: TestClient) -> None:

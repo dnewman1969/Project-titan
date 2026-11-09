@@ -2,30 +2,28 @@
 
 from __future__ import annotations
 
-import asyncio
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 
 import pytest
+import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from titan_core.errors import ErrorCode, TitanError
-from titan_db.migrate import upgrade
 from titan_db.repositories.settings import SettingsRepository
 from titan_db.session import create_engine, create_session_factory
-from titan_testing.db import TempDatabase, pg_server  # noqa: F401
+from titan_testing.db import TempDatabase
 
 pytestmark = pytest.mark.postgres
 
 
-@pytest.fixture
-def db_factory(pg_server, temp_db: TempDatabase) -> Iterator[async_sessionmaker[AsyncSession]]:  # noqa: F811
-    upgrade(temp_db.url)
-    engine = create_engine(temp_db.pg)
+@pytest_asyncio.fixture
+async def db_factory(migrated_db: TempDatabase) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    engine = create_engine(migrated_db.pg)
     factory = create_session_factory(engine)
     try:
         yield factory
     finally:
-        asyncio.run(engine.dispose())
+        await engine.dispose()
 
 
 @pytest.mark.asyncio

@@ -164,3 +164,28 @@ def test_session_start_invokes_live_telemetry(
     started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False})
     assert started.status_code == 202
     assert not called  # no profile, no default, no fixture
+
+
+def test_session_start_uses_fixture_fallback(
+    api_client: TestClient, game_slug: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from pathlib import Path
+
+    import titan_api.routers.sessions as sessions_routes
+
+    replayed: list[object] = []
+
+    async def fake_replay(session_id: object) -> None:
+        replayed.append(session_id)
+
+    monkeypatch.setattr(sessions_routes, "fixture_fallback_path", lambda slug: Path("/fixture.ndjson"))
+    monkeypatch.setattr(sessions_routes, "start_demo_replay", fake_replay)
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={"game_slug": game_slug, "title": "fallback", "settings": {"agents_enabled": False}},
+    )
+    sid = created.json()["id"]
+    started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False})
+    assert started.status_code == 202
+    assert replayed

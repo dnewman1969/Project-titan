@@ -61,7 +61,7 @@ def test_stop_live_telemetry_terminates(monkeypatch: pytest.MonkeyPatch) -> None
             self.terminated = True
 
     proc = FakeProc()
-    session_telemetry._LIVE_PROCS[sid] = proc  # noqa: SLF001
+    session_telemetry._LIVE_PROCS[sid] = proc
     session_telemetry.stop_live_telemetry(sid)
     assert proc.terminated
-    assert sid not in session_telemetry._LIVE_PROCS  # noqa: SLF001
+    assert sid not in session_telemetry._LIVE_PROCS

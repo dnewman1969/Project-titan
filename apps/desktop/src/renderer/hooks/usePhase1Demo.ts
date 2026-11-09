@@ -61,10 +61,13 @@ export function usePhase1Demo(): void {
   const [startSession] = useStartSessionMutation();
 
   useEffect(() => {
+    if (typeof localStorage !== "undefined" && localStorage.getItem("titan.skipAutoDemo") === "1") {
+      return;
+    }
     if (!AUTO_DEMO || backend === "none" || bootstrapped.current || activeId || !health) return;
     bootstrapped.current = true;
     void (async () => {
-      const title = "Demo — no game required";
+      const title = "Demo - no game required";
       const created = await createSession({
         game_slug: "ksp",
         title,

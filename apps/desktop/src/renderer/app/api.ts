@@ -167,8 +167,21 @@ export const titanApi = createApi({
       query: () => "/games?include_profiles=true",
       transformResponse: (raw: unknown) => z.object({ items: z.array(GameListItemSchema) }).parse(raw),
     }),
-    scanGames: build.mutation<{ detected: unknown[] }, undefined>({
-      query: () => ({ url: "/games/scan", method: "POST", body: { stores: ["steam", "epic", "gog"] } }),
+    scanGames: build.mutation<
+      { detected: Array<{ game_slug: string; install_path: string; profile_id: string }> },
+      { extra_paths?: string[] } | void
+    >({
+      query: (body) => ({
+        url: "/games/scan",
+        method: "POST",
+        body: { stores: ["steam", "epic", "gog"], extra_paths: body?.extra_paths ?? [] },
+      }),
+    }),
+    createGameProfile: build.mutation<
+      { id: string; install_path: string; executable_path: string },
+      { game_slug: string; executable_path: string }
+    >({
+      query: (body) => ({ url: "/game-profiles", method: "POST", body }),
     }),
     getBlackboard: build.query<
       { bb_version: number; entries: Array<z.infer<typeof BlackboardEntrySchema>> },
@@ -201,6 +214,7 @@ export const {
   useStopRecordingMutation,
   useListGamesQuery,
   useScanGamesMutation,
+  useCreateGameProfileMutation,
   useGetBlackboardQuery,
   useKillMutation,
   useResumeMutation,

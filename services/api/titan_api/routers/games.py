@@ -26,6 +26,7 @@ from titan_db.models.knowledge import ControlBinding, RiskEntry, Strategy
 from titan_sdk_games.adapter import GameAdapter
 from titan_sdk_games.catalog import GameCatalog
 from titan_sdk_games.profiles import GameProfile as AdapterProfile
+from titan_sdk_games.discovery.windows_defaults import enrich_discovery_context
 from titan_sdk_games.types import Consent, DiscoveryContext
 
 router = APIRouter(tags=["games"], dependencies=[Authenticated])
@@ -163,8 +164,8 @@ async def scan_games(
     catalog = _catalog(request)
     catalog.reload()
     await sync_games_from_catalog(session, catalog)
-    ctx = DiscoveryContext(
-        platform=_platform(),  # type: ignore[arg-type]
+    ctx = enrich_discovery_context(
+        platform=_platform(),
         extra_paths=[Path(p) for p in body.extra_paths],
     )
     detected: list[dict[str, Any]] = []

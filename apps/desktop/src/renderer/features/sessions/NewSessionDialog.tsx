@@ -1,3 +1,4 @@
+import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import Dialog from "@mui/material/Dialog";
@@ -34,7 +35,7 @@ export function NewSessionDialog() {
   const [gameSlug, setGameSlug] = useState<string>("ksp");
   const [profileId, setProfileId] = useState<string>("");
   const [launchGame, setLaunchGame] = useState(false);
-  const [agentPlay, setAgentPlay] = useState(false);
+  const [agentPlay, setAgentPlay] = useState(true);
   const [recordOnStart, setRecordOnStart] = useState(true);
   const { data: gamesList } = useListGamesQuery(undefined);
   const [createSession, { isLoading: creating }] = useCreateSessionMutation();
@@ -70,6 +71,7 @@ export function NewSessionDialog() {
         agents_enabled: true,
         ...(agentPlay ? { play_enabled: true } : {}),
         ...(recordOnStart ? { record_on_start: true } : {}),
+        demo_telemetry: !effectiveProfileId,
       },
     });
     if ("data" in result && result.data) {
@@ -139,6 +141,7 @@ export function NewSessionDialog() {
           {games.map((g) => (
             <MenuItem key={g.slug} value={g.slug}>
               {g.label}
+              {(g.profiles?.length ?? 0) > 0 ? ` (${g.profiles?.length} install(s))` : ""}
             </MenuItem>
           ))}
         </TextField>
@@ -160,10 +163,10 @@ export function NewSessionDialog() {
             ))}
           </TextField>
         ) : (
-          <FormControlLabel
-            control={<Checkbox disabled checked={false} />}
-            label="No install detected — session will use fixture/demo telemetry until you scan."
-          />
+          <Alert severity="warning" sx={{ width: "100%" }}>
+            No install for this game. Open View - Games, run Scan, or Register install path, then reopen New
+            session. Without a profile, this session uses fixture telemetry only (not live play).
+          </Alert>
         )}
         <FormControlLabel
           control={

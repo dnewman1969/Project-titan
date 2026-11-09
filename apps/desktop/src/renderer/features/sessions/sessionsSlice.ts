@@ -26,6 +26,9 @@ export const sessionsSlice = createSlice({
   reducers: {
     openSessionDialog(state, action: PayloadAction<SessionDialogKind>) {
       state.dialog = action.payload;
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem("titan.skipAutoDemo", "1");
+      }
     },
     closeSessionDialog(state) {
       state.dialog = null;

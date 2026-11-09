@@ -1,6 +1,10 @@
 # Double-click or:  powershell -ExecutionPolicy Bypass -File Start-Titan.ps1
 # Starts portable Postgres + Chroma (managed), requires Redis on 63790, then opens the Operations Center.
 # ASCII-only source file (no em dash or smart quotes) so Windows PowerShell parses reliably.
+param(
+    [switch]$SkipDependencyInstall
+)
+
 $ErrorActionPreference = "Stop"
 $RepoRoot = $PSScriptRoot
 Set-Location $RepoRoot
@@ -484,11 +488,16 @@ if (-not (Test-Path $desktopEnv) -and (Test-Path $envExample)) {
     Copy-Item $envExample $desktopEnv
 }
 
-Write-Host "Installing dependencies (first run may take several minutes)..." -ForegroundColor Cyan
-Invoke-Pnpm install --frozen-lockfile
-uv sync --frozen --all-packages
-Invoke-Pnpm codegen
-Ensure-ElectronBinary
+if ($SkipDependencyInstall) {
+    Write-Host "Skipping pnpm/uv install (Update-Titan: lockfiles unchanged)." -ForegroundColor DarkGray
+    Ensure-ElectronBinary
+} else {
+    Write-Host "Installing dependencies (first run may take several minutes)..." -ForegroundColor Cyan
+    Invoke-Pnpm install --frozen-lockfile
+    uv sync --frozen --all-packages
+    Invoke-Pnpm codegen
+    Ensure-ElectronBinary
+}
 
 Write-Host "Launching Titan Operations Center..." -ForegroundColor Green
 Write-Host "If the window is blank for >60s, check the boot splash for Redis/Postgres/API status." -ForegroundColor DarkGray

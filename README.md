@@ -8,6 +8,8 @@ See [docs/titan-architecture-spec.md](docs/titan-architecture-spec.md) for the a
 
 **Double-click `Start-Titan.bat` in this folder** (or run `Start-Titan.ps1` in PowerShell).
 
+After agent merges land on `main`, **double-click `Update-Titan.bat`** to pull latest `origin/main`, refresh dependencies when lockfiles changed, and relaunch Titan. If you have local edits, the script explains what will be discarded and asks before resetting.
+
 That script checks toolchain, starts **Redis** on `127.0.0.1:63790` (portable Windows build first, else Docker Desktop + `docker compose redis`), fetches portable PostgreSQL on first run, then opens the **Operations Center**. Missing **pnpm**, **uv**, and **Node** are auto-installed when possible. No Kerbal install needed for the built-in demo — fixture telemetry and the crew talk on a live session automatically.
 
 **Prerequisites once:** Node **22.12+** (22.x team default per `.nvmrc`; **24.x** works) and [uv](https://docs.astral.sh/uv/) (auto-installed by the script). Start-Titan runs `install-electron` before opening the desktop app. **Redis:** Start-Titan uses **portable Redis** on `127.0.0.1:63790` by default (or Docker `redis` as fallback). Memurai is **not required**. Postgres and Chroma are started by Titan without Docker. **Memurai (optional):** `tools\setup-memurai-titan.bat` as Administrator — applies Titan settings, validates service start, and **restores your previous `memurai.conf` if Memurai will not start**.

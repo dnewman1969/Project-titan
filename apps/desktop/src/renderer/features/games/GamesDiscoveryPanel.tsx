@@ -76,7 +76,9 @@ export function GamesDiscoveryPanel() {
     }
     const msg = formatApiError(result.error);
     dispatch(showNotice(`Register install failed: ${msg}`));
-    dispatch(logEvent({ type: "games.register_failed", category: "system", severity: "critical", text: msg }));
+    dispatch(
+      logEvent({ type: "games.register_failed", category: "system", severity: "critical", text: msg }),
+    );
   };
 
   return (

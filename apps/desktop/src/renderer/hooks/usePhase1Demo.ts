@@ -81,9 +81,7 @@ export function usePhase1Demo(): void {
       }
       const started = await startSession({ sessionId: created.data.id });
       if ("data" in started && started.data) {
-        dispatch(
-          setActiveSession({ id: started.data.id, title: started.data.title?.trim() || title }),
-        );
+        dispatch(setActiveSession({ id: started.data.id, title: started.data.title?.trim() || title }));
         dispatch(showNotice("Demo session live — fixture telemetry driving the bar; crew is listening."));
       }
     })();

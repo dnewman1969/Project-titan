@@ -13,8 +13,10 @@ from titan_core.protocol.events import GameEvent
 from titan_core.protocol.telemetry import (
     TELEMETRY_SCHEMA,
     Attitude,
+    CareerSnapshot,
     Controls,
     Damage,
+    Economy,
     Engine,
     Environment,
     Orbit,
@@ -248,6 +250,7 @@ class KspAdapter(GameAdapter):
             prograde_pitch_deg=_float(raw.get("prograde_pitch_deg")),
             prograde_heading_deg=_float(raw.get("prograde_heading_deg")),
         )
+        career = _career(raw)
         return TelemetryFrame(
             schema=TELEMETRY_SCHEMA,
             session_id=SESSION_STUB,
@@ -272,7 +275,8 @@ class KspAdapter(GameAdapter):
                 local_time=None,
             ),
             job=None,
-            economy=None,
+            economy=_economy(career),
+            career=career,
             game_specific=_game_specific(raw),
         )
 
@@ -345,6 +349,29 @@ def _orbit(raw: RawFrame) -> Orbit | None:
         time_to_apoapsis_s=None,
         time_to_periapsis_s=None,
         time_to_soi_change_s=None,
+    )
+
+
+def _career(raw: RawFrame) -> CareerSnapshot | None:
+    payload = raw.get("career")
+    if not isinstance(payload, dict):
+        return None
+    try:
+        return CareerSnapshot.model_validate(payload)
+    except ValueError:
+        return None
+
+
+def _economy(career: CareerSnapshot | None) -> Economy | None:
+    if career is None:
+        return None
+    if career.funds is None and career.science is None and career.reputation is None:
+        return None
+    return Economy(
+        funds=career.funds,
+        science=career.science,
+        reputation=career.reputation,
+        currency="Funds",
     )
 
 

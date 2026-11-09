@@ -6,7 +6,7 @@ import asyncio
 import contextlib
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from titan_core.bus import ORCH_CONSUMER, ORCH_GROUP
@@ -23,6 +23,12 @@ from titan_core.streams import (
     latest_entry,
     session_events_stream,
     session_telemetry_stream,
+)
+from titan_orchestrator.career import (
+    CareerDirective,
+    CareerMemory,
+    advance_career,
+    failed_keys_from_rows,
 )
 from titan_orchestrator.errors import PermissionDenied, RateLimited
 from titan_orchestrator.flight_policy import command_signature, decide_flight
@@ -278,6 +284,7 @@ class _FlightState:
     last_sig: tuple[object, ...] | None = None
     lesson_n: int = 0
     last_decision: str | None = None
+    career: CareerMemory = field(default_factory=CareerMemory)
 
 
 async def _flight_loop(runtime: SessionRuntime, *, period_s: float) -> None:
@@ -321,7 +328,15 @@ async def _flight_tick(runtime: SessionRuntime, state: _FlightState, memory: Pla
         return
     if not isinstance(payload, dict):
         return
-    decision = decide_flight(payload)
+    if not state.career.loaded_failures:
+        await _remember_failed_contracts(runtime, state.career)
+    directive = advance_career(state.career, payload)
+    if directive.notes or directive.actions:
+        await _publish_career(runtime, directive, memory)
+    if directive.use_generic_fly:
+        decision = decide_flight(payload)
+    else:
+        decision = decide_flight(payload, goal=directive.goal)
     if decision.situation == "landed":
         state.launch_staged = False
     staging = bool(decision.stage_once and not state.launch_staged)
@@ -378,6 +393,58 @@ async def _flight_tick(runtime: SessionRuntime, state: _FlightState, memory: Pla
             "event_type": "ksp.fly",
         },
     )
+
+
+async def _remember_failed_contracts(runtime: SessionRuntime, memory: CareerMemory) -> None:
+    """Load lesson rows so a contract that already failed is not accepted again."""
+    memory.loaded_failures = True
+    try:
+        async with runtime.sessions() as db:
+            bb = runtime.blackboard_service(db)
+            _version, rows = await bb.snapshot(sections=["lessons", "notes"])
+    except Exception:
+        log.exception("career_memory_load_failed", session_id=str(runtime.session_id))
+        return
+    if isinstance(rows, list):
+        memory.failed_keys |= failed_keys_from_rows(rows)
+
+
+async def _publish_career(runtime: SessionRuntime, directive: CareerDirective, memory: PlayMemory) -> None:
+    if directive.notes:
+        async with runtime.sessions() as db:
+            bb = runtime.blackboard_service(db)
+            for note in directive.notes:
+                author = Address(kind=note.author_kind, id=note.author_id)
+                await _safe_bb_put(
+                    bb,
+                    section=note.section,
+                    key=note.key,
+                    value=note.value,
+                    author=author,
+                    expected_version=-1,
+                    confidence=0.9 if note.value.get("ok") is not False else 0.85,
+                )
+            await db.commit()
+    for action in directive.actions:
+        proposal = {
+            "action_id": action.action_id,
+            "params": action.params,
+            "rationale": action.rationale,
+            "risk": "low",
+            "expected_effect": action.expected_effect,
+        }
+        envelope = make_envelope(
+            type="action.propose",
+            session_id=runtime.session_id,
+            sender=Address(kind="agent", id="director"),
+            recipients=["role:actions"],
+            visibility="internal",
+            priority=6,
+            payload=ActionPropose.model_validate(proposal),
+            correlation_id=uuid7(),
+        )
+        memory.remember_proposal(str(envelope.id), action.action_id)
+        await runtime.bus.publish(envelope)
 
 
 async def _flight_status(runtime: SessionRuntime, state: _FlightState, *, status: str, message: str) -> None:

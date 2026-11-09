@@ -10,6 +10,8 @@ import math
 import time
 from typing import Any
 
+from .career_sample import sample_career
+
 _SCENE = {
     "flight": "flight",
     "space_center": "space_center",
@@ -21,26 +23,46 @@ _SCENE = {
 
 def sample_vessel(conn: Any) -> dict[str, Any]:
     """Return a raw telemetry dict. No active flight vessel → ``scene`` is not ``flight``."""
+    career = sample_career(conn)
     scene = _scene_name(conn)
     paused = _paused(conn)
     vessel = _active_vessel(conn)
     if vessel is None or scene != "flight":
         shown = scene if scene and scene != "flight" else "no_vessel"
-        return {
-            "scene": shown,
-            "paused": paused,
-            "situation": None,
-            "vessel_present": False,
-        }
+        return _with_career(
+            {
+                "scene": shown,
+                "paused": paused,
+                "situation": None,
+                "vessel_present": False,
+            },
+            career,
+        )
     try:
-        return _vessel_raw(vessel, scene=scene, paused=paused)
+        return _with_career(_vessel_raw(vessel, scene=scene, paused=paused), career)
     except Exception:
-        return {
-            "scene": "no_vessel",
-            "paused": paused,
-            "situation": None,
-            "vessel_present": False,
-        }
+        return _with_career(
+            {
+                "scene": "no_vessel",
+                "paused": paused,
+                "situation": None,
+                "vessel_present": False,
+            },
+            career,
+        )
+
+
+def _with_career(raw: dict[str, Any], career: dict[str, Any]) -> dict[str, Any]:
+    raw["career"] = career
+    for src, dest in (
+        ("liquid_fuel", "liquid_fuel"),
+        ("oxidizer", "oxidizer"),
+        ("solid_fuel", "solid_fuel"),
+    ):
+        value = career.get(src)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            raw[dest] = float(value)
+    return raw
 
 
 def _vessel_raw(vessel: Any, *, scene: str, paused: bool) -> dict[str, Any]:

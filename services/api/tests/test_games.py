@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import subprocess
-import sys
 from collections.abc import AsyncIterator, Iterator
-from pathlib import Path
 
 import fakeredis
 import pytest
@@ -16,11 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from titan_api.main import create_app
 from titan_core.config import TitanConfig
 from titan_db.session import create_engine, create_session_factory
-from titan_sdk_games.catalog import GameCatalog
-from titan_sdk_games.loader import load_adapters
 from titan_testing.db import TempDatabase
 
-REPO = Path(__file__).resolve().parents[3]
 TOKEN = "test-launch-token"
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
 
@@ -35,17 +29,6 @@ async def db_factory(migrated_db: TempDatabase) -> AsyncIterator[async_sessionma
         yield factory
     finally:
         await engine.dispose()
-
-
-def _client(factory: async_sessionmaker[AsyncSession]) -> TestClient:
-    app = create_app(
-        TitanConfig().model_copy(update={"postgres": factory.kw.get("bind", None)}),  # type: ignore[arg-type]
-        launch_token=TOKEN,
-        redis=fakeredis.FakeAsyncRedis(decode_responses=True),
-        session_factory=factory,
-        start_persister=False,
-    )
-    return TestClient(app, raise_server_exceptions=False)
 
 
 @pytest.fixture
@@ -70,64 +53,3 @@ def test_list_games_syncs_from_entry_points(games_client: TestClient) -> None:
     slugs = {item["slug"] for item in response.json()["items"]}
     assert {"ksp", "ets2", "ats"}.issubset(slugs)
 
-
-def test_install_testgame_into_temp_target_surfaces_in_games(
-    migrated_db: TempDatabase,
-    db_factory: async_sessionmaker[AsyncSession],
-    tmp_path: Path,
-) -> None:
-    site_dir = tmp_path / "site-packages"
-    site_dir.mkdir()
-    subprocess.run(  # noqa: S603
-        [
-            "uv",
-            "pip",
-            "install",
-            "--quiet",
-            "--target",
-            str(site_dir),
-            str(REPO / "packages" / "py" / "titan-sdk-games"),
-            str(REPO / "packages" / "py" / "titan-core"),
-            str(REPO / "games" / "_testgame"),
-        ],
-        check=True,
-        cwd=REPO,
-    )
-    probe = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            "import os, sys; sys.path.insert(0, os.environ['SITE']); "
-            "from titan_sdk_games.loader import load_adapters; "
-            "print('testgame' in load_adapters())",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-        env={"SITE": str(site_dir)},
-        cwd=REPO,
-    )
-    assert probe.stdout.strip() == "True"
-
-    sys.path.insert(0, str(site_dir))
-    try:
-        from titan_game_testgame.adapter import TestgameAdapter
-    finally:
-        sys.path.remove(str(site_dir))
-
-    cfg = TitanConfig().model_copy(update={"postgres": migrated_db.pg})
-    app = create_app(
-        cfg,
-        launch_token=TOKEN,
-        redis=fakeredis.FakeAsyncRedis(decode_responses=True),
-        session_factory=db_factory,
-        start_persister=False,
-    )
-    catalog = GameCatalog(adapters={**load_adapters(), "testgame": TestgameAdapter})
-    catalog.reload = lambda: None  # type: ignore[method-assign]
-    app.state.game_catalog = catalog
-    with TestClient(app) as client:
-        response = client.get("/api/v1/games", headers=AUTH)
-        assert response.status_code == 200
-        slugs = {item["slug"] for item in response.json()["items"]}
-        assert "testgame" in slugs

@@ -3,8 +3,8 @@
  * lifecycle (Sections 2.2, 2.13 and 9.6, M1.T5).
  */
 import type { ChildProcess } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import {
   app,
@@ -13,7 +13,6 @@ import {
   globalShortcut,
   ipcMain,
   Menu,
-  net,
   protocol,
   session,
   shell,
@@ -26,10 +25,18 @@ import type { GameViewController } from "./gameEmbed/controller";
 import { blankStatus, parseGameViewHold, parseGameViewRect, parseGameViewTarget } from "./gameEmbed/protocol";
 import { DOCS_URL } from "../shared/menu";
 import { resolveMainConfig } from "./config";
+import { applyFirstPaintSwitches, revealWindow } from "./firstPaint";
 import { allowCapturePermission } from "./permissions";
 import { postKill, registerKillSwitch } from "./killSwitch";
 import { buildMenuTemplate } from "./menu";
-import { APP_INDEX_URL, APP_ORIGIN, APP_SCHEME, isAppUrl, resolveAppFile } from "./navigation";
+import {
+  APP_INDEX_URL,
+  APP_ORIGIN,
+  APP_SCHEME,
+  isAppUrl,
+  readRendererBody,
+  resolveAppFile,
+} from "./navigation";
 import {
   CrashBudget,
   startSupervisor,
@@ -37,6 +44,8 @@ import {
   SupervisorClient,
   SupervisorMonitor,
 } from "./supervisor";
+
+applyFirstPaintSwitches(app.commandLine, process.platform);
 
 const devServerUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL;
 const config = resolveMainConfig(process.env, { isPackaged: app.isPackaged, appPath: app.getAppPath() });
@@ -101,7 +110,7 @@ function createWindow(): BrowserWindow {
     },
   });
   win.once("ready-to-show", () => {
-    win.show();
+    revealWindow(win, process.platform);
   });
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.webContents.on("will-navigate", (event, url) => {
@@ -115,7 +124,7 @@ function serveRenderer(): void {
   protocol.handle(APP_SCHEME, (request) => {
     const file = resolveAppFile(rendererDir, request.url);
     if (!file) return new Response("Not found", { status: 404 });
-    return net.fetch(pathToFileURL(file).toString());
+    return readRendererBody(file, async (path) => new Uint8Array(await readFile(path)));
   });
 }
 

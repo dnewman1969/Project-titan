@@ -16,8 +16,9 @@ from titan_api import API_PREFIX
 from titan_api.auth import launch_token_from_env
 from titan_api.errors import install_error_handlers
 from titan_api.persister import StreamPersister
-from titan_api.routers import games, models, safety, settings, system
+from titan_api.routers import games, models, safety, sessions, settings, system
 from titan_api.safety import SafetyController
+from titan_api.session_controller import SessionController
 from titan_api.supervisor_client import SupervisorProbe, supervisor_probe
 from titan_api.ws import router as ws_router
 from titan_core.clock import utc_now
@@ -148,6 +149,7 @@ def create_app(
     app.state.models_registry = registry
     app.state.pull_jobs = pull_jobs
     app.state.game_catalog = GameCatalog()
+    app.state.session_controller = SessionController()
 
     # The renderer runs on a different origin. Auth is the bearer token, never cookies.
     app.add_middleware(
@@ -165,5 +167,6 @@ def create_app(
     app.include_router(settings.router, prefix=API_PREFIX)
     app.include_router(models.router, prefix=API_PREFIX)
     app.include_router(games.router, prefix=API_PREFIX)
+    app.include_router(sessions.router, prefix=API_PREFIX)
     app.include_router(ws_router, prefix=API_PREFIX)
     return app

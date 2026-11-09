@@ -1,0 +1,203 @@
+"""Session lifecycle routes (Section 5.2, M6.T6)."""
+
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+from typing import Annotated, Any
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query, Request, status
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from titan_api.auth import Authenticated
+from titan_api.deps import db_session
+from titan_core.clock import SessionClock, utc_now
+from titan_core.config import expand_path
+from titan_core.errors import ErrorCode, TitanError
+from titan_core.ids import uuid7
+from titan_db.models.games import Game
+from titan_db.models.sessions import Session
+from titan_db.repositories.blackboard import BlackboardRepository
+
+router = APIRouter(tags=["sessions"], dependencies=[Authenticated])
+SessionDep = Depends(db_session)
+
+
+class MissionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    objective: str
+    success_criteria: list[dict[str, Any]] = Field(default_factory=list)
+    failure_criteria: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class CreateSession(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    game_id: UUID
+    game_profile_id: UUID | None = None
+    team_id: UUID | None = None
+    title: str | None = None
+    mode: str = "observe"
+    settings: dict[str, Any] = Field(default_factory=dict)
+    replay_of_session_id: UUID | None = None
+    missions: list[MissionCreate] = Field(default_factory=list)
+
+
+class StartSession(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    launch_game: bool = False
+
+
+class StopSession(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: str | None = None
+
+
+def _session_json(row: Session) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "game_id": row.game_id,
+        "game_profile_id": row.game_profile_id,
+        "team_id": row.team_id,
+        "title": row.title,
+        "mode": row.mode,
+        "state": row.state,
+        "started_at": row.started_at,
+        "ended_at": row.ended_at,
+        "outcome": row.outcome,
+        "data_dir": row.data_dir,
+        "settings": row.settings,
+    }
+
+
+async def _session_or_404(session: AsyncSession, session_id: UUID) -> Session:
+    row = await session.scalar(select(Session).where(Session.id == session_id))
+    if row is None:
+        raise TitanError(ErrorCode.NOT_FOUND, f"session {session_id} not found")
+    return row
+
+
+@router.post("/sessions", status_code=status.HTTP_201_CREATED)
+async def create_session(
+    body: CreateSession, db: AsyncSession = SessionDep
+) -> dict[str, Any]:
+    if body.mode == "autonomous":
+        raise TitanError(ErrorCode.NOT_IMPLEMENTED_IN_PHASE, "autonomous mode is Phase 4+")
+    game = await db.scalar(select(Game).where(Game.id == body.game_id))
+    if game is None:
+        raise TitanError(ErrorCode.NOT_FOUND, "game not found")
+    clock = SessionClock.start()
+    data_dir = str(expand_path(f"%LOCALAPPDATA%/Titan/sessions/{uuid7()}"))
+    await asyncio.to_thread(Path(data_dir).mkdir, parents=True, exist_ok=True)
+    row = Session(
+        id=uuid7(),
+        game_id=body.game_id,
+        game_profile_id=body.game_profile_id,
+        team_id=body.team_id,
+        title=body.title,
+        mode=body.mode,
+        state="created",
+        replay_of_session_id=body.replay_of_session_id,
+        data_dir=data_dir,
+        settings=body.settings,
+        clock_origin_mono_ns=clock.origin_mono_ns,
+        clock_origin_wall=clock.origin_wall,
+    )
+    db.add(row)
+    await db.flush()
+    return _session_json(row)
+
+
+@router.get("/sessions/{session_id}")
+async def get_session(session_id: UUID, db: AsyncSession = SessionDep) -> dict[str, Any]:
+    row = await _session_or_404(db, session_id)
+    return _session_json(row)
+
+
+@router.post("/sessions/{session_id}/start", status_code=status.HTTP_202_ACCEPTED)
+async def start_session(
+    session_id: UUID,
+    body: StartSession,
+    request: Request,
+    db: AsyncSession = SessionDep,
+) -> dict[str, Any]:
+    del body
+    row = await _session_or_404(db, session_id)
+    if row.state in {"starting", "live", "paused", "stopping"}:
+        raise TitanError(ErrorCode.SESSION_ALREADY_LIVE, "session already active")
+    if row.state != "created":
+        raise TitanError(ErrorCode.INVALID_STATE_TRANSITION, f"cannot start from state {row.state!r}")
+    row.state = "starting"
+    row.started_at = utc_now()
+    if row.clock_origin_mono_ns is None:
+        clock = SessionClock.start()
+        row.clock_origin_mono_ns = clock.origin_mono_ns
+        row.clock_origin_wall = clock.origin_wall
+    game_row = await db.scalar(select(Game).where(Game.id == row.game_id))
+    game_slug = game_row.slug if game_row is not None else "ksp"
+    controller = request.app.state.session_controller
+    if row.settings.get("agents_enabled", True):
+        controller.start_orchestrator(session_id, game_slug=game_slug)
+    row.state = "live"
+    await db.flush()
+    return _session_json(row)
+
+
+@router.post("/sessions/{session_id}/stop", status_code=status.HTTP_202_ACCEPTED)
+async def stop_session(
+    session_id: UUID,
+    body: StopSession,
+    request: Request,
+    db: AsyncSession = SessionDep,
+) -> dict[str, Any]:
+    row = await _session_or_404(db, session_id)
+    if row.state in {"ended", "failed"}:
+        raise TitanError(ErrorCode.INVALID_STATE_TRANSITION, "session already ended")
+    row.state = "stopping"
+    request.app.state.session_controller.stop_orchestrator(session_id)
+    row.state = "ended"
+    row.ended_at = utc_now()
+    row.outcome = body.outcome
+    await db.flush()
+    return _session_json(row)
+
+
+@router.get("/sessions/{session_id}/blackboard")
+async def get_blackboard(
+    session_id: UUID,
+    db: AsyncSession = SessionDep,
+    sections: Annotated[list[str] | None, Query()] = None,
+    since_version: Annotated[int | None, Query(alias="since_version")] = None,
+) -> dict[str, Any]:
+    await _session_or_404(db, session_id)
+    repo = BlackboardRepository(db)
+    bb_version, entries = await repo.snapshot(
+        session_id, sections=sections, since_bb_version=since_version
+    )
+    return {
+        "bb_version": bb_version,
+        "entries": [
+            {
+                "section": row.section,
+                "key": row.key,
+                "version": row.version,
+                "op": row.op,
+                "value": row.value,
+                "author": row.author,
+                "confidence": row.confidence,
+                "evidence": row.evidence,
+                "bb_version": row.bb_version,
+                "created_at": row.created_at,
+                "expires_at": row.expires_at,
+            }
+            for row in entries
+        ],
+    }
+

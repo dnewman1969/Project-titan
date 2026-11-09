@@ -38,9 +38,7 @@ class BlackboardRepository:
         )
         return int(row) if row is not None else None
 
-    async def latest_entry(
-        self, session_id: uuid.UUID, section: str, key: str
-    ) -> BlackboardEntry | None:
+    async def latest_entry(self, session_id: uuid.UUID, section: str, key: str) -> BlackboardEntry | None:
         return await self._session.scalar(
             select(BlackboardEntry)
             .where(
@@ -104,9 +102,7 @@ class BlackboardRepository:
             ORDER BY section, key
             """
         )
-        result = await self._session.execute(
-            query, {"session_id": session_id, "since": since_bb_version}
-        )
+        result = await self._session.execute(query, {"session_id": session_id, "since": since_bb_version})
         entries: list[BlackboardEntry] = []
         for row in result.mappings():
             if sections is not None and row["section"] not in sections:

@@ -19,7 +19,6 @@ import {
   useCreateSessionMutation,
   useGetPlayReadinessQuery,
   useListGamesQuery,
-  useStartSessionMutation,
 } from "../../app/api";
 import { formatApiError } from "../../app/formatApiError";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
@@ -76,7 +75,6 @@ export function NewSessionDialog() {
     }
   }, [open, refetchGames]);
   const [createSession, { isLoading: creating }] = useCreateSessionMutation();
-  const [startSession, { isLoading: starting }] = useStartSessionMutation();
   const [createProfile, { isLoading: registering }] = useCreateGameProfileMutation();
 
   const games: Array<{ slug: string; label: string; profiles?: Array<{ id: string; label: string }> }> =
@@ -103,7 +101,7 @@ export function NewSessionDialog() {
   const playAttach = readiness?.play_attach;
   const exeHint = GAME_EXE_HINT[gameSlug] ?? "game .exe";
 
-  const isLoading = creating || starting || registering;
+  const isLoading = creating || registering;
   const onClose = () => {
     setDialogError(null);
     dispatch(closeSessionDialog());
@@ -156,6 +154,7 @@ export function NewSessionDialog() {
       localStorage.setItem("titan.skipAutoDemo", "1");
     }
     const sessionTitle = title.trim() || defaultTitle(agentPlay, game.label);
+    // Atomic create+start (auto_start) — avoids Windows create→start 404 race.
     // Always create as observe: API rejects mode=autonomous (Phase 4+). Learn-and-play uses
     // settings.play_enabled so the orchestrator + actions worker attach without that mode.
     const result = await createSession({
@@ -163,6 +162,8 @@ export function NewSessionDialog() {
       game_profile_id: effectiveProfileId || undefined,
       title: sessionTitle,
       mode: "observe",
+      auto_start: true,
+      launch_game: launchGame && Boolean(effectiveProfileId),
       settings: {
         agents_enabled: true,
         play_enabled: agentPlay,
@@ -172,102 +173,85 @@ export function NewSessionDialog() {
       },
     });
     if ("data" in result && result.data) {
-      const started = await startSession({
-        sessionId: result.data.id,
-        launch_game: launchGame && Boolean(effectiveProfileId),
-      });
-      if ("data" in started && started.data) {
-        const dataDir = Reflect.get(started.data, "data_dir");
-        const recordingRaw = Reflect.get(started.data, "recording");
-        const recording =
-          typeof recordingRaw === "object" && recordingRaw !== null
-            ? (recordingRaw as { state?: string; root_dir?: string })
-            : null;
-        const recordingActive =
-          recording?.state === "recording" ||
-          recording?.state === "starting" ||
-          (recordOnStart && recording !== null);
-        const recordingRoot =
-          (typeof recording?.root_dir === "string" && recording.root_dir) ||
-          (recordingActive && typeof dataDir === "string" && dataDir.length > 0
-            ? `${dataDir}/recording`
-            : null);
-        const liveTitle = started.data.title?.trim() || sessionTitle;
-        const attachRaw = Reflect.get(started.data, "play_attach");
-        const attach =
-          typeof attachRaw === "object" && attachRaw !== null
-            ? (attachRaw as {
-                backend?: string;
-                ready?: boolean;
-                message?: string;
-                source?: string;
-                detail?: { krpc_mod_hint?: boolean; degraded_to_observe?: boolean };
-              })
-            : null;
-        const resolvedSource =
-          Reflect.get(started.data, "session_source") === "live" ||
-          Reflect.get(started.data, "session_source") === "fixture"
-            ? (Reflect.get(started.data, "session_source") as "live" | "fixture")
-            : sessionSource;
-        const backend = (attach?.backend as PlayBackendKind | undefined) ?? null;
-        const attachReady = typeof attach?.ready === "boolean" ? attach.ready : null;
-        const playActions = Reflect.get(started.data, "play_actions") === true;
-        dispatch(
-          setActiveSession({
-            id: started.data.id,
-            title: liveTitle,
-            gameSlug,
-            recordingActive,
-            recordingRootDir: recordingRoot,
-            sessionSource: resolvedSource,
-            playEnabled: agentPlay,
-            playBackend: backend,
-            playReady: attachReady,
-            playAttachMessage: typeof attach?.message === "string" ? attach.message : null,
-          }),
-        );
-        const kind =
-          resolvedSource === "fixture"
-            ? agentPlay
-              ? "Fixture + HIL play"
-              : "Fixture telemetry"
-            : agentPlay && playActions
-              ? `Live + ${backend ?? "play"}`
-              : agentPlay
-                ? "Live observe (play waiting on attach)"
-                : "Live install";
-        const attachNote = attach?.message ? ` — ${attach.message}` : "";
-        dispatch(showNotice(`${kind}: ${liveTitle}${attachNote}`));
-        if (agentPlay && attachReady === false) {
-          const modHint =
-            attach?.detail?.krpc_mod_hint === true ||
-            backend === "krpc" ||
-            (typeof attach?.message === "string" && /kRPC mod/i.test(attach.message));
-          dispatch(
-            logEvent({
-              type: "session.play_attach_waiting",
-              category: "system",
-              severity: "warning",
-              text: modHint
-                ? `kRPC not ready — session is in observe/learn mode. ${attach?.message ?? "Install the kRPC mod, load a flight, then toggle Agent play."}`
-                : (attach?.message ?? "Play attach not ready; session continues in observe mode."),
-            }),
-          );
-        }
-        dispatch(closeSessionDialog());
-        return;
-      }
-      const startMsg = formatApiError(started.error);
-      setDialogError(`Session start failed: ${startMsg}`);
-      dispatch(showNotice(`Session start failed: ${startMsg}`));
+      const started = result.data;
+      const dataDir = Reflect.get(started, "data_dir");
+      const recordingRaw = Reflect.get(started, "recording");
+      const recording =
+        typeof recordingRaw === "object" && recordingRaw !== null
+          ? (recordingRaw as { state?: string; root_dir?: string })
+          : null;
+      const recordingActive =
+        recording?.state === "recording" ||
+        recording?.state === "starting" ||
+        (recordOnStart && recording !== null);
+      const recordingRoot =
+        (typeof recording?.root_dir === "string" && recording.root_dir) ||
+        (recordingActive && typeof dataDir === "string" && dataDir.length > 0
+          ? `${dataDir}/recording`
+          : null);
+      const liveTitle = started.title?.trim() || sessionTitle;
+      const attachRaw = Reflect.get(started, "play_attach");
+      const attach =
+        typeof attachRaw === "object" && attachRaw !== null
+          ? (attachRaw as {
+              backend?: string;
+              ready?: boolean;
+              message?: string;
+              source?: string;
+              detail?: { krpc_mod_hint?: boolean; degraded_to_observe?: boolean };
+            })
+          : null;
+      const resolvedSource =
+        Reflect.get(started, "session_source") === "live" ||
+        Reflect.get(started, "session_source") === "fixture"
+          ? (Reflect.get(started, "session_source") as "live" | "fixture")
+          : sessionSource;
+      const backend = (attach?.backend as PlayBackendKind | undefined) ?? null;
+      const attachReady = typeof attach?.ready === "boolean" ? attach.ready : null;
+      const playActions = Reflect.get(started, "play_actions") === true;
       dispatch(
-        logEvent({
-          type: "session.start_failed",
-          category: "system",
-          severity: "critical",
-          text: startMsg,
+        setActiveSession({
+          id: started.id,
+          title: liveTitle,
+          gameSlug,
+          recordingActive,
+          recordingRootDir: recordingRoot,
+          sessionSource: resolvedSource,
+          playEnabled: agentPlay,
+          playBackend: backend,
+          playReady: attachReady,
+          playAttachMessage: typeof attach?.message === "string" ? attach.message : null,
         }),
       );
+      const kind =
+        resolvedSource === "fixture"
+          ? agentPlay
+            ? "Fixture + HIL play"
+            : "Fixture telemetry"
+          : agentPlay && playActions
+            ? `Live + ${backend ?? "play"}`
+            : agentPlay
+              ? "Live observe (play waiting on attach)"
+              : "Live install";
+      const attachNote = attach?.message ? ` — ${attach.message}` : "";
+      dispatch(showNotice(`${kind}: ${liveTitle}${attachNote}`));
+      if (agentPlay && attachReady === false) {
+        const modHint =
+          attach?.detail?.krpc_mod_hint === true ||
+          backend === "krpc" ||
+          (typeof attach?.message === "string" && /kRPC mod/i.test(attach.message));
+        dispatch(
+          logEvent({
+            type: "session.play_attach_waiting",
+            category: "system",
+            severity: "warning",
+            text: modHint
+              ? `kRPC not ready — session is in observe/learn mode. ${attach?.message ?? "Install the kRPC mod, load a flight, then toggle Agent play."}`
+              : (attach?.message ?? "Play attach not ready; session continues in observe mode."),
+          }),
+        );
+      }
+      dispatch(closeSessionDialog());
       return;
     }
     const status = rtkMutationStatus(result.error);

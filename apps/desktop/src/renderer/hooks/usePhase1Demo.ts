@@ -1,6 +1,6 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
 
-import { useCreateSessionMutation, useGetHealthQuery, useStartSessionMutation } from "../app/api";
+import { useCreateSessionMutation, useGetHealthQuery } from "../app/api";
 import { useAppDispatch, useAppSelector } from "../app/hooks";
 import { getTitan } from "../app/runtime";
 import { agentSaid, setSpeaking } from "../features/agents/agentsChatSlice";
@@ -58,7 +58,6 @@ export function usePhase1Demo(): void {
   const voiceBusy = useRef(false);
   const { data: health } = useGetHealthQuery(undefined, { skip: backend === "none" || !AUTO_DEMO });
   const [createSession] = useCreateSessionMutation();
-  const [startSession] = useStartSessionMutation();
 
   useEffect(() => {
     if (typeof localStorage !== "undefined" && localStorage.getItem("titan.skipAutoDemo") === "1") {
@@ -72,6 +71,7 @@ export function usePhase1Demo(): void {
         game_slug: "ksp",
         title,
         mode: "observe",
+        auto_start: true,
         settings: { agents_enabled: true, demo_telemetry: true, play_enabled: true },
       });
       if (!("data" in created) || !created.data) {
@@ -79,21 +79,18 @@ export function usePhase1Demo(): void {
         bootstrapped.current = false;
         return;
       }
-      const started = await startSession({ sessionId: created.data.id });
-      if ("data" in started && started.data) {
-        dispatch(
-          setActiveSession({
-            id: started.data.id,
-            title: started.data.title?.trim() || title,
-            gameSlug: "ksp",
-            sessionSource: "fixture",
-            playEnabled: true,
-          }),
-        );
-        dispatch(showNotice("Demo session live - fixture telemetry driving the bar; crew is listening."));
-      }
+      dispatch(
+        setActiveSession({
+          id: created.data.id,
+          title: created.data.title?.trim() || title,
+          gameSlug: "ksp",
+          sessionSource: "fixture",
+          playEnabled: true,
+        }),
+      );
+      dispatch(showNotice("Demo session live - fixture telemetry driving the bar; crew is listening."));
     })();
-  }, [activeId, backend, createSession, dispatch, health, startSession]);
+  }, [activeId, backend, createSession, dispatch, health]);
 
   useEffect(() => {
     if (!AUTO_DEMO || !activeId || greeted.current) return;

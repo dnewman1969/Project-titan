@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from titan_api.auth import Authenticated
 from titan_api.demo_replay import start_demo_replay
 from titan_api.deps import db_session
+from titan_api.game_launch import game_process_argv
 from titan_api.memory_ops import seed_prior_memories_on_blackboard, write_learning_on_session_end
 from titan_api.session_lifecycle import end_session_row, supersede_other_live_sessions
 from titan_api.session_telemetry import (
@@ -236,20 +237,21 @@ async def _activate_created_session(
     # Launch before attach wait so kRPC/SCS have time to come up with the game.
     launched_game = False
     launch_error: str | None = None
+    launched_pid: int | None = None
     if launch_game and profile is not None:
         exe = profile.executable_path
 
-        def _launch() -> str | None:
+        def _launch() -> tuple[int | None, str | None]:
             path = Path(exe)
             if not path.is_file():
-                return f"executable not found: {exe}"
+                return None, f"executable not found: {exe}"
             try:
-                subprocess.Popen([exe])  # noqa: S603
+                proc = subprocess.Popen(game_process_argv(exe))  # noqa: S603
             except OSError as exc:
-                return f"{type(exc).__name__}: {exc}"
-            return None
+                return None, f"{type(exc).__name__}: {exc}"
+            return proc.pid, None
 
-        launch_error = await asyncio.to_thread(_launch)
+        launched_pid, launch_error = await asyncio.to_thread(_launch)
         launched_game = launch_error is None
 
     play_attach = None
@@ -332,6 +334,7 @@ async def _activate_created_session(
     payload["session_source"] = session_source
     payload["play_enabled"] = play_enabled
     payload["play_actions"] = play_actions
+    payload["game_pid"] = launched_pid
     if launch_error is not None:
         payload["launch_error"] = launch_error
     if recording_payload is not None:

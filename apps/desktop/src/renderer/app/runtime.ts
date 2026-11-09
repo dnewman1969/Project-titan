@@ -1,4 +1,13 @@
-import type { TitanBridge } from "../../shared/ipc";
+import type { GameViewStatus, TitanBridge } from "../../shared/ipc";
+
+const IDLE_GAME_VIEW: GameViewStatus = {
+  attached: false,
+  mode: null,
+  title: null,
+  exe: null,
+  pid: null,
+  reason: null,
+};
 
 declare global {
   interface Window {
@@ -21,6 +30,12 @@ const BROWSER_FALLBACK: TitanBridge = {
   openPath: () => Promise.resolve("unavailable"),
   openExternal: () => Promise.resolve(),
   pickExecutable: () => Promise.resolve(null),
+  gameViewSync: () => undefined,
+  gameViewConfigure: () => undefined,
+  gameViewHold: () => undefined,
+  gameViewFocus: () => undefined,
+  onGameViewStatus: () => () => undefined,
+  getGameViewStatus: () => Promise.resolve(IDLE_GAME_VIEW),
 };
 
 export function getTitan(): TitanBridge {

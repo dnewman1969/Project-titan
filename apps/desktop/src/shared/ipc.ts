@@ -8,7 +8,37 @@ export const IPC = {
   openPath: "titan:open-path",
   openExternal: "titan:open-external",
   pickExecutable: "titan:pick-executable",
+  gameViewSync: "titan:game-view-sync",
+  gameViewConfigure: "titan:game-view-configure",
+  gameViewHold: "titan:game-view-hold",
+  gameViewFocus: "titan:game-view-focus",
+  gameViewStatus: "titan:game-view-status",
+  gameViewSnapshot: "titan:game-view-snapshot",
 } as const;
+
+/** CSS pixels of the game viewport, relative to the Electron page. */
+export interface GameViewRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface GameViewTarget {
+  gameSlug: string | null;
+  pid: number | null;
+}
+
+/** Where the running game sits relative to the Operations Center preview. */
+export interface GameViewStatus {
+  attached: boolean;
+  /** `embed` is SetParent. `dock` is a borderless window locked to the preview. */
+  mode: "embed" | "dock" | null;
+  title: string | null;
+  exe: string | null;
+  pid: number | null;
+  reason: string | null;
+}
 
 /**
  * How the backend is provided in this launch:
@@ -56,4 +86,14 @@ export interface TitanBridge extends TitanRuntime {
   openExternal(url: string): Promise<void>;
   /** Native file picker for a game .exe (Windows). Returns null when cancelled. */
   pickExecutable(): Promise<string | null>;
+  /** Page-relative rectangle of the live game viewport. */
+  gameViewSync(rect: GameViewRect): void;
+  /** Which game the preview should prefer, plus the pid Titan just launched. */
+  gameViewConfigure(target: GameViewTarget): void;
+  /** Hide the docked game while a modal covers the preview. */
+  gameViewHold(reason: "modal", on: boolean): void;
+  /** Hand keyboard focus to the game window sitting in the preview. */
+  gameViewFocus(): void;
+  onGameViewStatus(listener: (status: GameViewStatus) => void): () => void;
+  getGameViewStatus(): Promise<GameViewStatus>;
 }

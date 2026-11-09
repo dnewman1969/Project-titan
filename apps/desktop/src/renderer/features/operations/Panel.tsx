@@ -11,9 +11,22 @@ export interface PanelProps {
   gridArea: string;
   /** Remove body padding for edge-to-edge content. */
   flush?: boolean;
+  /**
+   * `stretch` fills a grid cell (the agents column). `content` sizes to its body in the
+   * side rail. `fill` takes the rail's leftover height.
+   */
+  frame?: "stretch" | "content" | "fill";
 }
 
-export function Panel({ title, subtitle, actions, children, gridArea, flush = false }: PanelProps) {
+export function Panel({
+  title,
+  subtitle,
+  actions,
+  children,
+  gridArea,
+  flush = false,
+  frame = "stretch",
+}: PanelProps) {
   return (
     <Paper
       component="section"
@@ -21,11 +34,15 @@ export function Panel({ title, subtitle, actions, children, gridArea, flush = fa
       variant="outlined"
       sx={{
         gridArea,
-        minHeight: 0,
         minWidth: 0,
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
+        ...(frame === "fill"
+          ? { flex: "1 1 0", minHeight: 96, height: "auto" }
+          : frame === "content"
+            ? { flex: "0 0 auto", minHeight: 0, height: "auto" }
+            : { flex: "none", minHeight: 0, height: "100%" }),
       }}
     >
       <Box
@@ -33,6 +50,7 @@ export function Panel({ title, subtitle, actions, children, gridArea, flush = fa
         sx={{
           display: "flex",
           alignItems: "center",
+          flexWrap: "wrap",
           gap: 1,
           px: 1.5,
           py: 0.75,

@@ -524,6 +524,15 @@ def test_session_start_degrades_when_krpc_missing(
 
     exe = tmp_path / "KSP_x64.exe"
     exe.write_bytes(b"MZ")
+
+    class _Proc:
+        pid = 424242
+
+    def _fake_popen(argv: list[str], *_args: object, **_kwargs: object) -> _Proc:
+        flags["argv"] = list(argv)
+        return _Proc()
+
+    monkeypatch.setattr(sessions_routes.subprocess, "Popen", _fake_popen)
     registered = api_client.post(
         "/api/v1/game-profiles",
         headers=AUTH,
@@ -555,6 +564,12 @@ def test_session_start_degrades_when_krpc_missing(
     assert "kRPC" in body.get("play_attach", {}).get("message", "")
     assert flags.get("orch_play") is False
     assert flags.get("actions") == 0
+    assert body.get("game_pid") == 424242
+    assert "launch_error" not in body
+    argv = flags["argv"]
+    assert isinstance(argv, list)
+    assert str(argv[0]).endswith("KSP_x64.exe")
+    assert argv[1:] == ["-screen-fullscreen", "0", "-popupwindow"]
 
 
 def test_create_autonomous_with_play_coerces_to_observe(api_client: TestClient, game_slug: str) -> None:

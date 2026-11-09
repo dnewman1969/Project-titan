@@ -6,6 +6,9 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 
 import {
   IPC,
+  type GameViewRect,
+  type GameViewStatus,
+  type GameViewTarget,
   type KillSwitchEvent,
   type SupervisorUpdate,
   type TitanBridge,
@@ -43,6 +46,23 @@ const bridge: TitanBridge = {
   openPath: (path: string) => ipcRenderer.invoke(IPC.openPath, path) as Promise<string>,
   openExternal: (url: string) => ipcRenderer.invoke(IPC.openExternal, url) as Promise<void>,
   pickExecutable: () => ipcRenderer.invoke(IPC.pickExecutable) as Promise<string | null>,
+  gameViewSync: (rect: GameViewRect) => {
+    ipcRenderer.send(IPC.gameViewSync, rect);
+  },
+  gameViewConfigure: (target: GameViewTarget) => {
+    ipcRenderer.send(IPC.gameViewConfigure, target);
+  },
+  gameViewHold: (reason, on) => {
+    ipcRenderer.send(IPC.gameViewHold, { reason, on });
+  },
+  gameViewFocus: () => {
+    ipcRenderer.send(IPC.gameViewFocus);
+  },
+  onGameViewStatus: (listener) =>
+    subscribe(IPC.gameViewStatus, (payload) => {
+      listener(payload as GameViewStatus);
+    }),
+  getGameViewStatus: () => ipcRenderer.invoke(IPC.gameViewSnapshot) as Promise<GameViewStatus>,
 };
 
 contextBridge.exposeInMainWorld("titan", bridge);

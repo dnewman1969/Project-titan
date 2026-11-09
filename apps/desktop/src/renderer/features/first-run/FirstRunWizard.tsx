@@ -8,7 +8,7 @@ import Step from "@mui/material/Step";
 import StepLabel from "@mui/material/StepLabel";
 import Stepper from "@mui/material/Stepper";
 import Typography from "@mui/material/Typography";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { setFirstRunOpen } from "../operations/layoutSlice";
@@ -56,6 +56,10 @@ export function FirstRunWizard() {
   const [active, setActive] = useState(0);
   const step = STEPS[active] ?? STEPS[0];
   const open = !dismissed && (isFirstRunPending() || forcedOpen);
+
+  useEffect(() => {
+    if (open) dispatch(setFirstRunOpen(true));
+  }, [dispatch, open]);
 
   const finish = () => {
     markFirstRunComplete();

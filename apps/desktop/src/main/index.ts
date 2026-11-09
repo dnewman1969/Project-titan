@@ -17,6 +17,7 @@ import {
   protocol,
   session,
   shell,
+  type OpenDialogOptions,
 } from "electron";
 
 import { IPC, type KillSwitchEvent, type SupervisorUpdate, type TitanRuntime } from "../shared/ipc";
@@ -149,15 +150,19 @@ ipcMain.handle(IPC.openExternal, (event, url: unknown) => {
 
 ipcMain.handle(IPC.pickExecutable, async (event) => {
   if (!isAppUrl(event.senderFrame?.url, devServerUrl)) return null;
-  const parent = mainWindow && !mainWindow.isDestroyed() ? mainWindow : BrowserWindow.getFocusedWindow();
-  const result = await dialog.showOpenDialog(parent ?? undefined, {
+  const parent =
+    (mainWindow && !mainWindow.isDestroyed() ? mainWindow : null) ?? BrowserWindow.getFocusedWindow();
+  const dialogOpts: OpenDialogOptions = {
     title: "Select game executable",
     properties: ["openFile"],
     filters: [
       { name: "Game executable", extensions: ["exe"] },
       { name: "All files", extensions: ["*"] },
     ],
-  });
+  };
+  const result = parent
+    ? await dialog.showOpenDialog(parent, dialogOpts)
+    : await dialog.showOpenDialog(dialogOpts);
   if (result.canceled || result.filePaths.length === 0) return null;
   return result.filePaths[0] ?? null;
 });

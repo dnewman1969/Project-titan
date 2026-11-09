@@ -116,3 +116,28 @@ def test_recording_start_stop_without_obs(api_client: TestClient, game_slug: str
     stopped = api_client.post(f"/api/v1/sessions/{sid}/recordings/stop", headers=AUTH)
     assert stopped.status_code == 200, stopped.text
     assert stopped.json()["state"] == "complete"
+
+
+def test_recording_start_is_idempotent(api_client: TestClient, game_slug: str) -> None:
+    sid = _live_session(api_client, game_slug)
+    first = api_client.post(f"/api/v1/sessions/{sid}/recordings/start", headers=AUTH)
+    assert first.status_code == 201, first.text
+    second = api_client.post(f"/api/v1/sessions/{sid}/recordings/start", headers=AUTH)
+    assert second.status_code == 201, second.text
+    assert second.json()["id"] == first.json()["id"]
+
+
+def test_recording_timeline_endpoint(api_client: TestClient, game_slug: str) -> None:
+    sid = _live_session(api_client, game_slug)
+    empty = api_client.get(f"/api/v1/sessions/{sid}/recordings/timeline", headers=AUTH)
+    assert empty.status_code == 200, empty.text
+    assert empty.json()["events"] == []
+
+    started = api_client.post(f"/api/v1/sessions/{sid}/recordings/start", headers=AUTH)
+    assert started.status_code == 201, started.text
+    timeline = api_client.get(f"/api/v1/sessions/{sid}/recordings/timeline", headers=AUTH)
+    assert timeline.status_code == 200, timeline.text
+    body = timeline.json()
+    assert body["recording"] is not None
+    assert body["recording"]["id"] == started.json()["id"]
+    assert any(ev.get("kind") == "recording.start" for ev in body["events"])

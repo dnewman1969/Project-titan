@@ -54,3 +54,25 @@ def append_timeline_event(root_dir: Path, event: dict[str, Any]) -> Path:
     with path.open("a", encoding="utf-8") as fh:
         fh.write(line + "\n")
     return path
+
+
+def read_timeline_events(root_dir: Path, *, limit: int = 100) -> list[dict[str, Any]]:
+    """Return the newest timeline rows (oldest→newest within the window)."""
+    path = root_dir / "timeline.ndjson"
+    if not path.is_file():
+        return []
+    rows: list[dict[str, Any]] = []
+    with path.open(encoding="utf-8") as fh:
+        for line in fh:
+            text = line.strip()
+            if not text:
+                continue
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                rows.append(parsed)
+    if limit <= 0:
+        return []
+    return rows[-limit:]

@@ -17,7 +17,7 @@ from titan_api.recording_ops import recording_json, start_session_recording
 from titan_core.clock import utc_now
 from titan_core.errors import ErrorCode, TitanError
 from titan_core.obs_ws import ObsClient
-from titan_core.recording_manifest import append_timeline_event
+from titan_core.recording_manifest import append_timeline_event, read_timeline_events
 from titan_db.models.recording import Recording
 from titan_db.models.sessions import Session
 
@@ -47,16 +47,35 @@ async def active_recording(session_id: UUID, db: AsyncSession = SessionDep) -> d
     return {"item": recording_json(row)}
 
 
-@router.post("/sessions/{session_id}/recordings/start", status_code=status.HTTP_201_CREATED)
-async def start_recording(session_id: UUID, db: AsyncSession = SessionDep) -> dict[str, Any]:
+@router.get("/sessions/{session_id}/recordings/timeline")
+async def recording_timeline(
+    session_id: UUID,
+    limit: int = 80,
+    db: AsyncSession = SessionDep,
+) -> dict[str, Any]:
     session_row = await _session_or_404(db, session_id)
-    existing = await db.scalar(
+    capped = max(1, min(limit, 500))
+    root = Path(session_row.data_dir) / "recording"
+    events = await asyncio.to_thread(read_timeline_events, root, limit=capped)
+    active = await db.scalar(
         select(Recording)
         .where(Recording.session_id == session_id)
-        .where(Recording.state.in_(("starting", "recording")))
+        .where(Recording.state.in_(("starting", "recording", "stopping")))
+        .order_by(Recording.created_at.desc())
+        .limit(1)
     )
-    if existing is not None:
-        raise TitanError(ErrorCode.CONFLICT, "recording already active")
+    return {
+        "session_id": str(session_id),
+        "recording": recording_json(active) if active is not None else None,
+        "root_dir": str(root),
+        "events": events,
+    }
+
+
+@router.post("/sessions/{session_id}/recordings/start", status_code=status.HTTP_201_CREATED)
+async def start_recording(session_id: UUID, db: AsyncSession = SessionDep) -> dict[str, Any]:
+    """Start REC; idempotent when a recording is already active (double-click safe)."""
+    session_row = await _session_or_404(db, session_id)
     return await start_session_recording(db, session_row)
 
 

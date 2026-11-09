@@ -16,6 +16,7 @@ import { portraitUrl } from "../../services/avatar/portrait";
 import { speakAgentLine } from "../../services/voice/speak";
 import { LearnFeedbackStrip } from "../learn/LearnFeedbackStrip";
 import { Panel } from "../operations/Panel";
+import { RecTimelineStrip } from "../recording/RecTimelineStrip";
 import { agentSaid, setSpeaking } from "./agentsChatSlice";
 import {
   DEMO_ROSTER,
@@ -83,6 +84,7 @@ export function AgentsPanel() {
     <Panel title="AI Agents" subtitle="Mission Control" gridArea="agents" flush>
       <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <LearnFeedbackStrip />
+        <RecTimelineStrip />
         <Box
           role="list"
           aria-label="Agent roster"

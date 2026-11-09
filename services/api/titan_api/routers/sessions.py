@@ -261,14 +261,17 @@ async def start_session(
                 subprocess.Popen([exe])  # noqa: S603
 
         await asyncio.to_thread(_launch)
+    recording_payload: dict[str, object] | None = None
     if row.settings.get("record_on_start"):
         from titan_api.recording_ops import start_session_recording
 
-        await start_session_recording(db, row)
+        recording_payload = await start_session_recording(db, row)
     payload = _session_json(row)
     if play_attach is not None:
         payload["play_attach"] = play_attach.as_dict()
     payload["session_source"] = session_source
+    if recording_payload is not None:
+        payload["recording"] = recording_payload
     return payload
 
 

@@ -33,9 +33,10 @@ const SMACK: Record<BanterKind, string[]> = {
     "You call that a plan? Adorable. Watch a professional.",
   ],
   incredible: [
-    "Orbit achieved. You may clap. Quietly.",
+    "That play was clean. Save the replay—you'll need it when someone doubts me.",
+    "Impressive? For you, maybe. For me, Tuesday. Stay out of my burn window.",
+    "Watch the telemetry: perfect. Clap if you must, then don't touch the stick.",
     "Fine unlocked. I make impossible look routine—get used to it.",
-    "Perfect burn. NASA wishes they had my telemetry feed.",
   ],
 };
 

@@ -192,7 +192,7 @@ async def _play_feedback_loop(runtime: SessionRuntime) -> None:
                         "ok": payload.ok,
                     },
                 )
-                banter = pick_play_commentary(ok=payload.ok)
+                banter = pick_play_commentary(ok=payload.ok, impressive=payload.ok)
                 await bb.put(
                     section="notes",
                     key=f"commentary.{envelope.id}",

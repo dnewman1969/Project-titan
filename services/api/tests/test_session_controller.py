@@ -27,13 +27,14 @@ def test_start_actions_tracks_child() -> None:
     ctl = SessionController(spawn=fake_spawn_env)
     sid = UUID(int=9)
     data_root = "C:/Titan/sessions/unit-test"
-    ctl.start_actions(sid, game_slug="ksp", data_dir=data_root)
+    ctl.start_actions(sid, game_slug="ksp", data_dir=data_root, play_backend="hil")
     assert launched
     assert "-m" in launched[0] and "titan_actions" in launched[0]
     assert "--game-slug" in launched[0]
     env = env_captured.get("env")
     assert isinstance(env, dict)
     assert env.get("TITAN_SESSION_DATA_DIR") == data_root
+    assert env.get("TITAN_PLAY_BACKEND") == "hil"
     ctl.stop_actions(sid)
 
 

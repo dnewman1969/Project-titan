@@ -180,7 +180,15 @@ async def start_session(
                 data_dir=row.data_dir,
             )
         if play_enabled:
-            controller.start_actions(session_id, game_slug=game_slug, data_dir=row.data_dir)
+            fixture_play = bool(row.settings.get("demo_telemetry")) or row.settings.get(
+                "session_source"
+            ) == "fixture"
+            controller.start_actions(
+                session_id,
+                game_slug=game_slug,
+                data_dir=row.data_dir,
+                play_backend="hil" if fixture_play else None,
+            )
         row.state = "live"
         await db.flush()
     except IntegrityError as exc:

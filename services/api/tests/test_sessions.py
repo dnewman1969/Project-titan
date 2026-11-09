@@ -270,6 +270,7 @@ def test_session_start_play_enabled(
 
         def start_actions(self, session_id: UUID, **kwargs: object) -> None:
             flags["actions"] = True
+            flags["play_backend"] = kwargs.get("play_backend")
 
         def stop_orchestrator(self, session_id: UUID) -> None:
             return
@@ -297,3 +298,4 @@ def test_session_start_play_enabled(
     started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False})
     assert started.status_code == 202
     assert flags["actions"] and flags["orch"]
+    assert flags["play_backend"] == "hil"

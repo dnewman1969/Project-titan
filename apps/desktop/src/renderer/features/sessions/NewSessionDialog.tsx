@@ -39,7 +39,7 @@ function defaultTitle(play: boolean, gameLabel: string): string {
 export function NewSessionDialog() {
   const open = useAppSelector((s) => s.sessions.dialog === "new");
   const dispatch = useAppDispatch();
-  const [title, setTitle] = useState("Observe - Kerbal Space Program");
+  const [title, setTitle] = useState("Learn and play - Kerbal Space Program");
   const [titleTouched, setTitleTouched] = useState(false);
   const [gameSlug, setGameSlug] = useState<string>("ksp");
   const [profileId, setProfileId] = useState<string>("");
@@ -117,6 +117,8 @@ export function NewSessionDialog() {
             title: liveTitle,
             recordingActive: recordOnStart,
             recordingRootDir: recordingRoot,
+            sessionSource,
+            playEnabled: agentPlay,
           }),
         );
         const kind =
@@ -247,7 +249,7 @@ export function NewSessionDialog() {
           <FormHelperText sx={{ mt: -1.5, mx: 0 }}>
             {sessionSource === "live"
               ? "Starts the actions worker against the selected install (kRPC/SCS when available)."
-              : "Starts the actions worker. Without a live game, set TITAN_PLAY_BACKEND=hil for software HIL."}
+              : "Starts the actions worker with TITAN_PLAY_BACKEND=hil for software play without a game."}
           </FormHelperText>
         ) : null}
         <FormControlLabel

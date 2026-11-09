@@ -62,7 +62,12 @@ class SessionController:
         return child
 
     def start_actions(
-        self, session_id: UUID, *, game_slug: str = "ksp", data_dir: str | None = None
+        self,
+        session_id: UUID,
+        *,
+        game_slug: str = "ksp",
+        data_dir: str | None = None,
+        play_backend: str | None = None,
     ) -> ActionsProcess:
         if session_id in self._actions:
             return self._actions[session_id]
@@ -78,6 +83,9 @@ class SessionController:
         env = {**os.environ, "TITAN_GAME_SLUG": game_slug}
         if data_dir:
             env["TITAN_SESSION_DATA_DIR"] = data_dir
+        # Fixture / no-install sessions should not pretend to drive kRPC/SCS.
+        if play_backend:
+            env["TITAN_PLAY_BACKEND"] = play_backend
         proc = self.spawn(cmd, env=env)
         child = ActionsProcess(session_id=session_id, popen=proc)
         self._actions[session_id] = child

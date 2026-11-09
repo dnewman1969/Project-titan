@@ -75,6 +75,14 @@ def test_overspeed_eases_throttle() -> None:
     proposal = play_proposal_for_event(_event("ets2.overspeed"))
     assert proposal is not None
     assert proposal["action_id"] == "scs.throttle"
+    assert play_proposal_for_event(_event("vehicle.speeding")) is not None
+
+
+def test_collision_brakes() -> None:
+    proposal = play_proposal_for_event(_event("vehicle.collision"))
+    assert proposal is not None
+    assert proposal["action_id"] == "scs.brake"
+    assert play_proposal_for_event(_event("scs.hard_brake"))["action_id"] == "scs.brake"
 
 
 def test_memory_adapts_after_repeated_failures() -> None:

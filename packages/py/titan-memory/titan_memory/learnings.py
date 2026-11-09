@@ -167,7 +167,7 @@ async def fetch_prior_memory_lines(
     vectors = embedder.embed([query])
     try:
         raw = await store.query(MEMORIES_COLLECTION, query_embeddings=vectors, n_results=n_results)
-    except Exception:  # noqa: BLE001 — Chroma/HTTP may be offline during session start
+    except Exception:
         return []
     docs = raw.get("documents")
     if not isinstance(docs, list) or not docs or not isinstance(docs[0], list):

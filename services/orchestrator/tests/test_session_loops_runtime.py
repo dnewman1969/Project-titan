@@ -11,10 +11,16 @@ import pytest
 from titan_orchestrator.session_loops import run_session_loops
 
 
+class _Bus:
+    async def ensure_group(self, _group: str) -> None:
+        return
+
+
 @dataclass
 class StoppedRuntime:
     session_id: UUID
     redis: object
+    bus: _Bus = field(default_factory=_Bus)
     _stopped: asyncio.Event = field(default_factory=asyncio.Event)
 
     def sessions(self) -> object:

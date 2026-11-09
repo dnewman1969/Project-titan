@@ -34,6 +34,15 @@ class _Bus:
     def __init__(self) -> None:
         self.published: list[object] = []
 
+    async def ensure_group(self, _group: str) -> None:
+        return
+
+    async def read_group(self, *_a: object, **_k: object) -> list[tuple[str, object]]:
+        return []
+
+    async def ack(self, *_a: object) -> int:
+        return 0
+
     async def publish(self, envelope: object) -> None:
         self.published.append(envelope)
 

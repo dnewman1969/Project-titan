@@ -24,10 +24,19 @@ async def test_run_executes_low_risk_proposal(monkeypatch: pytest.MonkeyPatch) -
     acked: list[str] = []
 
     class _Bus:
+        def __init__(self) -> None:
+            self.published: list[object] = []
+
         async def ensure_group(self, _name: str) -> None:
             return
 
-        async def read_group(self, _group: str, _consumer: str, block_ms: int = 0) -> list[tuple[str, object]]:
+        async def publish(self, envelope: object) -> str:
+            self.published.append(envelope)
+            return "2-0"
+
+        async def read_group(
+            self, _group: str, _consumer: str, block_ms: int = 0
+        ) -> list[tuple[str, object]]:
             _ = block_ms
             if acked:
                 raise asyncio.CancelledError
@@ -61,7 +70,9 @@ async def test_run_executes_low_risk_proposal(monkeypatch: pytest.MonkeyPatch) -
 
     monkeypatch.setattr(actions_main, "load_config", lambda: type("Cfg", (), {"redis": object()})())
     monkeypatch.setattr(actions_main, "redis_client", lambda _cfg: _Redis())
-    monkeypatch.setattr(actions_main, "SessionBus", lambda _r, _s: _Bus())
+    bus = _Bus()
+    monkeypatch.setattr(actions_main, "SessionBus", lambda _r, _s: bus)
 
     assert await actions_main._run(sid) == 0
     assert acked == ["1-0"]
+    assert bus.published

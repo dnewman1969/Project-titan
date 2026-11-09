@@ -7,10 +7,11 @@ import contextlib
 import json
 from typing import Any
 
+from titan_core.bus import ORCH_CONSUMER, ORCH_GROUP
 from titan_core.ids import uuid7
 from titan_core.protocol.envelope import Address, make_envelope
 from titan_core.protocol.events import GameEvent
-from titan_core.protocol.payloads import ActionPropose
+from titan_core.protocol.payloads import ActionExecuted, ActionPropose
 from titan_core.protocol.telemetry import TelemetryFrameUI
 from titan_core.streams import entry_data, session_events_stream, session_telemetry_stream
 from titan_orchestrator.play_policy import play_proposal_for_event
@@ -20,12 +21,16 @@ from titan_orchestrator.world_state import WorldStateUpdater
 
 async def run_session_loops(runtime: SessionRuntime, *, play_enabled: bool = False) -> None:
     """Run until runtime.stop() is called."""
+    await runtime.bus.ensure_group(ORCH_GROUP)
     telemetry_task = asyncio.create_task(_telemetry_loop(runtime), name="telemetry-loop")
     events_task = asyncio.create_task(_events_loop(runtime, play_enabled=play_enabled), name="events-loop")
+    tasks = [telemetry_task, events_task]
+    if play_enabled:
+        tasks.append(asyncio.create_task(_play_feedback_loop(runtime), name="play-feedback-loop"))
     try:
-        await asyncio.gather(telemetry_task, events_task)
+        await asyncio.gather(*tasks)
     finally:
-        for task in (telemetry_task, events_task):
+        for task in tasks:
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
@@ -119,6 +124,36 @@ async def _events_loop(runtime: SessionRuntime, *, play_enabled: bool) -> None:
                                 expected_version=-1,
                                 confidence=0.9,
                             )
+            await db.commit()
+
+
+async def _play_feedback_loop(runtime: SessionRuntime) -> None:
+    while not runtime._stopped.is_set():
+        batch = await runtime.bus.read_group(ORCH_GROUP, ORCH_CONSUMER, block_ms=2000)
+        if not batch:
+            await asyncio.sleep(0)
+            continue
+        async with runtime.sessions() as db:
+            bb = runtime.blackboard_service(db)
+            for entry_id, envelope in batch:
+                if envelope.type != "action.executed":
+                    await runtime.bus.ack(ORCH_GROUP, entry_id)
+                    continue
+                payload = ActionExecuted.model_validate(envelope.payload)
+                text = (
+                    "Play worked — crew should repeat this control pattern."
+                    if payload.ok
+                    else f"Play attempt failed: {payload.error or 'unknown error'}"
+                )
+                await bb.put(
+                    section="lessons",
+                    key=f"feedback.{envelope.id}",
+                    value={"text": text, "proposal_id": str(payload.proposal_id), "ok": payload.ok},
+                    author=Address(kind="agent", id="flight_engineer"),
+                    expected_version=-1,
+                    confidence=0.92 if payload.ok else 0.4,
+                )
+                await runtime.bus.ack(ORCH_GROUP, entry_id)
             await db.commit()
 
 

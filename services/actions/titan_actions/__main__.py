@@ -11,6 +11,7 @@ from titan_actions.executor import PlayExecutor
 from titan_core.bus import SessionBus
 from titan_core.config import load_config
 from titan_core.logging import configure_logging, get_logger
+from titan_core.protocol.envelope import Address, make_envelope
 from titan_core.protocol.payloads import ActionExecuted, ActionPropose
 from titan_core.streams import redis_client
 
@@ -50,11 +51,24 @@ async def _run(session_id: UUID) -> int:
                     err=err,
                     session_id=str(session_id),
                 )
-                _ = ActionExecuted(
+                executed = ActionExecuted(
                     proposal_id=envelope.id,
                     ok=ok,
                     latency_ms=1,
                     error=err,
+                )
+                await bus.publish(
+                    make_envelope(
+                        type="action.executed",
+                        session_id=session_id,
+                        sender=Address(kind="agent", id="actions"),
+                        recipients=["broadcast"],
+                        visibility="internal",
+                        priority=5,
+                        payload=executed,
+                        correlation_id=envelope.id,
+                        causation_id=envelope.id,
+                    )
                 )
                 await bus.ack(ACTIONS_GROUP, entry_id)
     except asyncio.CancelledError:

@@ -74,6 +74,22 @@ export const sessionsSlice = createSlice({
     setRecordingActive(state, action: PayloadAction<boolean>) {
       state.recordingActive = action.payload;
     },
+    setPlayEnabled(
+      state,
+      action: PayloadAction<{
+        playEnabled: boolean;
+        playBackend?: PlayBackendKind;
+        playReady?: boolean | null;
+        playAttachMessage?: string | null;
+      }>,
+    ) {
+      state.playEnabled = action.payload.playEnabled;
+      if (action.payload.playBackend !== undefined) state.playBackend = action.payload.playBackend;
+      if (action.payload.playReady !== undefined) state.playReady = action.payload.playReady;
+      if (action.payload.playAttachMessage !== undefined) {
+        state.playAttachMessage = action.payload.playAttachMessage;
+      }
+    },
     clearActiveSession(state) {
       state.activeSessionId = null;
       state.activeTitle = null;
@@ -103,6 +119,7 @@ export const {
   closeSessionDialog,
   setActiveSession,
   setRecordingActive,
+  setPlayEnabled,
   clearActiveSession,
   requestRecordingFromMenu,
   clearRecordingMenuRequest,

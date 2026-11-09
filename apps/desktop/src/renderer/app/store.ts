@@ -2,6 +2,7 @@ import { combineReducers, configureStore } from "@reduxjs/toolkit";
 
 import { agentsChatSlice } from "../features/agents/agentsChatSlice";
 import { eventsSlice } from "../features/events/eventsSlice";
+import { learnSlice } from "../features/learn/learnSlice";
 import { layoutSlice } from "../features/operations/layoutSlice";
 import { safetySlice } from "../features/safety/safetySlice";
 import { sessionsSlice } from "../features/sessions/sessionsSlice";
@@ -17,6 +18,7 @@ const rootReducer = combineReducers({
   safety: safetySlice.reducer,
   events: eventsSlice.reducer,
   agentsChat: agentsChatSlice.reducer,
+  learn: learnSlice.reducer,
   system: systemSlice.reducer,
   gameTelemetry: gameTelemetrySlice.reducer,
   sessions: sessionsSlice.reducer,

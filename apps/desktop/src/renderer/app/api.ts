@@ -150,6 +150,14 @@ export const titanApi = createApi({
       }),
       transformResponse: (raw: unknown) => SessionCreatedSchema.parse(raw),
     }),
+    setSessionPlay: build.mutation<SessionCreated, { sessionId: string; enabled: boolean }>({
+      query: ({ sessionId, enabled }) => ({
+        url: `/sessions/${sessionId}/play`,
+        method: "POST",
+        body: { enabled },
+      }),
+      transformResponse: (raw: unknown) => SessionCreatedSchema.parse(raw),
+    }),
     getActiveRecording: build.query<{ item: Recording | null }, string>({
       query: (sessionId) => `/sessions/${sessionId}/recordings/active`,
       transformResponse: (raw: unknown) => {
@@ -233,6 +241,7 @@ export const {
   useCreateSessionMutation,
   useStartSessionMutation,
   useStopSessionMutation,
+  useSetSessionPlayMutation,
   useGetActiveRecordingQuery,
   useStartRecordingMutation,
   useStopRecordingMutation,

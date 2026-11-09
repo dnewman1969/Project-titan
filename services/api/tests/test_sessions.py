@@ -374,6 +374,92 @@ def test_session_start_live_play_attaches_krpc(
     assert body.get("play_attach", {}).get("backend") == expected_backend
 
 
+def test_create_autonomous_with_play_coerces_to_observe(api_client: TestClient, game_slug: str) -> None:
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={
+            "game_slug": game_slug,
+            "title": "auto-play",
+            "mode": "autonomous",
+            "settings": {"play_enabled": True, "agents_enabled": False},
+        },
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["mode"] == "observe"
+
+
+def test_create_autonomous_without_play_rejected(api_client: TestClient, game_slug: str) -> None:
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={
+            "game_slug": game_slug,
+            "title": "auto-no-play",
+            "mode": "autonomous",
+            "settings": {"agents_enabled": False},
+        },
+    )
+    assert created.status_code == 501
+
+
+def test_session_play_toggle(api_client: TestClient, game_slug: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    import titan_api.routers.sessions as sessions_routes
+
+    flags: dict[str, object] = {"actions": 0, "orch_restart": 0, "stop_actions": 0}
+
+    class _Ctl:
+        def start_orchestrator(self, session_id: UUID, **kwargs: object) -> None:
+            flags["orch"] = True
+
+        def restart_orchestrator(self, session_id: UUID, **kwargs: object) -> None:
+            flags["orch_restart"] = int(flags["orch_restart"]) + 1
+            flags["restart_play"] = kwargs.get("play_enabled")
+
+        def start_actions(self, session_id: UUID, **kwargs: object) -> None:
+            flags["actions"] = int(flags["actions"]) + 1
+            flags["play_backend"] = kwargs.get("play_backend")
+
+        def stop_actions(self, session_id: UUID) -> None:
+            flags["stop_actions"] = int(flags["stop_actions"]) + 1
+
+        def stop_orchestrator(self, session_id: UUID) -> None:
+            return
+
+    api_client.app.state.session_controller = _Ctl()
+
+    async def noop(*_a: object, **_k: object) -> None:
+        return None
+
+    monkeypatch.setattr(sessions_routes, "start_demo_replay", noop)
+    monkeypatch.setattr(sessions_routes, "_seed_director_demo_line", noop)
+
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={
+            "game_slug": game_slug,
+            "title": "toggle-play",
+            "settings": {"agents_enabled": True, "play_enabled": False, "demo_telemetry": True},
+        },
+    )
+    sid = created.json()["id"]
+    started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False})
+    assert started.status_code == 202
+
+    enabled = api_client.post(f"/api/v1/sessions/{sid}/play", headers=AUTH, json={"enabled": True})
+    assert enabled.status_code == 202, enabled.text
+    assert enabled.json().get("play_enabled") is True
+    assert enabled.json().get("play_attach", {}).get("backend") == "hil"
+    assert flags["orch_restart"] == 1 and flags["restart_play"] is True
+    assert flags["actions"] >= 1
+
+    disabled = api_client.post(f"/api/v1/sessions/{sid}/play", headers=AUTH, json={"enabled": False})
+    assert disabled.status_code == 202
+    assert disabled.json().get("play_enabled") is False
+    assert flags["stop_actions"] >= 1
+
+
 def test_play_readiness_endpoint(api_client: TestClient) -> None:
     fixture = api_client.get(
         "/api/v1/play/readiness", headers=AUTH, params={"game_slug": "ksp", "source": "fixture"}

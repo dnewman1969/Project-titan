@@ -98,14 +98,16 @@ export function NewSessionDialog() {
       localStorage.setItem("titan.skipAutoDemo", "1");
     }
     const sessionTitle = title.trim() || defaultTitle(agentPlay, game.label);
+    // Always create as observe: API rejects mode=autonomous (Phase 4+). Learn-and-play uses
+    // settings.play_enabled so the orchestrator + actions worker attach without that mode.
     const result = await createSession({
       game_slug: game.slug,
       game_profile_id: effectiveProfileId || undefined,
       title: sessionTitle,
-      mode: agentPlay ? "autonomous" : "observe",
+      mode: "observe",
       settings: {
         agents_enabled: true,
-        ...(agentPlay ? { play_enabled: true } : {}),
+        play_enabled: agentPlay,
         ...(recordOnStart ? { record_on_start: true } : {}),
         demo_telemetry: sessionSource === "fixture",
         session_source: sessionSource,

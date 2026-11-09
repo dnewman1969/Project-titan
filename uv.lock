@@ -1909,11 +1909,13 @@ version = "0.1.0"
 source = { editable = "services/api" }
 dependencies = [
     { name = "fastapi" },
+    { name = "titan-capture" },
     { name = "titan-core" },
     { name = "titan-db" },
     { name = "titan-game-ats" },
     { name = "titan-game-ets2" },
     { name = "titan-game-ksp" },
+    { name = "titan-memory" },
     { name = "titan-models" },
     { name = "titan-sdk-games" },
     { name = "uvicorn" },
@@ -1922,11 +1924,13 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "titan-capture", editable = "services/capture" },
     { name = "titan-core", editable = "packages/py/titan-core" },
     { name = "titan-db", editable = "packages/py/titan-db" },
     { name = "titan-game-ats", editable = "games/ats" },
     { name = "titan-game-ets2", editable = "games/ets2" },
     { name = "titan-game-ksp", editable = "games/ksp" },
+    { name = "titan-memory", editable = "packages/py/titan-memory" },
     { name = "titan-models", editable = "packages/py/titan-models" },
     { name = "titan-sdk-games", editable = "packages/py/titan-sdk-games" },
     { name = "uvicorn", specifier = ">=0.32" },

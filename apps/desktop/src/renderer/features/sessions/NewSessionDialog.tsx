@@ -7,15 +7,15 @@ import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import { useState } from "react";
 
-import { useCreateSessionMutation } from "../../app/api";
+import { useCreateSessionMutation, useStartSessionMutation } from "../../app/api";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { showNotice } from "../operations/layoutSlice";
-import { closeSessionDialog } from "./sessionsSlice";
+import { closeSessionDialog, setActiveSession } from "./sessionsSlice";
 
 const GAMES = [
-  { id: "ksp", profile: "ksp_default", label: "Kerbal Space Program" },
-  { id: "ets2", profile: "ets2_default", label: "Euro Truck Simulator 2" },
-  { id: "ats", profile: "ats_default", label: "American Truck Simulator" },
+  { slug: "ksp", label: "Kerbal Space Program" },
+  { slug: "ets2", label: "Euro Truck Simulator 2" },
+  { slug: "ats", label: "American Truck Simulator" },
 ] as const;
 
 function rtkMutationStatus(error: unknown): number | null {
@@ -29,23 +29,38 @@ export function NewSessionDialog() {
   const open = useAppSelector((s) => s.sessions.dialog === "new");
   const dispatch = useAppDispatch();
   const [title, setTitle] = useState("Observe session");
-  const [gameId, setGameId] = useState<(typeof GAMES)[number]["id"]>("ksp");
-  const [createSession, { isLoading }] = useCreateSessionMutation();
+  const [gameSlug, setGameSlug] = useState<(typeof GAMES)[number]["slug"]>("ksp");
+  const [createSession, { isLoading: creating }] = useCreateSessionMutation();
+  const [startSession, { isLoading: starting }] = useStartSessionMutation();
 
-  const game = GAMES.find((g) => g.id === gameId) ?? GAMES[0];
+  const game = GAMES.find((g) => g.slug === gameSlug) ?? GAMES[0];
+  const isLoading = creating || starting;
   const onClose = () => {
     dispatch(closeSessionDialog());
   };
 
   const onCreate = async () => {
+    const sessionTitle = title.trim() || "Observe session";
     const result = await createSession({
-      game_id: game.id,
-      game_profile_id: game.profile,
-      title: title.trim() || "Observe session",
+      game_slug: game.slug,
+      title: sessionTitle,
       mode: "observe",
+      settings: { agents_enabled: true },
     });
     if ("data" in result && result.data) {
-      dispatch(showNotice(`Session created (${result.data.state}): ${result.data.title}`));
+      const started = await startSession(result.data.id);
+      if ("data" in started && started.data) {
+        dispatch(
+          setActiveSession({
+            id: started.data.id,
+            title: started.data.title,
+          }),
+        );
+        dispatch(showNotice(`Live session: ${started.data.title}`));
+        dispatch(closeSessionDialog());
+        return;
+      }
+      dispatch(showNotice(`Session created but could not start: check API logs.`));
       dispatch(closeSessionDialog());
       return;
     }
@@ -78,14 +93,14 @@ export function NewSessionDialog() {
         <TextField
           select
           label="Game"
-          value={gameId}
+          value={gameSlug}
           onChange={(e) => {
-            setGameId(e.target.value as (typeof GAMES)[number]["id"]);
+            setGameSlug(e.target.value as (typeof GAMES)[number]["slug"]);
           }}
           fullWidth
         >
           {GAMES.map((g) => (
-            <MenuItem key={g.id} value={g.id}>
+            <MenuItem key={g.slug} value={g.slug}>
               {g.label}
             </MenuItem>
           ))}

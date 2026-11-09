@@ -3,20 +3,53 @@ import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
+import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { MONO_FONT, StatusPill } from "@titan/ui-kit";
 
-import { useKillMutation } from "../../app/api";
-import { useAppDispatch } from "../../app/hooks";
+import { useKillMutation, useStartRecordingMutation, useStopRecordingMutation } from "../../app/api";
+import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { getTitan } from "../../app/runtime";
 import type { ApiStatus } from "../../app/useApiStatus";
 import { triggerKill } from "../../app/useShellBridge";
+import { showNotice } from "./layoutSlice";
+import { setRecordingActive } from "../sessions/sessionsSlice";
 
 export function TopBar({ status }: { status: ApiStatus }) {
   const dispatch = useAppDispatch();
   const [kill] = useKillMutation();
+  const [startRec] = useStartRecordingMutation();
+  const [stopRec] = useStopRecordingMutation();
+  const activeSessionId = useAppSelector((s) => s.sessions.activeSessionId);
+  const activeTitle = useAppSelector((s) => s.sessions.activeTitle);
+  const recordingActive = useAppSelector((s) => s.sessions.recordingActive);
   const { killHotkey, backend } = getTitan();
+
+  const toggleRecording = async () => {
+    if (!activeSessionId) {
+      dispatch(showNotice("Create a live session first (Session → New session)."));
+      return;
+    }
+    if (recordingActive) {
+      const result = await stopRec(activeSessionId);
+      if ("data" in result && result.data) {
+        dispatch(setRecordingActive(false));
+        dispatch(showNotice("Recording stopped."));
+      } else {
+        dispatch(showNotice("Could not stop recording — see API logs."));
+      }
+      return;
+    }
+    const result = await startRec(activeSessionId);
+    if ("data" in result && result.data) {
+      dispatch(setRecordingActive(true));
+      dispatch(showNotice("Recording started (OBS optional — manifest still written)."));
+    } else {
+      dispatch(showNotice("Could not start recording — need a live session."));
+    }
+  };
+
   return (
     <Box
       component="header"
@@ -50,7 +83,13 @@ export function TopBar({ status }: { status: ApiStatus }) {
       <Typography variant="body2" color="text.secondary">
         Operations Center
       </Typography>
-      <Chip size="small" variant="outlined" label="No session" sx={{ ml: 1 }} />
+      <Chip
+        size="small"
+        variant={activeSessionId ? "filled" : "outlined"}
+        color={activeSessionId ? "primary" : "default"}
+        label={activeTitle ?? "No session"}
+        sx={{ ml: 1, maxWidth: 220 }}
+      />
       <Box sx={{ flex: 1 }} />
       <StatusPill
         status={status.api}
@@ -60,15 +99,37 @@ export function TopBar({ status }: { status: ApiStatus }) {
       />
       <StatusPill status={status.postgres} label="Database" detail={status.postgresDetail} />
       <StatusPill status={status.services} label="Services" detail={status.servicesDetail} />
-      <Tooltip title="Recording arrives in M8">
+      <Tooltip
+        title={
+          activeSessionId
+            ? recordingActive
+              ? "Stop session recording"
+              : "Start session recording (writes manifest; OBS improves quality)"
+            : "Start a session first"
+        }
+      >
         <Box
           role="status"
-          aria-label="Recording: idle"
-          sx={{ display: "flex", alignItems: "center", gap: 0.5, px: 1, color: "text.disabled" }}
+          aria-label={recordingActive ? "Recording: active" : "Recording: idle"}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 0.5,
+            px: 0.5,
+            color: recordingActive ? "error.main" : "text.secondary",
+          }}
         >
-          <FiberManualRecordIcon sx={{ fontSize: 12 }} />
+          <IconButton
+            size="small"
+            color={recordingActive ? "error" : "default"}
+            disabled={!activeSessionId || backend === "none"}
+            onClick={() => void toggleRecording()}
+            aria-label={recordingActive ? "Stop recording" : "Start recording"}
+          >
+            <FiberManualRecordIcon sx={{ fontSize: 16 }} />
+          </IconButton>
           <Typography variant="caption" sx={{ fontFamily: MONO_FONT, fontWeight: 700 }}>
-            REC --:--:--
+            {recordingActive ? "REC ON" : "REC"}
           </Typography>
         </Box>
       </Tooltip>

@@ -1,6 +1,6 @@
 # Beta test playbook — download, run, and report
 
-Use this on **`main`** (current milestone: M4–M7 + agent voice demo + publish-kit research doc).  
+Use this on **`main`** (Phase 1: M4–M10 testable slice — sessions, recording manifest + REC control, memory search API, agent voice demo).  
 There is **no standalone installer build required** for this test — you run from source like a developer.
 
 Target OS for the full experience: **Windows 11**. Linux works for API/tests; game adapters and the installer are Windows-oriented.
@@ -43,14 +43,14 @@ Copy `project-titan-*.tar.gz` to the test PC, extract, then continue from **Part
 
 Install each once (Windows / PowerShell unless noted).
 
-| Tool | How |
-|------|-----|
-| Node 22 | `winget install OpenJS.NodeJS.LTS` |
-| pnpm 10 | `corepack enable` then `corepack prepare pnpm@10.33.4 --activate` |
-| uv | `powershell -ExecutionPolicy Bypass -c "irm https://astral.sh/uv/install.ps1 \| iex"` |
-| Python 3.12 | `uv python install 3.12` (or let `uv sync` install it) |
-| Docker Desktop | Optional; simplifies Postgres + Redis (see Part C) |
-| Memurai | If **not** using Docker: [Memurai Developer](https://www.memurai.com/get-memurai), port **63790**, set `requirepass` |
+| Tool           | How                                                                                                                  |
+| -------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Node 22        | `winget install OpenJS.NodeJS.LTS`                                                                                   |
+| pnpm 10        | `corepack enable` then `corepack prepare pnpm@10.33.4 --activate`                                                    |
+| uv             | `powershell -ExecutionPolicy Bypass -c "irm https://astral.sh/uv/install.ps1 \| iex"`                                |
+| Python 3.12    | `uv python install 3.12` (or let `uv sync` install it)                                                               |
+| Docker Desktop | Optional; simplifies Postgres + Redis (see Part C)                                                                   |
+| Memurai        | If **not** using Docker: [Memurai Developer](https://www.memurai.com/get-memurai), port **63790**, set `requirepass` |
 
 Close and reopen PowerShell after installs so `node`, `pnpm`, and `uv` are on `PATH`.
 
@@ -58,7 +58,17 @@ Close and reopen PowerShell after installs so `node`, `pnpm`, and `uv` are on `P
 
 ## Part C — Install dependencies
 
-In the repo root (`Project-titan`):
+**Fast path (Windows):**
+
+```powershell
+cd path\to\Project-titan
+.\tools\setup-windows-test.ps1
+.\tools\dev-up.ps1 -NoCompose
+```
+
+`setup-windows-test.ps1` runs `pnpm install`, `uv sync`, `pnpm codegen`, and starts Docker Compose when Docker is installed.
+
+**Manual path** — in the repo root (`Project-titan`):
 
 ```powershell
 pnpm install
@@ -160,13 +170,13 @@ Do these in order. For each item, note **PASS / FAIL / SKIP** and one line of wh
 
 ### E1 — App shell and health
 
-| # | Action | Pass if |
-|---|--------|---------|
-| 1 | App opens without crashing | Main grid visible (top bar, game area, panels) |
-| 2 | Boot splash clears | Not stuck on “Starting…” |
-| 3 | Status / pills | API and Postgres show healthy (not stuck red) |
-| 4 | Menu **Help → About** | Version dialog opens |
-| 5 | Menu **View** toggles | Panels hide/show; layout should persist after refresh (M7) |
+| #   | Action                     | Pass if                                                    |
+| --- | -------------------------- | ---------------------------------------------------------- |
+| 1   | App opens without crashing | Main grid visible (top bar, game area, panels)             |
+| 2   | Boot splash clears         | Not stuck on “Starting…”                                   |
+| 3   | Status / pills             | API and Postgres show healthy (not stuck red)              |
+| 4   | Menu **Help → About**      | Version dialog opens                                       |
+| 5   | Menu **View** toggles      | Panels hide/show; layout should persist after refresh (M7) |
 
 ### E2 — Games API (M4)
 
@@ -177,28 +187,51 @@ $headers = @{ Authorization = "Bearer dev-token" }   # if you set dev-token
 Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/v1/games" -Headers $headers
 ```
 
-| # | Pass if |
-|---|---------|
-| 6 | HTTP 200 and items include slugs like `ksp`, `ets2`, `ats` |
-| 7 | **View → toggle Games** (if present) or games panel shows discovery skeleton |
+| #   | Pass if                                                                      |
+| --- | ---------------------------------------------------------------------------- |
+| 6   | HTTP 200 and items include slugs like `ksp`, `ets2`, `ats`                   |
+| 7   | **View → toggle Games** (if present) or games panel shows discovery skeleton |
 
 ### E3 — Sessions (M6 + M7)
 
-| # | Action | Pass if |
-|---|--------|---------|
-| 8 | **File → New Session** (or Ctrl+N) | Dialog opens |
-| 9 | Create session with KSP | Success notice **or** clear message if API blocked |
-| 10 | If session created | Note the session id for telemetry (below) |
+| #   | Action                             | Pass if                                            |
+| --- | ---------------------------------- | -------------------------------------------------- |
+| 8   | **File → New Session** (or Ctrl+N) | Dialog opens                                       |
+| 9   | Create session with KSP            | “Live session” notice; top bar chip shows title    |
+| 10  | Top bar after create               | Session chip filled (not “No session”)               |
+
+### E3b — Recording (M8)
+
+| #   | Action                    | Pass if                                                                 |
+| --- | ------------------------- | ----------------------------------------------------------------------- |
+| 11  | Click **REC** (red dot)  | “Recording started” notice; label shows **REC ON**                      |
+| 12  | Click **REC** again       | Stops; notice says stopped                                              |
+| 13  | Optional: OBS on 4455     | No error in API log; manifest still written if OBS offline (degraded OK) |
+
+Manifest path is returned by the API under the session `data_dir/recording/manifest.json`.
+
+### E3c — Memory API (M9 stub)
+
+```powershell
+$h = @{ Authorization = "Bearer $($env:TITAN_LAUNCH_TOKEN)" }
+Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/v1/memory/status" -Headers $h
+Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/v1/memory/search" -Method POST -Headers $h -ContentType "application/json" -Body '{"query":"ksp launch"}'
+```
+
+| #   | Pass if                                      |
+| --- | -------------------------------------------- |
+| 14  | `/memory/status` returns chroma state JSON   |
+| 15  | `/memory/search` returns `items` array (may be empty if Chroma has no data) |
 
 ### E4 — Agents voice demo
 
-| # | Action | Pass if |
-|---|--------|---------|
-| 11 | **Brag** button | New chat line + you hear speech (browser or Owl) |
-| 12 | **Roast me** | Arrogant line + speech |
-| 13 | Tap a crew chip (Wernher, etc.) | Greeting line appears |
-| 14 | Type in chat box and Send | Agent replies with smack-talk flavor |
-| 15 | Avatar “speaking” ring | Visible while audio plays |
+| #   | Action                          | Pass if                                          |
+| --- | ------------------------------- | ------------------------------------------------ |
+| 16  | **Brag** button                 | New chat line + you hear speech (browser or Owl) |
+| 17  | **Roast me**                    | Arrogant line + speech                           |
+| 18  | Tap a crew chip (Wernher, etc.) | Greeting line appears                            |
+| 19  | Type in chat box and Send       | Agent replies with smack-talk flavor             |
+| 20  | Avatar “speaking” ring          | Visible while audio plays                        |
 
 ### E5 — Telemetry (M5, optional)
 
@@ -211,24 +244,24 @@ If you created a session id `S`:
 uv run python -m titan_telemetry replay games/ksp/fixtures/launch-to-orbit.ndjson
 ```
 
-| # | Pass if |
-|---|---------|
-| 16 | Telemetry bar shows **Speed** (or values change) when demo session + WS work |
-| 17 | Event log gains lines when WS events flow |
+| #   | Pass if                                                                      |
+| --- | ---------------------------------------------------------------------------- |
+| 21  | Telemetry bar shows **Speed** (or values change) when demo session + WS work |
+| 22  | Event log gains lines when WS events flow                                    |
 
 ### E6 — Safety
 
-| # | Action | Pass if |
-|---|--------|---------|
-| 18 | Press **Ctrl+Shift+F12** | Kill switch engages; banner/state updates |
-| 19 | Resume if offered | Returns to normal |
+| #   | Action                   | Pass if                                   |
+| --- | ------------------------ | ----------------------------------------- |
+| 23  | Press **Ctrl+Shift+F12** | Kill switch engages; banner/state updates |
+| 24  | Resume if offered        | Returns to normal                         |
 
 ### E7 — First-run wizard (M10 stub)
 
-| # | Pass if |
-|---|---------|
-| 20 | First-run wizard appears (or can be opened from tools menu if linked) |
-| 21 | Links open (Ollama, Memurai, etc.) without crashing the app |
+| #   | Pass if                                                               |
+| --- | --------------------------------------------------------------------- |
+| 25  | First-run wizard appears (or can be opened from tools menu if linked) |
+| 26  | Links open (Ollama, Memurai, etc.) without crashing the app           |
 
 ### E8 — Automated smoke (optional but helpful)
 
@@ -237,9 +270,9 @@ pnpm test
 uv run pytest -q
 ```
 
-| # | Pass if |
-|---|---------|
-| 22 | TS tests pass; most Python tests pass (Redis integration may fail if Memurai not on 63790 — note if so) |
+| #   | Pass if                                                                                                 |
+| --- | ------------------------------------------------------------------------------------------------------- |
+| 27  | TS tests pass; most Python tests pass (Redis integration may fail if Memurai not on 63790 — note if so) |
 
 ---
 
@@ -255,14 +288,14 @@ Copy this template into your next message:
 - Memurai / Redis: yes/no, port:
 
 ## Results
-E1: 
-E2: 
-E3: 
-E4: 
-E5: 
-E6: 
-E7: 
-E8: 
+E1:
+E2:
+E3:
+E4:
+E5:
+E6:
+E7:
+E8:
 
 ## Blockers
 - (anything that stopped you before E4)
@@ -281,7 +314,7 @@ E8:
 ## Part G — Known limits (not bugs)
 
 - **No packaged NSIS installer** yet for daily use — dev workflow only unless you build `pnpm --filter @titan/desktop dist` yourself.
-- **Real game + OBS recording** (M8) is stubbed; OBS client tests run in CI with mocks.
+- **OBS** improves M8 capture when obs-websocket v5 is on **4455**; without OBS, REC still writes **manifest.json** (degraded).
 - **Live agent bus chat** (full M7.T2 streaming) is not wired; Agents panel is a **demo** until WS chat lands.
 - **YouTube publish kit** is documented from FoF research, not yet a button in the UI.
 - **Ollama** optional for this test; missing Ollama may show degraded model pill, not a crash.
@@ -290,9 +323,9 @@ E8:
 
 ## Quick reference
 
-| Item | Value |
-|------|--------|
-| API | http://127.0.0.1:8765/api/v1 |
-| API docs | http://127.0.0.1:8765/api/v1/docs |
-| Supervisor status | http://127.0.0.1:8769/status |
-| More detail | [dev-setup.md](./dev-setup.md), [local-test-package.md](./local-test-package.md) |
+| Item              | Value                                                                            |
+| ----------------- | -------------------------------------------------------------------------------- |
+| API               | http://127.0.0.1:8765/api/v1                                                     |
+| API docs          | http://127.0.0.1:8765/api/v1/docs                                                |
+| Supervisor status | http://127.0.0.1:8769/status                                                     |
+| More detail       | [dev-setup.md](./dev-setup.md), [local-test-package.md](./local-test-package.md) |

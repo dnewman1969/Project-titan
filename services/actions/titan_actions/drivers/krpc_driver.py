@@ -114,6 +114,8 @@ class KrpcDriver:
             if action_id == "ksp.roll":
                 control.roll = _clamp_axis(float(params.get("roll", params.get("value", 0.0))))
                 return True, None
+            if action_id == "ksp.fly":
+                return _apply_fly(vessel, control, params)
             return False, f"unknown ksp action {action_id!r}"
         except Exception as exc:
             return False, f"krpc: {exc}"
@@ -130,5 +132,57 @@ class KrpcDriver:
             control.pitch = 0.0
             control.yaw = 0.0
             control.roll = 0.0
+            _disengage_autopilot(vessel)
         except Exception as exc:
             log.warning("krpc_reset_failed", err=str(exc))
+
+
+def _apply_fly(vessel: Any, control: Any, params: dict[str, Any]) -> tuple[bool, str | None]:
+    """Hold throttle plus either the kRPC autopilot (pitch/heading) or SAS.
+
+    kRPC cannot run SAS and the autopilot together. A heading target engages
+    ``auto_pilot`` in the surface frame (the tutorial's ``target_pitch_and_heading``).
+    Without a target, SAS stays on so the vessel does not tumble. Throttle is
+    applied after staging so a launch stage does not leave the engines at zero.
+    """
+    if params.get("stage"):
+        control.activate_next_stage()
+    control.throttle = _clamp01(float(params.get("throttle", 0.0)))
+    pitch = params.get("pitch_deg")
+    heading = params.get("heading_deg")
+    autopilot = getattr(vessel, "auto_pilot", None)
+    if pitch is not None and heading is not None and autopilot is not None:
+        try:
+            control.sas = False
+            reference = getattr(vessel, "surface_reference_frame", None)
+            if reference is not None:
+                autopilot.reference_frame = reference
+            autopilot.target_pitch_and_heading(
+                max(-90.0, min(90.0, float(pitch))),
+                float(heading) % 360.0,
+            )
+            engage = getattr(autopilot, "engage", None)
+            if callable(engage):
+                engage()
+            return True, None
+        except Exception as exc:
+            log.warning("krpc_autopilot_failed", err=str(exc))
+            try:
+                control.sas = True
+            except Exception as sas_exc:
+                log.warning("krpc_sas_fallback_failed", err=str(sas_exc))
+            return True, None
+    _disengage_autopilot(vessel)
+    control.sas = bool(params.get("sas", True))
+    return True, None
+
+
+def _disengage_autopilot(vessel: Any) -> None:
+    autopilot = getattr(vessel, "auto_pilot", None)
+    disengage = getattr(autopilot, "disengage", None)
+    if not callable(disengage):
+        return
+    try:
+        disengage()
+    except Exception as exc:
+        log.warning("krpc_autopilot_disengage_failed", err=str(exc))

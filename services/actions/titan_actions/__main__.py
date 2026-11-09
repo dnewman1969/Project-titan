@@ -17,7 +17,7 @@ from titan_core.config import load_config
 from titan_core.logging import configure_logging, get_logger
 from titan_core.protocol.envelope import Address, make_envelope
 from titan_core.protocol.payloads import ActionExecuted, ActionPropose
-from titan_core.streams import redis_client
+from titan_core.streams import BUS_BLOCK_MS, IDLE_READ_ERRORS, blocking_socket_timeout_s, redis_client
 
 log = get_logger(__name__)
 ACTIONS_GROUP = "actions"
@@ -35,7 +35,9 @@ async def _run(session_id: UUID, game_slug: str | None) -> int:
     cfg = load_config()
     if game_slug:
         os.environ["TITAN_GAME_SLUG"] = game_slug
-    redis = redis_client(cfg.redis)
+    # Socket timeout must exceed XREADGROUP BLOCK or an idle stream raises TimeoutError
+    # and the worker exits, which is what left KSP with no pilot after attach.
+    redis = redis_client(cfg.redis, timeout_s=blocking_socket_timeout_s(BUS_BLOCK_MS))
     bus = SessionBus(redis, session_id)
     await bus.ensure_group(ACTIONS_GROUP)
     play_settings = PlaySettings.from_environ()
@@ -63,7 +65,11 @@ async def _run(session_id: UUID, game_slug: str | None) -> int:
     )
     try:
         while True:
-            batch = await bus.read_group(ACTIONS_GROUP, ACTIONS_CONSUMER, block_ms=2000)
+            try:
+                batch = await bus.read_group(ACTIONS_GROUP, ACTIONS_CONSUMER, block_ms=BUS_BLOCK_MS)
+            except IDLE_READ_ERRORS:
+                log.warning("actions_read_timeout", session_id=str(session_id))
+                continue
             for entry_id, envelope in batch:
                 if envelope.type != "action.propose":
                     await bus.ack(ACTIONS_GROUP, entry_id)

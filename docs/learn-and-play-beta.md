@@ -35,15 +35,17 @@ HIL does **not** touch the game; it updates in-memory state and optional `hil.nd
 
 ## Real KSP (kRPC)
 
-| Step    | Detail                                                                       |
-| ------- | ---------------------------------------------------------------------------- |
-| Mod     | kRPC 0.5.x in `GameData/kRPC` (pinned in `third_party/manifest.yaml`)        |
-| Server  | RPC `50000`, stream `50001`, `127.0.0.1`, auto-accept                        |
-| Titan   | New session → KSP install → **agent play** → start (optional launch)         |
-| Driver  | `TITAN_PLAY_BACKEND=auto` (default) + `TITAN_GAME_SLUG=ksp`                  |
-| Actions | Thrust/stage/SAS/RCS/brakes/gear + `ksp.steer` pitch/yaw/roll (mocked in CI) |
+| Step    | Detail                                                                                                   |
+| ------- | -------------------------------------------------------------------------------------------------------- |
+| Mod     | kRPC 0.5.x in `GameData/kRPC` (pinned in `third_party/manifest.yaml`)                                    |
+| Server  | RPC `50000`, stream `50001`, `127.0.0.1`, auto-accept                                                    |
+| Titan   | New session → KSP install → **agent play** → start (optional launch)                                     |
+| Driver  | `TITAN_PLAY_BACKEND=auto` (default) + `TITAN_GAME_SLUG=ksp`                                              |
+| Actions | `ksp.fly` (throttle + SAS or autopilot pitch/heading), plus thrust/stage/RCS/brakes/gear and `ksp.steer` |
 
-If kRPC is down, `action.executed` reports `ok: false` with a connect error (no fake success).
+With play on and the game set to KSP, the orchestrator runs a **flight loop** (about 1 Hz) on the latest telemetry frame. It publishes `ksp.fly`: kRPC's built-in autopilot holds pitch and heading 90° east (gravity turn after 250 m, throttle eased through high dynamic pressure, full throttle and nose-up if the vessel is low and descending, throttle idle and SAS once apoapsis is above 80 km or the craft is in orbit). That is the same hold as the kRPC launch-into-orbit tutorial and kOS `lock steering to heading()`. kOS and MechJeb are not required. The first pre-launch tick also stages once so the engine actually lights. If the scene is not flight, or the frame has no vessel, the loop writes a blackboard discovery (`flight.no_vessel` / `flight.waiting`) and does not send controls. Proposals land in `lessons` (`play.flight.*`) and outcomes in `lessons` (`feedback.*`), which the desktop learn strip already polls.
+
+If kRPC is down, `action.executed` reports `ok: false` with a connect error (no fake success). Live telemetry retries the port instead of exiting.
 
 Env overrides: `TITAN_KRPC_HOST`, `TITAN_KRPC_RPC_PORT`, `TITAN_KRPC_STREAM_PORT`.
 
@@ -81,6 +83,7 @@ Linux dev hosts cannot drive SCS; use HIL or a Windows machine.
 
 - `services/actions/titan_actions/drivers/` — kRPC, SCS, HIL
 - `services/orchestrator/titan_orchestrator/play_policy.py` — event → proposal
-- `services/orchestrator/titan_orchestrator/session_loops.py` — telemetry, learn, feedback
+- `services/orchestrator/titan_orchestrator/flight_policy.py` — continuous KSP heading hold
+- `services/orchestrator/titan_orchestrator/session_loops.py` — telemetry, learn, flight loop, feedback
 - `services/api/titan_api/youtube_stub.py` — YouTube auth + draft upload stubs
 - `services/actions/README.md` — backend env table

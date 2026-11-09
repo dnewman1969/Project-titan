@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from titan_core.bus import SessionBus
 from titan_core.clock import SessionClock
 from titan_core.config import TitanConfig, load_config
-from titan_core.streams import redis_client
+from titan_core.streams import blocking_socket_timeout_s, redis_client
 from titan_db.session import create_engine, create_session_factory
 from titan_orchestrator.blackboard import BlackboardService
 from titan_orchestrator.floor import FloorManager
@@ -39,7 +39,7 @@ class SessionRuntime:
     @classmethod
     async def create(cls, session_id: UUID, cfg: TitanConfig | None = None) -> SessionRuntime:
         config = cfg or load_config()
-        client = redis_client(config.redis)
+        client = redis_client(config.redis, timeout_s=blocking_socket_timeout_s())
         engine = create_engine(config.postgres)
         factory = create_session_factory(engine)
         clock = SessionClock.start()

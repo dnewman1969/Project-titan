@@ -122,6 +122,70 @@ def test_krpc_connect_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     assert err is not None and "refused" in err
 
 
+class _AutoPilot:
+    def __init__(self) -> None:
+        self.pitch: float | None = None
+        self.heading: float | None = None
+        self.engaged = False
+        self.ref: object = None
+
+    def target_pitch_and_heading(self, pitch: float, heading: float) -> None:
+        self.pitch = pitch
+        self.heading = heading
+
+    def engage(self) -> None:
+        self.engaged = True
+
+    def disengage(self) -> None:
+        self.engaged = False
+
+    @property
+    def reference_frame(self) -> object:
+        return self.ref
+
+    @reference_frame.setter
+    def reference_frame(self, value: object) -> None:
+        self.ref = value
+
+
+def test_krpc_fly_engages_surface_autopilot() -> None:
+    vessel = _Conn.space_center.active_vessel
+    autopilot = _AutoPilot()
+    vessel.auto_pilot = autopilot  # type: ignore[attr-defined]
+    vessel.surface_reference_frame = "srf"  # type: ignore[attr-defined]
+    ok, err = _driver().execute(
+        "ksp.fly",
+        {"throttle": 1.0, "pitch_deg": 120, "heading_deg": 450, "stage": True},
+    )
+    assert ok and err is None
+    assert vessel.control.throttle == 1.0
+    assert vessel.control.staged == 1
+    assert vessel.control.sas is False
+    assert autopilot.engaged is True
+    assert autopilot.pitch == 90.0
+    assert autopilot.heading == 90.0
+    assert autopilot.ref == "srf"
+
+    ok, err = _driver().execute("ksp.fly", {"throttle": 0.0, "sas": True})
+    assert ok and err is None
+    assert autopilot.engaged is False
+    assert vessel.control.sas is True
+    assert vessel.control.throttle == 0.0
+
+    vessel.control.throttle = 0.4
+    _driver().reset()
+    assert vessel.control.throttle == 0.0
+    assert autopilot.engaged is False
+
+
+def test_krpc_fly_without_autopilot_still_sets_throttle() -> None:
+    ok, err = _driver().execute("ksp.fly", {"throttle": 0.55, "pitch_deg": 80, "heading_deg": 90})
+    assert ok and err is None
+    control = _Conn.space_center.active_vessel.control
+    assert control.throttle == 0.55
+    assert control.sas is True
+
+
 def test_krpc_no_active_vessel() -> None:
     _Conn.space_center.active_vessel = None  # type: ignore[assignment]
     ok, err = _driver().execute("ksp.throttle", {"throttle": 0.5})

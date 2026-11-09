@@ -21,8 +21,10 @@ Environment set by the session controller when play is enabled:
 
 ## Actions
 
-- **KSP (kRPC):** `ksp.throttle`, `ksp.stage`, `ksp.sas`, `ksp.rcs`, `ksp.brake`/`ksp.brakes`,
-  `ksp.gear`, `ksp.steer` (pitch/yaw/roll), plus `ksp.pitch` / `ksp.yaw` / `ksp.roll`
+- **KSP (kRPC):** `ksp.fly` (throttle, optional one-shot stage, and either SAS or
+  `auto_pilot.target_pitch_and_heading` in the surface frame), `ksp.throttle`, `ksp.stage`,
+  `ksp.sas`, `ksp.rcs`, `ksp.brake`/`ksp.brakes`, `ksp.gear`, `ksp.steer` (pitch/yaw/roll),
+  plus `ksp.pitch` / `ksp.yaw` / `ksp.roll`
 - **SCS:** `scs.brake`, `scs.throttle`
 
 Failed kRPC/SCS connections return `ok: false` on `action.executed` (no silent stub success).

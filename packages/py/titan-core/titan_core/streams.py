@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from typing import Any
 
 import redis.asyncio as aioredis
+import redis.exceptions
 from pydantic import BaseModel
 
 from titan_core.config import RedisConfig
@@ -29,6 +30,22 @@ DATA_FIELD = "data"
 REDIS_PROTOCOL = 2
 """RESP2, pinned: redis-py 8 defaults to RESP3, whose `HELLO` older Redis-compatible servers reject
 and whose replies (`XREAD` as a dict) differ from the shapes this codebase parses."""
+BUS_BLOCK_MS = 2000
+"""Default XREAD / XREADGROUP block for session workers. Socket timeout must exceed this."""
+# redis-py 8's TimeoutError subclasses RedisError only, not builtins.TimeoutError.
+IDLE_READ_ERRORS: tuple[type[BaseException], ...] = (TimeoutError, redis.exceptions.TimeoutError)
+
+
+def blocking_socket_timeout_s(block_ms: int = BUS_BLOCK_MS, *, margin_s: float = 5.0) -> float:
+    """Socket timeout for a blocking Redis read.
+
+    ``XREAD BLOCK`` holds the socket for ``block_ms``. redis-py raises
+    ``TimeoutError`` when ``socket_timeout`` fires first, so an idle stream
+    kills the consumer instead of returning no messages. Keep the timeout
+    longer than the block.
+    """
+    block_s = 0.0 if block_ms <= 0 else block_ms / 1000.0
+    return block_s + max(0.0, margin_s)
 
 
 def redis_client(cfg: RedisConfig, *, timeout_s: float = 2.0) -> aioredis.Redis:

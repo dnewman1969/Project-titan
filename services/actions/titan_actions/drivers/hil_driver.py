@@ -42,6 +42,7 @@ class HilDriver:
             "ksp.pitch",
             "ksp.yaw",
             "ksp.roll",
+            "ksp.fly",
             "scs.brake",
             "scs.throttle",
         }
@@ -85,6 +86,18 @@ class HilDriver:
                 ksp["yaw"] = max(-1.0, min(1.0, float(params.get("yaw", params.get("value", 0.0)))))
             elif action_id == "ksp.roll":
                 ksp["roll"] = max(-1.0, min(1.0, float(params.get("roll", params.get("value", 0.0)))))
+            elif action_id == "ksp.fly":
+                throttle = max(0.0, min(1.0, float(params.get("throttle", 0.0))))
+                ksp["throttle"] = throttle
+                guided = "pitch_deg" in params and "heading_deg" in params
+                ksp["sas"] = False if guided else bool(params.get("sas", True))
+                ksp["autopilot"] = guided
+                if "pitch_deg" in params:
+                    ksp["pitch_deg"] = max(-90.0, min(90.0, float(params["pitch_deg"])))
+                if "heading_deg" in params:
+                    ksp["heading_deg"] = float(params["heading_deg"]) % 360.0
+                if params.get("stage"):
+                    ksp["stage_count"] = int(ksp.get("stage_count", 0)) + 1
         if action_id.startswith("scs."):
             scs = _STATE.setdefault("scs", {})
             if not isinstance(scs, dict):

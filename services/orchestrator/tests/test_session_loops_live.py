@@ -183,3 +183,88 @@ async def test_run_session_loops_ingests_telemetry_and_play_event() -> None:
     lesson_puts = [p for p in runtime.bb.puts if p.get("section") == "lessons"]
     assert lesson_puts
     assert runtime.bus.published
+
+
+class _LatestRedis:
+    def __init__(self, session_id: UUID, payload: str) -> None:
+        self._stream = session_telemetry_stream(str(session_id))
+        self._payload = payload
+
+    async def xread(self, streams: dict[str, str], count: int = 8, block: int = 2000) -> list[object]:
+        _ = streams, count, block
+        await asyncio.sleep(0.01)
+        return []
+
+    async def xrevrange(self, stream: str, count: int = 1) -> list[tuple[str, dict[str, str]]]:
+        _ = count
+        if stream != self._stream:
+            return []
+        return [("9-0", {DATA_FIELD: self._payload})]
+
+
+def _fly_proposals(runtime: LoopRuntime) -> list[dict[str, Any]]:
+    found: list[dict[str, Any]] = []
+    for envelope in runtime.bus.published:
+        payload = getattr(envelope, "payload", None)
+        if isinstance(payload, dict) and payload.get("action_id") == "ksp.fly":
+            found.append(payload)
+    return found
+
+
+async def _run_flight(runtime: LoopRuntime, *, until: Any) -> None:
+    task = asyncio.create_task(
+        run_session_loops(runtime, play_enabled=True, game_slug="ksp", flight_period_s=0.05)
+    )
+
+    async def stop_soon() -> None:
+        for _ in range(80):
+            if until():
+                runtime._stopped.set()
+                return
+            await asyncio.sleep(0.02)
+        runtime._stopped.set()
+
+    await asyncio.wait_for(stop_soon(), timeout=3.0)
+    await asyncio.wait_for(task, timeout=3.0)
+
+
+@pytest.mark.asyncio
+async def test_flight_loop_proposes_heading_hold() -> None:
+    sid = UUID(int=77)
+    payload = json.dumps(
+        {
+            "scene": "flight",
+            "paused": False,
+            "vehicle": {
+                "name": "Explorer",
+                "situation": "pre_launch",
+                "geo": {"lat_deg": 0.0, "lon_deg": 0.0, "alt_m": 70.0},
+                "velocity": {"vertical_mps": 0.0},
+            },
+        }
+    )
+    runtime = LoopRuntime(session_id=sid, redis=_LatestRedis(sid, payload))  # type: ignore[arg-type]
+    await _run_flight(runtime, until=lambda: bool(_fly_proposals(runtime)))
+    proposals = _fly_proposals(runtime)
+    assert proposals
+    params = proposals[0]["params"]
+    assert params["throttle"] == 1.0
+    assert params["pitch_deg"] == 90.0
+    assert params["heading_deg"] == 90.0
+    assert params.get("stage") is True
+    assert any(str(p.get("key", "")).startswith("play.flight.") for p in runtime.bb.puts)
+    assert any(p.get("key") == "flight.launch" for p in runtime.bb.puts)
+
+
+@pytest.mark.asyncio
+async def test_flight_loop_reports_missing_vessel() -> None:
+    sid = UUID(int=78)
+    payload = json.dumps({"scene": "space_center", "paused": False, "vehicle": None})
+    runtime = LoopRuntime(session_id=sid, redis=_LatestRedis(sid, payload))  # type: ignore[arg-type]
+    await _run_flight(
+        runtime,
+        until=lambda: any(p.get("key") == "flight.no_vessel" for p in runtime.bb.puts),
+    )
+    assert _fly_proposals(runtime) == []
+    note = next(p for p in runtime.bb.puts if p.get("key") == "flight.no_vessel")
+    assert "not steering" in str(note["value"]["text"])

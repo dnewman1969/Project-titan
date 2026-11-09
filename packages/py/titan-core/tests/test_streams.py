@@ -32,6 +32,12 @@ def test_entry_data_requires_the_data_field() -> None:
         streams.entry_data({"other": "{}"})
 
 
+def test_blocking_socket_timeout_exceeds_block() -> None:
+    timeout = streams.blocking_socket_timeout_s(2000)
+    assert timeout > 2.0
+    assert timeout == 7.0
+
+
 def test_session_stream_names_roundtrip() -> None:
     sid = "01933e7a-0000-7000-8000-000000000001"
     bus = streams.session_bus_stream(sid)

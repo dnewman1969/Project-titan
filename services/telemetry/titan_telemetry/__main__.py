@@ -11,6 +11,7 @@ from uuid import UUID
 from titan_core.config import load_config
 from titan_core.logging import configure_logging, get_logger
 from titan_sdk_games.adapter import AdapterConfig, GameAdapter, RawFrame
+from titan_sdk_games.exceptions import GameNotConnected
 from titan_sdk_games.profiles import GameProfile
 from titan_telemetry.host import TelemetryHost
 from titan_telemetry.loader import adapter_for, rules_path
@@ -61,7 +62,7 @@ def main() -> None:
 
 
 async def _run_live(adapter: GameAdapter, profile: GameProfile, session_id: UUID, game: str) -> None:
-    await adapter.connect(profile, AdapterConfig())
+    """Keep sampling after a refused kRPC port instead of exiting the process."""
     host = TelemetryHost.from_config(
         load_config(),
         session_id=session_id,
@@ -69,8 +70,18 @@ async def _run_live(adapter: GameAdapter, profile: GameProfile, session_id: UUID
         game=game,
         profile=profile,
     )
+    delay = 1.0
     try:
-        await host.run_live()
+        while True:
+            try:
+                await adapter.connect(profile, AdapterConfig())
+            except GameNotConnected as exc:
+                log.warning("telemetry_connect_retry", err=str(exc), delay_s=delay, game=game)
+                await asyncio.sleep(delay)
+                delay = min(5.0, delay * 2)
+                continue
+            delay = 1.0
+            await host.run_live()
     finally:
         host.close()
         await adapter.disconnect()

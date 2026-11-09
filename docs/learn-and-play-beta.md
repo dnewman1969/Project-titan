@@ -14,7 +14,7 @@ Until that happens on **your** KSP or ETS2/ATS install, treat production paths a
 2. **Discover game** — Operations Center → scan installs; pick game + profile in **New session**.
 3. **Agent play** — enable **Enable agent play (beta)** (starts `titan-orchestrator` with play + `titan-actions`).
 4. **Learn** — orchestrator `session_loops` writes `discoveries` / `lessons`; play feedback loop records outcomes from `action.executed`.
-5. **REC** — top bar **REC** (or **Record with session** on create) writes `manifest.json` + `timeline.ndjson` under `%LOCALAPPDATA%/Titan/sessions/<id>/recording/`. Play actions append `play.action` rows when REC is on.
+5. **REC** — top bar **REC** (or **Record with session** on create) writes `manifest.json` + `timeline.ndjson` under `%LOCALAPPDATA%/Titan/sessions/<id>/recording/`. Play actions and lesson learn events append timeline rows when REC is on.
 
 ### Demo path (no game)
 
@@ -63,7 +63,7 @@ Linux dev hosts cannot drive SCS; use HIL or a Windows machine.
 | ------------------------------------- | ------------------------------------------------------ |
 | `<session>/play.ndjson`               | Every play attempt (when `TITAN_SESSION_DATA_DIR` set) |
 | `<session>/recording/manifest.json`   | REC metadata                                           |
-| `<session>/recording/timeline.ndjson` | `recording.*`, `play.action` events                    |
+| `<session>/recording/timeline.ndjson` | `recording.*`, `play.action`, `lesson.proposed`, `lesson.feedback` |
 | Blackboard `lessons` / `discoveries`  | Crew learnings (UI agents panel / WS)                  |
 
 ## Hardware checklist vs software HIL

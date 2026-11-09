@@ -32,7 +32,12 @@ class SessionController:
     _actions: dict[UUID, ActionsProcess] = field(default_factory=dict)
 
     def start_orchestrator(
-        self, session_id: UUID, *, game_slug: str = "ksp", play_enabled: bool = False
+        self,
+        session_id: UUID,
+        *,
+        game_slug: str = "ksp",
+        play_enabled: bool = False,
+        data_dir: str | None = None,
     ) -> OrchestratorProcess:
         if session_id in self._children:
             return self._children[session_id]
@@ -45,7 +50,12 @@ class SessionController:
             "--game-slug",
             game_slug,
         ]
-        env = {**os.environ, "TITAN_SESSION_PLAY": "1"} if play_enabled else None
+        extra: dict[str, str] = {}
+        if play_enabled:
+            extra["TITAN_SESSION_PLAY"] = "1"
+        if data_dir:
+            extra["TITAN_SESSION_DATA_DIR"] = data_dir
+        env = {**os.environ, **extra} if extra else None
         proc = self.spawn(cmd, env=env) if env is not None else self.spawn(cmd)
         child = OrchestratorProcess(session_id=session_id, popen=proc, game_slug=game_slug)
         self._children[session_id] = child

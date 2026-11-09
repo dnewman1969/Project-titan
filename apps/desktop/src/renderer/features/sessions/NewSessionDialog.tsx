@@ -12,7 +12,7 @@ import { useState } from "react";
 import { useCreateSessionMutation, useListGamesQuery, useStartSessionMutation } from "../../app/api";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { showNotice } from "../operations/layoutSlice";
-import { closeSessionDialog, setActiveSession, setRecordingActive, setRecordingRootDir } from "./sessionsSlice";
+import { closeSessionDialog, setActiveSession } from "./sessionsSlice";
 
 const FALLBACK_GAMES = [
   { slug: "ksp", label: "Kerbal Space Program" },
@@ -78,19 +78,17 @@ export function NewSessionDialog() {
         launch_game: launchGame && Boolean(effectiveProfileId),
       });
       if ("data" in started && started.data) {
+        const dataDir = Reflect.get(started.data, "data_dir");
+        const recordingRoot =
+          recordOnStart && typeof dataDir === "string" && dataDir.length > 0 ? `${dataDir}/recording` : null;
         dispatch(
           setActiveSession({
             id: started.data.id,
             title: started.data.title,
+            recordingActive: recordOnStart,
+            recordingRootDir: recordingRoot,
           }),
         );
-        if (recordOnStart) {
-          dispatch(setRecordingActive(true));
-          const dataDir = Reflect.get(started.data, "data_dir");
-          if (typeof dataDir === "string" && dataDir.length > 0) {
-            dispatch(setRecordingRootDir(`${dataDir}/recording`));
-          }
-        }
         dispatch(showNotice(`Live session: ${started.data.title}`));
         dispatch(closeSessionDialog());
         return;

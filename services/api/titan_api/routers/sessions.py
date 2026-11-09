@@ -160,7 +160,12 @@ async def start_session(
     controller = request.app.state.session_controller
     play_enabled = bool(row.settings.get("play_enabled", False))
     if row.settings.get("agents_enabled", True):
-        controller.start_orchestrator(session_id, game_slug=game_slug, play_enabled=play_enabled)
+        controller.start_orchestrator(
+            session_id,
+            game_slug=game_slug,
+            play_enabled=play_enabled,
+            data_dir=row.data_dir,
+        )
     if play_enabled:
         controller.start_actions(session_id, game_slug=game_slug, data_dir=row.data_dir)
     row.state = "live"

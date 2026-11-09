@@ -15,6 +15,7 @@ from titan_core.protocol.payloads import ActionExecuted, ActionPropose
 from titan_core.protocol.telemetry import TelemetryFrameUI
 from titan_core.streams import entry_data, session_events_stream, session_telemetry_stream
 from titan_orchestrator.play_policy import play_proposal_for_event
+from titan_orchestrator.rec_timeline import append_rec_timeline
 from titan_orchestrator.runtime import SessionRuntime
 from titan_orchestrator.world_state import WorldStateUpdater
 
@@ -124,6 +125,14 @@ async def _events_loop(runtime: SessionRuntime, *, play_enabled: bool) -> None:
                                 expected_version=-1,
                                 confidence=0.9,
                             )
+                            append_rec_timeline(
+                                kind="lesson.proposed",
+                                payload={
+                                    "action_id": proposal["action_id"],
+                                    "text": proposal["rationale"],
+                                    "event_type": event.type,
+                                },
+                            )
             await db.commit()
 
 
@@ -152,6 +161,10 @@ async def _play_feedback_loop(runtime: SessionRuntime) -> None:
                     author=Address(kind="agent", id="flight_engineer"),
                     expected_version=-1,
                     confidence=0.92 if payload.ok else 0.4,
+                )
+                append_rec_timeline(
+                    kind="lesson.feedback",
+                    payload={"text": text, "proposal_id": str(payload.proposal_id), "ok": payload.ok},
                 )
                 await runtime.bus.ack(ORCH_GROUP, entry_id)
             await db.commit()

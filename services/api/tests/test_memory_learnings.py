@@ -95,7 +95,11 @@ def test_session_start_seeds_prior_notes(api_client: TestClient, game_slug: str)
     created = api_client.post(
         "/api/v1/sessions",
         headers=AUTH,
-        json={"game_slug": game_slug, "title": "prior-seed", "settings": {"agents_enabled": True, "play_enabled": False}},
+        json={
+            "game_slug": game_slug,
+            "title": "prior-seed",
+            "settings": {"agents_enabled": True, "play_enabled": False},
+        },
     )
     assert created.status_code == 201
     sid = created.json()["id"]

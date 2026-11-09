@@ -5,6 +5,8 @@ export const IPC = {
   killSwitch: "titan:kill-switch",
   supervisor: "titan:supervisor",
   supervisorSnapshot: "titan:supervisor-snapshot",
+  openPath: "titan:open-path",
+  openExternal: "titan:open-external",
 } as const;
 
 /**
@@ -48,4 +50,7 @@ export interface TitanBridge extends TitanRuntime {
   onMenuCommand(listener: (id: string) => void): () => void;
   onSupervisorUpdate(listener: (update: SupervisorUpdate) => void): () => void;
   getSupervisorStatus(): Promise<SupervisorUpdate | null>;
+  /** Open a local folder in the OS file manager (recording dir, logs, etc.). */
+  openPath(path: string): Promise<string>;
+  openExternal(url: string): Promise<void>;
 }

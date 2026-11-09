@@ -124,6 +124,18 @@ ipcMain.handle(IPC.supervisorSnapshot, (event) =>
   isAppUrl(event.senderFrame?.url, devServerUrl) && config.backend === "managed" ? monitor.snapshot() : null,
 );
 
+ipcMain.handle(IPC.openPath, (event, path: unknown) => {
+  if (!isAppUrl(event.senderFrame?.url, devServerUrl)) return "blocked";
+  if (typeof path !== "string" || path.length === 0) return "invalid";
+  return shell.openPath(path);
+});
+
+ipcMain.handle(IPC.openExternal, (event, url: unknown) => {
+  if (!isAppUrl(event.senderFrame?.url, devServerUrl)) return;
+  if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return;
+  void shell.openExternal(url);
+});
+
 function launchSupervisor(): void {
   const child = startSupervisor({
     repoRoot: config.repoRoot,

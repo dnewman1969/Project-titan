@@ -8,6 +8,7 @@ interface SessionsState {
   activeTitle: string | null;
   recordingActive: boolean;
   recordingMenuRequest: "start" | "stop" | null;
+  recordingRootDir: string | null;
 }
 
 const initialState: SessionsState = {
@@ -16,6 +17,7 @@ const initialState: SessionsState = {
   activeTitle: null,
   recordingActive: false,
   recordingMenuRequest: null,
+  recordingRootDir: null,
 };
 
 export const sessionsSlice = createSlice({
@@ -32,6 +34,7 @@ export const sessionsSlice = createSlice({
       state.activeSessionId = action.payload.id;
       state.activeTitle = action.payload.title;
       state.recordingActive = false;
+      state.recordingRootDir = null;
     },
     setRecordingActive(state, action: PayloadAction<boolean>) {
       state.recordingActive = action.payload;
@@ -41,6 +44,10 @@ export const sessionsSlice = createSlice({
       state.activeTitle = null;
       state.recordingActive = false;
       state.recordingMenuRequest = null;
+      state.recordingRootDir = null;
+    },
+    setRecordingRootDir(state, action: PayloadAction<string | null>) {
+      state.recordingRootDir = action.payload;
     },
     requestRecordingFromMenu(state, action: PayloadAction<"start" | "stop">) {
       state.recordingMenuRequest = action.payload;
@@ -59,4 +66,5 @@ export const {
   clearActiveSession,
   requestRecordingFromMenu,
   clearRecordingMenuRequest,
+  setRecordingRootDir,
 } = sessionsSlice.actions;

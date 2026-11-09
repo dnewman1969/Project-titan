@@ -48,6 +48,7 @@ export const RecordingSchema = z
     session_id: z.string().uuid(),
     state: z.string(),
     manifest_path: z.string().nullable().optional(),
+    root_dir: z.string().optional(),
     duration_ms: z.number().nullable().optional(),
   })
   .passthrough();

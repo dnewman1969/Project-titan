@@ -4,7 +4,7 @@ import { logEvent } from "../features/events/eventsSlice";
 import { handleMenuCommand } from "../features/operations/commands";
 import { killSwitchTriggered } from "../features/safety/safetySlice";
 import type { KillSwitchEvent } from "../../shared/ipc";
-import type { AppDispatch } from "./store";
+import { appStore, type AppDispatch } from "./store";
 import { useAppDispatch } from "./hooks";
 import { getTitan } from "./runtime";
 
@@ -30,7 +30,7 @@ export function useShellBridge(): void {
       triggerKill(dispatch, event);
     });
     const offMenu = titan.onMenuCommand((id) => {
-      handleMenuCommand(id, dispatch);
+      handleMenuCommand(id, dispatch, () => appStore.getState());
     });
     return () => {
       offKill();

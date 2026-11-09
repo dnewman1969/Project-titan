@@ -6,14 +6,14 @@ import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 
 import { App } from "./app/App";
-import { makeStore } from "./app/store";
+import { appStore } from "./app/store";
 
 const container = document.getElementById("root");
 if (!container) throw new Error("#root missing from index.html");
 
 createRoot(container).render(
   <StrictMode>
-    <Provider store={makeStore()}>
+    <Provider store={appStore}>
       <ThemeProvider theme={createTitanTheme()}>
         <CssBaseline />
         <App />

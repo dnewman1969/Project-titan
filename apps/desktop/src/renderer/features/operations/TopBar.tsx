@@ -15,7 +15,11 @@ import { getTitan } from "../../app/runtime";
 import type { ApiStatus } from "../../app/useApiStatus";
 import { triggerKill } from "../../app/useShellBridge";
 import { showNotice } from "./layoutSlice";
-import { clearRecordingMenuRequest, setRecordingActive } from "../sessions/sessionsSlice";
+import {
+  clearRecordingMenuRequest,
+  setRecordingActive,
+  setRecordingRootDir,
+} from "../sessions/sessionsSlice";
 
 export function TopBar({ status }: { status: ApiStatus }) {
   const dispatch = useAppDispatch();
@@ -46,6 +50,7 @@ export function TopBar({ status }: { status: ApiStatus }) {
     const result = await startRec(activeSessionId);
     if ("data" in result && result.data) {
       dispatch(setRecordingActive(true));
+      dispatch(setRecordingRootDir(result.data.root_dir ?? null));
       dispatch(showNotice("Recording started (OBS optional — manifest still written)."));
     } else {
       dispatch(showNotice("Could not start recording — need a live session."));

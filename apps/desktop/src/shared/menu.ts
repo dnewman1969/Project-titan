@@ -55,6 +55,9 @@ const toggle = (panel: PanelId, label: string): MenuToggle => ({
 export const DOCS_URL =
   "https://github.com/dnewman1969/Project-titan/blob/main/docs/titan-architecture-spec.md";
 
+export const BETA_TEST_PLAYBOOK_URL =
+  "https://github.com/dnewman1969/Project-titan/blob/main/docs/beta-test-playbook.md";
+
 export const MENU: readonly MenuSection[] = [
   {
     label: "FILE",
@@ -117,7 +120,7 @@ export const MENU: readonly MenuSection[] = [
       cmd("record.addMarker", "Add Marker", "M8.T3", "CmdOrCtrl+M"),
       sep,
       cmd("record.settings", "Recording Settings", "M8.T1"),
-      cmd("record.openFolder", "Open Folder", "M8.T3"),
+      cmd("record.openFolder", "Open Folder"),
     ],
   },
   {
@@ -134,6 +137,7 @@ export const MENU: readonly MenuSection[] = [
     label: "HELP",
     items: [
       cmd("help.docs", "Documentation"),
+      cmd("help.betaTest", "Beta Test Guide"),
       cmd("help.firstRun", "First-Run Setup"),
       cmd("help.about", "About Titan"),
       cmd("help.licenses", "Licenses", "M10.T4"),

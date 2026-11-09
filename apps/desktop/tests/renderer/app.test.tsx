@@ -150,6 +150,8 @@ function fakeBridge(snapshot: SupervisorUpdate | null = null): FakeBridge {
         return () => supervisors.delete(l);
       },
       getSupervisorStatus: () => Promise.resolve(snapshot),
+      openPath: () => Promise.resolve(""),
+      openExternal: () => Promise.resolve(),
     },
     kill: (e) => {
       kills.forEach((l) => {

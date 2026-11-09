@@ -18,6 +18,8 @@ const BROWSER_FALLBACK: TitanBridge = {
   onMenuCommand: () => () => undefined,
   onSupervisorUpdate: () => () => undefined,
   getSupervisorStatus: () => Promise.resolve(null),
+  openPath: () => Promise.resolve("unavailable"),
+  openExternal: () => Promise.resolve(),
 };
 
 export function getTitan(): TitanBridge {

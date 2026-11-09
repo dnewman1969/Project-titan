@@ -202,11 +202,12 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/v1/games" -Headers $headers
 
 ### E3b — Recording (M8)
 
-| #   | Action                  | Pass if                                                                  |
-| --- | ----------------------- | ------------------------------------------------------------------------ |
-| 11  | Click **REC** (red dot) | “Recording started” notice; label shows **REC ON**                       |
-| 12  | Click **REC** again     | Stops; notice says stopped                                               |
-| 13  | Optional: OBS on 4455   | No error in API log; manifest still written if OBS offline (degraded OK) |
+| #   | Action                   | Pass if                                                                  |
+| --- | ------------------------ | ------------------------------------------------------------------------ |
+| 11  | Click **REC** (red dot)  | “Recording started” notice; label shows **REC ON**                       |
+| 12  | Click **REC** again      | Stops; notice says stopped                                               |
+| 13  | Optional: OBS on 4455    | No error in API log; manifest still written if OBS offline (degraded OK) |
+| 13b | **Record → Open Folder** | Opens the session `recording` folder in Explorer after REC start         |
 
 Manifest path is returned by the API under the session `data_dir/recording/manifest.json`.
 

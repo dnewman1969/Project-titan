@@ -57,8 +57,8 @@ export function GameWindow() {
           variant="outlined"
           sx={{ position: "absolute", top: 52, left: 12, right: 12, zIndex: 1 }}
         >
-          Fixture mode — demo telemetry only. Register a game install (View → Games), then File → New session
-          with that profile for live kRPC/SCS attach
+          Fixture mode — demo telemetry only. Register a game install (View → Game discovery), then File → New
+          session with that profile for live kRPC/SCS attach
           {playEnabled ? " (current play is software HIL)." : "."}
         </Alert>
       ) : null}

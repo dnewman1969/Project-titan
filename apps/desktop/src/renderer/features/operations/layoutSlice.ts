@@ -12,6 +12,7 @@ export interface LayoutState {
   notice: { id: number; text: string } | null;
   aboutOpen: boolean;
   firstRunOpen: boolean;
+  krpcObsHelpOpen: boolean;
   publishOpen: boolean;
   memoryBrowserOpen: boolean;
 }
@@ -23,6 +24,7 @@ const initialState: LayoutState = {
   notice: null,
   aboutOpen: false,
   firstRunOpen: false,
+  krpcObsHelpOpen: false,
   publishOpen: false,
   memoryBrowserOpen: false,
 };
@@ -57,6 +59,9 @@ export const layoutSlice = createSlice({
     setFirstRunOpen(state, action: PayloadAction<boolean>) {
       state.firstRunOpen = action.payload;
     },
+    setKrpcObsHelpOpen(state, action: PayloadAction<boolean>) {
+      state.krpcObsHelpOpen = action.payload;
+    },
     setPublishOpen(state, action: PayloadAction<boolean>) {
       state.publishOpen = action.payload;
     },
@@ -75,6 +80,7 @@ export const {
   dismissNotice,
   setAboutOpen,
   setFirstRunOpen,
+  setKrpcObsHelpOpen,
   setPublishOpen,
   setMemoryBrowserOpen,
 } = layoutSlice.actions;

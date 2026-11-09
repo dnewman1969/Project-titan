@@ -27,7 +27,7 @@ function toItem(entry: MenuEntry, handlers: MenuHandlers): MenuItemConstructorOp
     case "command":
       return {
         id: entry.id,
-        label: entry.milestone ? `${entry.label}  (${entry.milestone})` : entry.label,
+        label: entry.label,
         ...(entry.accelerator ? { accelerator: entry.accelerator } : {}),
         click: () => {
           if (entry.id === "help.docs") handlers.openDocs();
@@ -43,7 +43,7 @@ export function buildMenuTemplate(
 ): MenuItemConstructorOptions[] {
   return menu.map((section) => {
     const submenu = section.items.map((entry) => toItem(entry, handlers));
-    if (dev && section.label === "VIEW") {
+    if (dev && section.label === "View") {
       submenu.push({ type: "separator" }, { role: "reload" }, { role: "toggleDevTools" });
     }
     return { label: section.label, submenu };

@@ -12,17 +12,15 @@ import { MONO_FONT, StatusPill } from "@titan/ui-kit";
 import { useCallback, useEffect } from "react";
 
 import {
-  useKillMutation,
   useSetSessionPlayMutation,
   useStartRecordingMutation,
   useStopRecordingMutation,
-  useStopSessionMutation,
 } from "../../app/api";
 import { formatApiError } from "../../app/formatApiError";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { getTitan } from "../../app/runtime";
 import type { ApiStatus } from "../../app/useApiStatus";
-import { triggerKill } from "../../app/useShellBridge";
+import { engageKill } from "../safety/engageKill";
 import { showNotice } from "./layoutSlice";
 import {
   clearRecordingMenuRequest,
@@ -34,8 +32,6 @@ import {
 
 export function TopBar({ status }: { status: ApiStatus }) {
   const dispatch = useAppDispatch();
-  const [kill] = useKillMutation();
-  const [stopSession] = useStopSessionMutation();
   const [setSessionPlay, { isLoading: playToggling }] = useSetSessionPlayMutation();
   const [startRec] = useStartRecordingMutation();
   const [stopRec] = useStopRecordingMutation();
@@ -267,15 +263,7 @@ export function TopBar({ status }: { status: ApiStatus }) {
           size="small"
           startIcon={<PowerSettingsNewIcon />}
           onClick={() => {
-            const at = new Date().toISOString();
-            const sid = activeSessionId;
-            triggerKill(dispatch, { source: "button", at });
-            if (backend !== "none") {
-              if (sid) {
-                void stopSession({ sessionId: sid, outcome: "aborted" });
-              }
-              void kill("button");
-            }
+            engageKill(dispatch);
           }}
           sx={{ fontWeight: 800, letterSpacing: 1.5, px: 2 }}
         >

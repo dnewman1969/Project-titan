@@ -1,6 +1,6 @@
 /**
- * Menu definition (Section 2.13), shared by the main process (builds the native menu) and the
- * renderer (handles commands and explains which milestone delivers each feature).
+ * Menu definition shared by the main process (native menu) and the renderer (command routing).
+ * Every command here has a handler. Items with no product behavior are omitted.
  */
 export type PanelId = "agents" | "webcam" | "telemetry" | "events" | "games";
 
@@ -9,8 +9,6 @@ export interface MenuCommand {
   id: string;
   label: string;
   accelerator?: string;
-  /** Milestone that implements the command; absent once it works. */
-  milestone?: string;
 }
 
 export interface MenuToggle {
@@ -33,16 +31,15 @@ export interface MenuSeparator {
 export type MenuEntry = MenuCommand | MenuToggle | MenuRole | MenuSeparator;
 
 export interface MenuSection {
-  label: "FILE" | "EDIT" | "VIEW" | "AI" | "RECORD" | "TOOLS" | "HELP";
+  label: "File" | "Edit" | "View" | "AI" | "Record" | "Tools" | "Help";
   items: MenuEntry[];
 }
 
 const sep: MenuSeparator = { kind: "separator" };
-const cmd = (id: string, label: string, milestone?: string, accelerator?: string): MenuCommand => ({
+const cmd = (id: string, label: string, accelerator?: string): MenuCommand => ({
   kind: "command",
   id,
   label,
-  ...(milestone ? { milestone } : {}),
   ...(accelerator ? { accelerator } : {}),
 });
 const toggle = (panel: PanelId, label: string): MenuToggle => ({
@@ -60,19 +57,15 @@ export const BETA_TEST_PLAYBOOK_URL =
 
 export const MENU: readonly MenuSection[] = [
   {
-    label: "FILE",
+    label: "File",
     items: [
-      cmd("file.newSession", "New Session", undefined, "CmdOrCtrl+N"),
-      cmd("file.openSession", "Open Session", "M7.T6", "CmdOrCtrl+O"),
-      cmd("file.replaySession", "Replay Session", "M7.T6"),
-      sep,
-      cmd("file.settings", "Settings", "M2.T3", "CmdOrCtrl+,"),
+      cmd("file.newSession", "New session", "CmdOrCtrl+N"),
       sep,
       { kind: "role", role: "quit", label: "Exit" },
     ],
   },
   {
-    label: "EDIT",
+    label: "Edit",
     items: [
       { kind: "role", role: "undo" },
       { kind: "role", role: "redo" },
@@ -81,67 +74,49 @@ export const MENU: readonly MenuSection[] = [
       { kind: "role", role: "copy" },
       { kind: "role", role: "paste" },
       { kind: "role", role: "selectAll" },
-      sep,
-      cmd("edit.personas", "Personas", "M6.T6"),
-      cmd("edit.teams", "Teams", "M6.T6"),
-      cmd("edit.controlBindings", "Control Bindings", "M4.T4"),
     ],
   },
   {
-    label: "VIEW",
+    label: "View",
     items: [
-      toggle("agents", "AI Agents Panel"),
-      toggle("webcam", "Webcam Panel"),
-      toggle("telemetry", "Telemetry Bar"),
-      toggle("events", "Event Log"),
-      toggle("games", "Game Discovery"),
-      sep,
-      cmd("view.blackboardInspector", "Blackboard Inspector", "M7.T5"),
-      cmd("view.messageInspector", "Message Inspector", "M7.T5"),
-      cmd("view.telemetryCharts", "Telemetry Charts", "M7.T4"),
+      toggle("agents", "AI agents"),
+      toggle("webcam", "Webcam"),
+      toggle("telemetry", "Telemetry"),
+      toggle("events", "Event log"),
+      toggle("games", "Game discovery"),
     ],
   },
   {
     label: "AI",
+    items: [cmd("ai.memoryBrowser", "Memory browser")],
+  },
+  {
+    label: "Record",
     items: [
-      cmd("ai.startAgents", "Start Agents", "M6.T6"),
-      cmd("ai.stopAgents", "Stop Agents", "M6.T6"),
+      cmd("record.start", "Start recording"),
+      cmd("record.stop", "Stop recording"),
       sep,
-      cmd("ai.models", "Models", "M3.T2"),
-      cmd("ai.directorReport", "Director Report", "M7.T5"),
-      cmd("ai.memoryBrowser", "Memory Browser"),
+      cmd("record.openFolder", "Open recording folder"),
     ],
   },
   {
-    label: "RECORD",
+    label: "Tools",
     items: [
-      cmd("record.start", "Start Recording"),
-      cmd("record.stop", "Stop Recording"),
-      cmd("record.addMarker", "Add Marker", "M8.T3", "CmdOrCtrl+M"),
+      cmd("tools.gameDiscovery", "Game discovery"),
+      cmd("tools.youtubePublish", "YouTube publish"),
+      cmd("tools.logs", "Logs"),
       sep,
-      cmd("record.settings", "Recording Settings", "M8.T1"),
-      cmd("record.openFolder", "Open Folder"),
+      cmd("tools.killSwitch", "Kill switch"),
     ],
   },
   {
-    label: "TOOLS",
-    items: [
-      cmd("tools.gameDiscovery", "Game Discovery"),
-      cmd("tools.youtubePublish", "YouTube Publish"),
-      cmd("tools.integrationInstaller", "Integration Installer", "M7.T1"),
-      sep,
-      cmd("tools.logs", "Logs", "M10.T4"),
-      cmd("tools.diagnostics", "Diagnostics Bundle", "M10.T4"),
-    ],
-  },
-  {
-    label: "HELP",
+    label: "Help",
     items: [
       cmd("help.docs", "Documentation"),
-      cmd("help.betaTest", "Beta Test Guide"),
-      cmd("help.firstRun", "First-Run Setup"),
+      cmd("help.betaTest", "Beta test guide"),
+      cmd("help.firstRun", "First-run setup"),
+      cmd("help.krpcObs", "kRPC and OBS"),
       cmd("help.about", "About Titan"),
-      cmd("help.licenses", "Licenses", "M10.T4"),
     ],
   },
 ];

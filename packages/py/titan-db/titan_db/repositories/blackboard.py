@@ -103,9 +103,7 @@ class BlackboardRepository:
             result = await self._session.execute(query, {"session_id": session_id})
         else:
             query = text(base + " AND bb_version > :since ORDER BY section, key")
-            result = await self._session.execute(
-                query, {"session_id": session_id, "since": since_bb_version}
-            )
+            result = await self._session.execute(query, {"session_id": session_id, "since": since_bb_version})
         entries: list[BlackboardEntry] = []
         for row in result.mappings():
             if sections is not None and row["section"] not in sections:

@@ -1,4 +1,4 @@
-"""Live session background loops: telemetry → blackboard, events → crew learnings."""
+"""Live session background loops: telemetry -> blackboard, events -> crew learnings."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from titan_core.protocol.events import GameEvent
 from titan_core.protocol.payloads import ActionExecuted, ActionPropose
 from titan_core.protocol.telemetry import TelemetryFrameUI
 from titan_core.streams import entry_data, session_events_stream, session_telemetry_stream
-from titan_orchestrator.play_policy import play_proposal_for_event
+from titan_orchestrator.play_policy import play_memory_for, play_proposal_for_event
 from titan_orchestrator.rec_timeline import append_rec_timeline
 from titan_orchestrator.runtime import SessionRuntime
 from titan_orchestrator.world_state import WorldStateUpdater
@@ -73,6 +73,8 @@ async def _events_loop(runtime: SessionRuntime, *, play_enabled: bool) -> None:
     stream = session_events_stream(str(runtime.session_id))
     last_id = "$"
     seq = 0
+    session_key = str(runtime.session_id)
+    memory = play_memory_for(session_key)
     while not runtime._stopped.is_set():
         rows: Any = await runtime.redis.xread({stream: last_id}, count=16, block=2000)
         if not rows:
@@ -103,24 +105,28 @@ async def _events_loop(runtime: SessionRuntime, *, play_enabled: bool) -> None:
                         confidence=0.85,
                     )
                     if play_enabled:
-                        proposal = play_proposal_for_event(event)
+                        proposal = play_proposal_for_event(event, memory=memory)
                         if proposal is not None:
-                            await runtime.bus.publish(
-                                make_envelope(
-                                    type="action.propose",
-                                    session_id=runtime.session_id,
-                                    sender=Address(kind="agent", id="director"),
-                                    recipients=["role:actions"],
-                                    visibility="internal",
-                                    priority=6,
-                                    payload=ActionPropose.model_validate(proposal),
-                                    correlation_id=uuid7(),
-                                )
+                            envelope = make_envelope(
+                                type="action.propose",
+                                session_id=runtime.session_id,
+                                sender=Address(kind="agent", id="director"),
+                                recipients=["role:actions"],
+                                visibility="internal",
+                                priority=6,
+                                payload=ActionPropose.model_validate(proposal),
+                                correlation_id=uuid7(),
                             )
+                            memory.remember_proposal(str(envelope.id), str(proposal["action_id"]))
+                            await runtime.bus.publish(envelope)
                             await bb.put(
                                 section="lessons",
                                 key=f"play.{lesson_key}",
-                                value={"text": proposal["rationale"], "action_id": proposal["action_id"]},
+                                value={
+                                    "text": proposal["rationale"],
+                                    "action_id": proposal["action_id"],
+                                    "params": proposal.get("params", {}),
+                                },
                                 author=Address(kind="agent", id="director"),
                                 expected_version=-1,
                                 confidence=0.9,
@@ -137,6 +143,8 @@ async def _events_loop(runtime: SessionRuntime, *, play_enabled: bool) -> None:
 
 
 async def _play_feedback_loop(runtime: SessionRuntime) -> None:
+    session_key = str(runtime.session_id)
+    memory = play_memory_for(session_key)
     while not runtime._stopped.is_set():
         batch = await runtime.bus.read_group(ORCH_GROUP, ORCH_CONSUMER, block_ms=2000)
         if not batch:
@@ -149,22 +157,39 @@ async def _play_feedback_loop(runtime: SessionRuntime) -> None:
                     await runtime.bus.ack(ORCH_GROUP, entry_id)
                     continue
                 payload = ActionExecuted.model_validate(envelope.payload)
-                text = (
-                    "Play worked — crew should repeat this control pattern."
-                    if payload.ok
-                    else f"Play attempt failed: {payload.error or 'unknown error'}"
+                action_id = memory.record_outcome(
+                    proposal_id=str(payload.proposal_id),
+                    ok=payload.ok,
                 )
+                if payload.ok:
+                    action_bit = f" ({action_id})" if action_id else ""
+                    text = f"Play worked{action_bit} - crew should repeat this control pattern."
+                else:
+                    detail = payload.error or "unknown error"
+                    action_bit = f" for {action_id}" if action_id else ""
+                    text = f"Play attempt failed{action_bit}: {detail}"
                 await bb.put(
                     section="lessons",
                     key=f"feedback.{envelope.id}",
-                    value={"text": text, "proposal_id": str(payload.proposal_id), "ok": payload.ok},
+                    value={
+                        "text": text,
+                        "proposal_id": str(payload.proposal_id),
+                        "action_id": action_id,
+                        "ok": payload.ok,
+                        "latency_ms": payload.latency_ms,
+                    },
                     author=Address(kind="agent", id="flight_engineer"),
                     expected_version=-1,
                     confidence=0.92 if payload.ok else 0.4,
                 )
                 append_rec_timeline(
                     kind="lesson.feedback",
-                    payload={"text": text, "proposal_id": str(payload.proposal_id), "ok": payload.ok},
+                    payload={
+                        "text": text,
+                        "proposal_id": str(payload.proposal_id),
+                        "action_id": action_id,
+                        "ok": payload.ok,
+                    },
                 )
                 await runtime.bus.ack(ORCH_GROUP, entry_id)
             await db.commit()
@@ -173,7 +198,7 @@ async def _play_feedback_loop(runtime: SessionRuntime) -> None:
 def _event_line(event: GameEvent) -> str:
     label = event.type.replace(".", " ").replace("_", " ")
     if event.salience >= 0.8:
-        return f"Critical: {label} — note it for the playbook."
+        return f"Critical: {label} - note it for the playbook."
     if event.salience >= 0.5:
         return f"Noted {label}; updating mental model."
     return f"Saw {label}."

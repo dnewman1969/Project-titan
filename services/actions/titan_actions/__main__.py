@@ -58,7 +58,7 @@ async def _run(session_id: UUID, game_slug: str | None) -> int:
                     await bus.ack(ACTIONS_GROUP, entry_id)
                     continue
                 params = dict(payload.params)
-                ok, err = executor.execute(payload.action_id, params)
+                ok, err, latency_ms = executor.execute(payload.action_id, params)
                 append_play_event(
                     data_dir,
                     action_id=payload.action_id,
@@ -71,12 +71,13 @@ async def _run(session_id: UUID, game_slug: str | None) -> int:
                     action_id=payload.action_id,
                     ok=ok,
                     err=err,
+                    latency_ms=latency_ms,
                     session_id=str(session_id),
                 )
                 executed = ActionExecuted(
                     proposal_id=envelope.id,
                     ok=ok,
-                    latency_ms=1,
+                    latency_ms=latency_ms,
                     error=err,
                 )
                 await bus.publish(

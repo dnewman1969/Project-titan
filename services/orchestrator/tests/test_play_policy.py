@@ -1,4 +1,4 @@
-"""Play policy mapping."""
+"""Play policy mapping and learn memory."""
 
 from __future__ import annotations
 
@@ -6,7 +6,11 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from titan_core.protocol.events import GameEvent
-from titan_orchestrator.play_policy import play_proposal_for_event
+from titan_orchestrator.play_policy import (
+    PlayMemory,
+    clear_play_memory,
+    play_proposal_for_event,
+)
 
 
 def _event(type_: str) -> GameEvent:
@@ -30,6 +34,7 @@ def _event(type_: str) -> GameEvent:
 
 
 def test_ksp_launch_proposal() -> None:
+    clear_play_memory()
     proposal = play_proposal_for_event(_event("ksp.launch"))
     assert proposal is not None
     assert proposal["action_id"] == "ksp.throttle"
@@ -49,3 +54,30 @@ def test_max_q_throttle_cut() -> None:
     proposal = play_proposal_for_event(_event("ksp.max_q"))
     assert proposal is not None
     assert proposal["params"]["throttle"] < 0.5
+
+
+def test_orbit_cuts_throttle() -> None:
+    proposal = play_proposal_for_event(_event("ksp.orbit_achieved"))
+    assert proposal is not None
+    assert proposal["action_id"] == "ksp.throttle"
+    assert proposal["params"]["throttle"] == 0.0
+
+
+def test_overspeed_eases_throttle() -> None:
+    proposal = play_proposal_for_event(_event("ets2.overspeed"))
+    assert proposal is not None
+    assert proposal["action_id"] == "scs.throttle"
+
+
+def test_memory_adapts_after_repeated_failures() -> None:
+    mem = PlayMemory()
+    first = play_proposal_for_event(_event("ksp.launch"), memory=mem)
+    assert first is not None
+    mem.remember_proposal("p1", "ksp.throttle")
+    mem.record_outcome(proposal_id="p1", ok=False)
+    mem.remember_proposal("p2", "ksp.throttle")
+    mem.record_outcome(proposal_id="p2", ok=False)
+    adapted = play_proposal_for_event(_event("ksp.launch"), memory=mem)
+    assert adapted is not None
+    assert adapted["params"]["throttle"] < first["params"]["throttle"]
+    assert "Prior throttle" in adapted["rationale"]

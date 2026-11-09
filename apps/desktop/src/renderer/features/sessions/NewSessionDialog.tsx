@@ -72,7 +72,6 @@ export function NewSessionDialog() {
   });
   useEffect(() => {
     if (open) {
-      setDialogError(null);
       void refetchGames();
     }
   }, [open, refetchGames]);
@@ -106,6 +105,7 @@ export function NewSessionDialog() {
 
   const isLoading = creating || starting || registering;
   const onClose = () => {
+    setDialogError(null);
     dispatch(closeSessionDialog());
   };
 
@@ -264,7 +264,12 @@ export function NewSessionDialog() {
       <DialogTitle id="new-session-title">New session</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
         {dialogError ? (
-          <Alert severity="error" onClose={() => setDialogError(null)}>
+          <Alert
+            severity="error"
+            onClose={() => {
+              setDialogError(null);
+            }}
+          >
             {dialogError}
           </Alert>
         ) : null}

@@ -11,6 +11,7 @@ export interface LayoutState {
   settingsHydrated: boolean;
   notice: { id: number; text: string } | null;
   aboutOpen: boolean;
+  firstRunOpen: boolean;
 }
 
 const initialState: LayoutState = {
@@ -19,6 +20,7 @@ const initialState: LayoutState = {
   settingsHydrated: false,
   notice: null,
   aboutOpen: false,
+  firstRunOpen: false,
 };
 
 export const layoutSlice = createSlice({
@@ -45,6 +47,9 @@ export const layoutSlice = createSlice({
     setAboutOpen(state, action: PayloadAction<boolean>) {
       state.aboutOpen = action.payload;
     },
+    setFirstRunOpen(state, action: PayloadAction<boolean>) {
+      state.firstRunOpen = action.payload;
+    },
   },
 });
 
@@ -55,4 +60,5 @@ export const {
   showNotice,
   dismissNotice,
   setAboutOpen,
+  setFirstRunOpen,
 } = layoutSlice.actions;

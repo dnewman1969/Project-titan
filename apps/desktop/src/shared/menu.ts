@@ -112,8 +112,8 @@ export const MENU: readonly MenuSection[] = [
   {
     label: "RECORD",
     items: [
-      cmd("record.start", "Start Recording", "M8.T1"),
-      cmd("record.stop", "Stop Recording", "M8.T1"),
+      cmd("record.start", "Start Recording"),
+      cmd("record.stop", "Stop Recording"),
       cmd("record.addMarker", "Add Marker", "M8.T3", "CmdOrCtrl+M"),
       sep,
       cmd("record.settings", "Recording Settings", "M8.T1"),
@@ -134,6 +134,7 @@ export const MENU: readonly MenuSection[] = [
     label: "HELP",
     items: [
       cmd("help.docs", "Documentation"),
+      cmd("help.firstRun", "First-Run Setup"),
       cmd("help.about", "About Titan"),
       cmd("help.licenses", "Licenses", "M10.T4"),
     ],

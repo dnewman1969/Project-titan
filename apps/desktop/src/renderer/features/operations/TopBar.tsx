@@ -7,6 +7,7 @@ import IconButton from "@mui/material/IconButton";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { MONO_FONT, StatusPill } from "@titan/ui-kit";
+import { useCallback, useEffect } from "react";
 
 import { useKillMutation, useStartRecordingMutation, useStopRecordingMutation } from "../../app/api";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
@@ -14,7 +15,7 @@ import { getTitan } from "../../app/runtime";
 import type { ApiStatus } from "../../app/useApiStatus";
 import { triggerKill } from "../../app/useShellBridge";
 import { showNotice } from "./layoutSlice";
-import { setRecordingActive } from "../sessions/sessionsSlice";
+import { clearRecordingMenuRequest, setRecordingActive } from "../sessions/sessionsSlice";
 
 export function TopBar({ status }: { status: ApiStatus }) {
   const dispatch = useAppDispatch();
@@ -24,9 +25,10 @@ export function TopBar({ status }: { status: ApiStatus }) {
   const activeSessionId = useAppSelector((s) => s.sessions.activeSessionId);
   const activeTitle = useAppSelector((s) => s.sessions.activeTitle);
   const recordingActive = useAppSelector((s) => s.sessions.recordingActive);
+  const recordingMenuRequest = useAppSelector((s) => s.sessions.recordingMenuRequest);
   const { killHotkey, backend } = getTitan();
 
-  const toggleRecording = async () => {
+  const toggleRecording = useCallback(async () => {
     if (!activeSessionId) {
       dispatch(showNotice("Create a live session first (Session → New session)."));
       return;
@@ -48,7 +50,19 @@ export function TopBar({ status }: { status: ApiStatus }) {
     } else {
       dispatch(showNotice("Could not start recording — need a live session."));
     }
-  };
+  }, [activeSessionId, dispatch, recordingActive, startRec, stopRec]);
+
+  useEffect(() => {
+    if (!recordingMenuRequest) return;
+    const wantStart = recordingMenuRequest === "start";
+    if (wantStart === recordingActive) {
+      dispatch(clearRecordingMenuRequest());
+      return;
+    }
+    void toggleRecording().finally(() => {
+      dispatch(clearRecordingMenuRequest());
+    });
+  }, [dispatch, recordingActive, recordingMenuRequest, toggleRecording]);
 
   return (
     <Box

@@ -4,12 +4,17 @@ export type SessionDialogKind = "new" | "open" | "replay";
 
 export type SessionSourceKind = "live" | "fixture" | null;
 
+export type PlayBackendKind = "hil" | "krpc" | "scs" | "keyboard" | "auto" | null;
+
 interface SessionsState {
   dialog: SessionDialogKind | null;
   activeSessionId: string | null;
   activeTitle: string | null;
   sessionSource: SessionSourceKind;
   playEnabled: boolean;
+  playBackend: PlayBackendKind;
+  playReady: boolean | null;
+  playAttachMessage: string | null;
   recordingActive: boolean;
   recordingMenuRequest: "start" | "stop" | null;
   recordingRootDir: string | null;
@@ -21,6 +26,9 @@ const initialState: SessionsState = {
   activeTitle: null,
   sessionSource: null,
   playEnabled: false,
+  playBackend: null,
+  playReady: null,
+  playAttachMessage: null,
   recordingActive: false,
   recordingMenuRequest: null,
   recordingRootDir: null,
@@ -48,6 +56,9 @@ export const sessionsSlice = createSlice({
         recordingRootDir?: string | null;
         sessionSource?: SessionSourceKind;
         playEnabled?: boolean;
+        playBackend?: PlayBackendKind;
+        playReady?: boolean | null;
+        playAttachMessage?: string | null;
       }>,
     ) {
       state.activeSessionId = action.payload.id;
@@ -56,6 +67,9 @@ export const sessionsSlice = createSlice({
       state.recordingRootDir = action.payload.recordingRootDir ?? null;
       state.sessionSource = action.payload.sessionSource ?? null;
       state.playEnabled = action.payload.playEnabled ?? false;
+      state.playBackend = action.payload.playBackend ?? null;
+      state.playReady = action.payload.playReady ?? null;
+      state.playAttachMessage = action.payload.playAttachMessage ?? null;
     },
     setRecordingActive(state, action: PayloadAction<boolean>) {
       state.recordingActive = action.payload;
@@ -65,6 +79,9 @@ export const sessionsSlice = createSlice({
       state.activeTitle = null;
       state.sessionSource = null;
       state.playEnabled = false;
+      state.playBackend = null;
+      state.playReady = null;
+      state.playAttachMessage = null;
       state.recordingActive = false;
       state.recordingMenuRequest = null;
       state.recordingRootDir = null;

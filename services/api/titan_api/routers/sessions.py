@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from titan_actions.attach import probe_attach, resolve_session_source
 from titan_api.auth import Authenticated
 from titan_api.demo_replay import start_demo_replay
 from titan_api.deps import db_session
@@ -147,6 +148,19 @@ async def get_session(session_id: UUID, db: AsyncSession = SessionDep) -> dict[s
     return _session_json(row)
 
 
+@router.get("/play/readiness")
+async def play_readiness(
+    game_slug: Annotated[str, Query(description="ksp | ets2 | ats")],
+    source: Annotated[str, Query(description="live | fixture")] = "live",
+) -> dict[str, Any]:
+    """Probe kRPC/SCS/HIL attach readiness before starting a learn-and-play session."""
+    from typing import Literal
+
+    session_source: Literal["live", "fixture"] = "fixture" if source.strip().lower() == "fixture" else "live"
+    attach = probe_attach(game_slug=game_slug, source=session_source)
+    return {"play_attach": attach.as_dict()}
+
+
 @router.post("/sessions/{session_id}/start", status_code=status.HTTP_202_ACCEPTED)
 async def start_session(
     session_id: UUID,
@@ -170,6 +184,31 @@ async def start_session(
     game_row = await db.scalar(select(Game).where(Game.id == row.game_id))
     game_slug = game_row.slug if game_row is not None else "ksp"
     play_enabled = bool(row.settings.get("play_enabled", False))
+
+    profile: GameProfile | None = None
+    if row.game_profile_id is not None:
+        profile = await db.scalar(select(GameProfile).where(GameProfile.id == row.game_profile_id))
+    default_profile: GameProfile | None = None
+    if profile is None:
+        default_profile = await db.scalar(
+            select(GameProfile)
+            .where(GameProfile.game_id == row.game_id, GameProfile.is_default.is_(True))
+            .limit(1)
+        )
+    install_profile = profile or default_profile
+    has_install = install_profile is not None
+    session_source = resolve_session_source(
+        session_source=str(row.settings.get("session_source") or "") or None,
+        demo_telemetry=bool(row.settings.get("demo_telemetry", False)),
+        has_install=has_install,
+    )
+    play_attach = probe_attach(game_slug=game_slug, source=session_source) if play_enabled else None
+    if play_attach is not None:
+        settings = dict(row.settings or {})
+        settings["session_source"] = session_source
+        settings["play_attach"] = play_attach.as_dict()
+        row.settings = settings
+
     try:
         await db.flush()
         if row.settings.get("agents_enabled", True):
@@ -179,15 +218,14 @@ async def start_session(
                 play_enabled=play_enabled,
                 data_dir=row.data_dir,
             )
-        if play_enabled:
-            fixture_play = (
-                bool(row.settings.get("demo_telemetry")) or row.settings.get("session_source") == "fixture"
-            )
+        if play_enabled and play_attach is not None:
+            # Always set an explicit backend so a registered install attaches kRPC/SCS
+            # (not silent auto), and fixture sessions stay on honest HIL.
             controller.start_actions(
                 session_id,
                 game_slug=game_slug,
                 data_dir=row.data_dir,
-                play_backend="hil" if fixture_play else None,
+                play_backend=play_attach.backend,
             )
         row.state = "live"
         await db.flush()
@@ -198,27 +236,14 @@ async def start_session(
                 "Another session is still live (ux_sessions_one_live). Stop it or retry start.",
             ) from exc
         raise
-    profile: GameProfile | None = None
-    if row.game_profile_id is not None:
-        profile = await db.scalar(select(GameProfile).where(GameProfile.id == row.game_profile_id))
-    if row.settings.get("demo_telemetry", False):
+    if session_source == "fixture" or row.settings.get("demo_telemetry", False):
         await start_demo_replay(session_id)
         await _seed_director_demo_line(db, session_id)
-    elif profile is not None:
-        await start_live_telemetry(session_id, game_slug=game_slug, install_path=profile.install_path)
-    else:
-        default_profile = await db.scalar(
-            select(GameProfile)
-            .where(GameProfile.game_id == row.game_id, GameProfile.is_default.is_(True))
-            .limit(1)
-        )
-        if default_profile is not None:
-            await start_live_telemetry(
-                session_id, game_slug=game_slug, install_path=default_profile.install_path
-            )
-        elif fixture_fallback_path(game_slug) is not None:
-            await start_demo_replay(session_id)
-            await _seed_director_demo_line(db, session_id)
+    elif install_profile is not None:
+        await start_live_telemetry(session_id, game_slug=game_slug, install_path=install_profile.install_path)
+    elif fixture_fallback_path(game_slug) is not None:
+        await start_demo_replay(session_id)
+        await _seed_director_demo_line(db, session_id)
     if body.launch_game and profile is not None:
         exe = profile.executable_path
 
@@ -231,7 +256,11 @@ async def start_session(
         from titan_api.recording_ops import start_session_recording
 
         await start_session_recording(db, row)
-    return _session_json(row)
+    payload = _session_json(row)
+    if play_attach is not None:
+        payload["play_attach"] = play_attach.as_dict()
+    payload["session_source"] = session_source
+    return payload
 
 
 async def _seed_director_demo_line(db: AsyncSession, session_id: UUID) -> None:

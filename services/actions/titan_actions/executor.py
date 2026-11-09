@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
+from titan_actions.attach import PlayAttach, probe_attach
 from titan_actions.drivers.factory import build_driver
 from titan_actions.drivers.protocol import PlayDriver
 from titan_actions.play_env import PlaySettings
@@ -25,11 +26,32 @@ class PlayExecutor:
         data_dir: Path | None = None,
         driver: PlayDriver | None = None,
         settings: PlaySettings | None = None,
+        attach: PlayAttach | None = None,
     ) -> None:
         self.session_id = session_id
+        self._data_dir = data_dir
         self._log = data_dir / "play.ndjson" if data_dir is not None else None
         cfg = settings or PlaySettings.from_environ()
+        self._settings = cfg
+        source: Literal["live", "fixture"] = "fixture" if cfg.backend == "hil" else "live"
+        self.attach = attach or probe_attach(game_slug=cfg.game_slug, source=source, settings=cfg)
         self._driver = driver or build_driver(cfg, session_id=session_id, data_dir=data_dir)
+        self._write_attach()
+
+    def _write_attach(self) -> None:
+        if self._data_dir is None:
+            return
+        self._data_dir.mkdir(parents=True, exist_ok=True)
+        path = self._data_dir / "play_attach.json"
+        path.write_text(json.dumps(self.attach.as_dict(), indent=2) + "\n", encoding="utf-8")
+        log.info(
+            "play_attach",
+            session_id=str(self.session_id),
+            backend=self.attach.backend,
+            ready=self.attach.ready,
+            source=self.attach.source,
+            message=self.attach.message,
+        )
 
     def execute(self, action_id: str, params: dict[str, Any]) -> tuple[bool, str | None, int]:
         """Run one action. Returns (ok, error, latency_ms)."""

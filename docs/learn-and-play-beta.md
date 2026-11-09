@@ -12,9 +12,9 @@ Until that happens on **your** KSP or ETS2/ATS install, treat production paths a
 
 1. **Start Titan** — `Start-Titan.bat` / `.ps1` (see root `README.md`).
 2. **Discover game** — Operations Center → scan installs; pick game + profile in **New session**.
-3. **Agent play** — New session defaults to **Enable agent play (learn-and-play beta)** (starts `titan-orchestrator` with play + `titan-actions`). Mode is `autonomous` when play is on.
+3. **Agent play** — New session defaults to **Enable agent play (learn-and-play beta)** (starts `titan-orchestrator` with play + `titan-actions`). Mode is `autonomous` when play is on. With a **registered install**, start attaches an explicit backend (`krpc` for KSP, `scs` for ETS2/ATS). Without an install, source is **fixture** and play attaches **HIL**. New session and the top bar show readiness (kRPC port / SCS Windows).
 4. **Learn** — orchestrator `session_loops` writes `discoveries` / `lessons`; play feedback loop records outcomes from `action.executed`. Failed actions adapt later proposals (gentler throttle / stronger brake) via session `PlayMemory`.
-5. **REC** — top bar **REC** (or **Record with session** on create) writes `manifest.json` + `timeline.ndjson` under `%LOCALAPPDATA%/Titan/sessions/<id>/recording/`. Play actions and lesson learn events append timeline rows when REC is on.
+5. **REC** — top bar **REC** (or **Record with session** on create) writes `manifest.json` + `timeline.ndjson` under `%LOCALAPPDATA%/Titan/sessions/<id>/recording/`. Play actions and lesson learn events append timeline rows when REC is on. Session `play_attach.json` records the backend probe.
 
 ### Demo path (no game)
 

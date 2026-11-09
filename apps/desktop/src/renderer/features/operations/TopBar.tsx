@@ -36,6 +36,9 @@ export function TopBar({ status }: { status: ApiStatus }) {
   const activeTitle = useAppSelector((s) => s.sessions.activeTitle);
   const sessionSource = useAppSelector((s) => s.sessions.sessionSource);
   const playEnabled = useAppSelector((s) => s.sessions.playEnabled);
+  const playBackend = useAppSelector((s) => s.sessions.playBackend);
+  const playReady = useAppSelector((s) => s.sessions.playReady);
+  const playAttachMessage = useAppSelector((s) => s.sessions.playAttachMessage);
   const recordingActive = useAppSelector((s) => s.sessions.recordingActive);
   const recordingMenuRequest = useAppSelector((s) => s.sessions.recordingMenuRequest);
   const { killHotkey, backend } = getTitan();
@@ -118,21 +121,31 @@ export function TopBar({ status }: { status: ApiStatus }) {
         sx={{ ml: 1, maxWidth: 220 }}
       />
       {activeSessionId && sessionSource ? (
-        <Chip
-          size="small"
-          variant="outlined"
-          color={sessionSource === "live" ? "success" : "default"}
-          label={
-            sessionSource === "live"
-              ? playEnabled
-                ? "Live + play"
-                : "Live install"
-              : playEnabled
-                ? "Fixture + HIL play"
-                : "Fixture telemetry"
-          }
-          sx={{ maxWidth: 160 }}
-        />
+        <Tooltip title={playAttachMessage ?? (sessionSource === "live" ? "Live install" : "Fixture session")}>
+          <Chip
+            size="small"
+            variant="outlined"
+            color={
+              sessionSource === "live"
+                ? playEnabled && playReady === false
+                  ? "warning"
+                  : "success"
+                : "default"
+            }
+            label={
+              sessionSource === "live"
+                ? playEnabled
+                  ? playReady === false
+                    ? `Live + ${playBackend ?? "play"} (waiting)`
+                    : `Live + ${playBackend ?? "play"}`
+                  : "Live install"
+                : playEnabled
+                  ? "Fixture + HIL play"
+                  : "Fixture telemetry"
+            }
+            sx={{ maxWidth: 200 }}
+          />
+        </Tooltip>
       ) : null}
       <Box sx={{ flex: 1 }} />
       <StatusPill

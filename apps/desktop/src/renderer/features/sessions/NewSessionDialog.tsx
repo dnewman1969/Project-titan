@@ -12,12 +12,17 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useEffect, useState } from "react";
 
-import { useCreateSessionMutation, useListGamesQuery, useStartSessionMutation } from "../../app/api";
+import {
+  useCreateSessionMutation,
+  useGetPlayReadinessQuery,
+  useListGamesQuery,
+  useStartSessionMutation,
+} from "../../app/api";
 import { formatApiError } from "../../app/formatApiError";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { logEvent } from "../events/eventsSlice";
 import { showNotice } from "../operations/layoutSlice";
-import { closeSessionDialog, setActiveSession } from "./sessionsSlice";
+import { closeSessionDialog, setActiveSession, type PlayBackendKind } from "./sessionsSlice";
 
 const FALLBACK_GAMES = [
   { slug: "ksp", label: "Kerbal Space Program" },
@@ -70,6 +75,11 @@ export function NewSessionDialog() {
   const profiles = game?.profiles ?? [];
   const effectiveProfileId = profiles.some((p) => p.id === profileId) ? profileId : (profiles[0]?.id ?? "");
   const sessionSource: "live" | "fixture" = effectiveProfileId ? "live" : "fixture";
+  const { data: readiness } = useGetPlayReadinessQuery(
+    { gameSlug: gameSlug, source: sessionSource },
+    { skip: !open || !agentPlay, refetchOnMountOrArgChange: true },
+  );
+  const playAttach = readiness?.play_attach;
 
   const isLoading = creating || starting;
   const onClose = () => {
@@ -111,23 +121,45 @@ export function NewSessionDialog() {
         const recordingRoot =
           recordOnStart && typeof dataDir === "string" && dataDir.length > 0 ? `${dataDir}/recording` : null;
         const liveTitle = started.data.title?.trim() || sessionTitle;
+        const attachRaw = Reflect.get(started.data, "play_attach");
+        const attach =
+          typeof attachRaw === "object" && attachRaw !== null
+            ? (attachRaw as {
+                backend?: string;
+                ready?: boolean;
+                message?: string;
+                source?: string;
+              })
+            : null;
+        const resolvedSource =
+          Reflect.get(started.data, "session_source") === "live" ||
+          Reflect.get(started.data, "session_source") === "fixture"
+            ? (Reflect.get(started.data, "session_source") as "live" | "fixture")
+            : sessionSource;
+        const backend = (attach?.backend as PlayBackendKind | undefined) ?? null;
         dispatch(
           setActiveSession({
             id: started.data.id,
             title: liveTitle,
             recordingActive: recordOnStart,
             recordingRootDir: recordingRoot,
-            sessionSource,
+            sessionSource: resolvedSource,
             playEnabled: agentPlay,
+            playBackend: backend,
+            playReady: typeof attach?.ready === "boolean" ? attach.ready : null,
+            playAttachMessage: typeof attach?.message === "string" ? attach.message : null,
           }),
         );
         const kind =
-          sessionSource === "fixture"
-            ? "Fixture session"
+          resolvedSource === "fixture"
+            ? agentPlay
+              ? "Fixture + HIL play"
+              : "Fixture telemetry"
             : agentPlay
-              ? "Learn-and-play session"
-              : "Live observe session";
-        dispatch(showNotice(`${kind}: ${liveTitle}`));
+              ? `Live + ${backend ?? "play"}`
+              : "Live install";
+        const attachNote = attach?.message ? ` — ${attach.message}` : "";
+        dispatch(showNotice(`${kind}: ${liveTitle}${attachNote}`));
         dispatch(closeSessionDialog());
         return;
       }
@@ -175,9 +207,18 @@ export function NewSessionDialog() {
         </Typography>
         <Alert severity={sessionSource === "live" ? "success" : "info"} sx={{ width: "100%" }}>
           {sessionSource === "live"
-            ? "Live install attached - telemetry and play target this profile."
-            : "No install attached - fixture/demo telemetry only (software HIL path for play)."}
+            ? "Live install selected — telemetry targets this profile; play attaches kRPC (KSP) or SCS (ETS2/ATS)."
+            : "No install attached — fixture/demo telemetry only. Agent play uses software HIL (no game input)."}
         </Alert>
+        {agentPlay && playAttach ? (
+          <Alert
+            severity={playAttach.ready ? (sessionSource === "live" ? "success" : "info") : "warning"}
+            sx={{ width: "100%" }}
+          >
+            Play attach ({playAttach.backend}
+            {sessionSource === "live" ? ", live" : ", fixture"}): {playAttach.message}
+          </Alert>
+        ) : null}
         <TextField
           label="Title"
           value={title}
@@ -248,8 +289,10 @@ export function NewSessionDialog() {
         {agentPlay ? (
           <FormHelperText sx={{ mt: -1.5, mx: 0 }}>
             {sessionSource === "live"
-              ? "Starts the actions worker against the selected install (kRPC/SCS when available)."
-              : "Starts the actions worker with TITAN_PLAY_BACKEND=hil for software play without a game."}
+              ? gameSlug === "ksp"
+                ? "Starts titan-actions with TITAN_PLAY_BACKEND=krpc. Start KSP with the kRPC mod (RPC 50000 / stream 50001)."
+                : "Starts titan-actions with TITAN_PLAY_BACKEND=scs (ViGEm on Windows, keyboard brake fallback)."
+              : "Starts titan-actions with TITAN_PLAY_BACKEND=hil for software play without a game."}
           </FormHelperText>
         ) : null}
         <FormControlLabel

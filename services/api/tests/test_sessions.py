@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from pathlib import Path
 from uuid import UUID
 
 import fakeredis
@@ -299,3 +300,89 @@ def test_session_start_play_enabled(
     assert started.status_code == 202
     assert flags["actions"] and flags["orch"]
     assert flags["play_backend"] == "hil"
+    body = started.json()
+    assert body.get("session_source") == "fixture"
+    assert body.get("play_attach", {}).get("backend") == "hil"
+    assert body.get("play_attach", {}).get("ready") is True
+
+
+def test_session_start_live_play_attaches_krpc(
+    api_client: TestClient, game_slug: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Registered install + play_enabled starts actions with explicit krpc/scs backend."""
+    import titan_api.routers.sessions as sessions_routes
+
+    flags: dict[str, object] = {}
+
+    class _Ctl:
+        def start_orchestrator(self, session_id: UUID, **kwargs: object) -> None:
+            flags["orch"] = True
+
+        def start_actions(self, session_id: UUID, **kwargs: object) -> None:
+            flags["actions"] = True
+            flags["play_backend"] = kwargs.get("play_backend")
+
+        def stop_orchestrator(self, session_id: UUID) -> None:
+            return
+
+        def stop_actions(self, session_id: UUID) -> None:
+            return
+
+    api_client.app.state.session_controller = _Ctl()
+
+    async def noop(*_a: object, **_k: object) -> None:
+        return None
+
+    monkeypatch.setattr(sessions_routes, "start_demo_replay", noop)
+    monkeypatch.setattr(sessions_routes, "_seed_director_demo_line", noop)
+    monkeypatch.setattr(sessions_routes, "start_live_telemetry", noop)
+
+    exe = tmp_path / ("KSP_x64.exe" if game_slug == "ksp" else "eurotrucks2.exe")
+    exe.write_bytes(b"MZ")
+    registered = api_client.post(
+        "/api/v1/game-profiles",
+        headers=AUTH,
+        json={"game_slug": game_slug, "executable_path": str(exe)},
+    )
+    assert registered.status_code == 201, registered.text
+    profile_id = registered.json()["id"]
+
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={
+            "game_slug": game_slug,
+            "game_profile_id": profile_id,
+            "title": "live-play",
+            "settings": {
+                "agents_enabled": True,
+                "play_enabled": True,
+                "demo_telemetry": False,
+                "session_source": "live",
+            },
+        },
+    )
+    assert created.status_code == 201, created.text
+    sid = created.json()["id"]
+    started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False})
+    assert started.status_code == 202, started.text
+    assert flags.get("actions") and flags.get("orch")
+    expected_backend = "krpc" if game_slug == "ksp" else "scs" if game_slug in {"ets2", "ats"} else "hil"
+    assert flags.get("play_backend") == expected_backend
+    body = started.json()
+    assert body.get("session_source") == "live"
+    assert body.get("play_attach", {}).get("backend") == expected_backend
+
+
+def test_play_readiness_endpoint(api_client: TestClient) -> None:
+    fixture = api_client.get(
+        "/api/v1/play/readiness", headers=AUTH, params={"game_slug": "ksp", "source": "fixture"}
+    )
+    assert fixture.status_code == 200
+    assert fixture.json()["play_attach"]["backend"] == "hil"
+    assert fixture.json()["play_attach"]["ready"] is True
+    live = api_client.get(
+        "/api/v1/play/readiness", headers=AUTH, params={"game_slug": "ksp", "source": "live"}
+    )
+    assert live.status_code == 200
+    assert live.json()["play_attach"]["backend"] == "krpc"

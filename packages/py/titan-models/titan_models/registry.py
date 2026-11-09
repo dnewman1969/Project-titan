@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from titan_models.fake import FakeProvider
 from titan_models.ollama import OllamaProvider
@@ -144,11 +145,11 @@ class ModelsRegistry:
     def persist(self, path: Path | None = None) -> None:
         save_models_yaml(self.config, path)
 
-    async def list_provider_status(self) -> list[dict]:
-        items: list[dict] = []
+    async def list_provider_status(self) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
         for provider_id, provider in self.providers.items():
             healthy = await provider.health()
-            model_rows: list[dict] = []
+            model_rows: list[dict[str, Any]] = []
             if healthy:
                 if isinstance(provider, OllamaProvider):
                     loaded = await provider.loaded_models()

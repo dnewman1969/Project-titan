@@ -126,7 +126,7 @@ class OllamaProvider:
         latency_ms = ttft_ms
         message = body.get("message") if isinstance(body, dict) else None
         text = ""
-        tool_calls: list[dict] = []
+        tool_calls: list[dict[str, Any]] = []
         if isinstance(message, dict):
             text = str(message.get("content") or "")
             raw_tools = message.get("tool_calls")
@@ -134,7 +134,9 @@ class OllamaProvider:
                 tool_calls = [t for t in raw_tools if isinstance(t, dict)]
         prompt_tokens = int((body.get("prompt_eval_count") if isinstance(body, dict) else 0) or 0)
         completion_tokens = int((body.get("eval_count") if isinstance(body, dict) else 0) or 0)
-        finish = "tool" if tool_calls else "stop"
+        finish: Literal["stop", "length", "tool", "error", "cancelled"] = (
+            "tool" if tool_calls else "stop"
+        )
         if isinstance(body, dict) and body.get("done_reason") == "length":
             finish = "length"
         return ChatResult(
@@ -159,7 +161,7 @@ class OllamaProvider:
         started = time.monotonic()
         ttft_ms = 0
         text_parts: list[str] = []
-        tool_calls: list[dict] = []
+        tool_calls: list[dict[str, Any]] = []
         prompt_tokens = 0
         completion_tokens = 0
         finish: Literal["stop", "length", "tool", "error", "cancelled"] = "stop"

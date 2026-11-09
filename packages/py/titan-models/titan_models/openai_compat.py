@@ -6,7 +6,7 @@ import asyncio
 import json
 import time
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, Literal
 
 from titan_core.http import HTTPError, local_client
 from titan_models.ollama import _cancelled
@@ -45,7 +45,7 @@ class OpenAICompatProvider:
 
     def _body(
         self, model: str, messages: list[ChatMessage], params: GenerationParams, *, stream: bool
-    ) -> dict:
+    ) -> dict[str, Any]:
         body: dict[str, Any] = {
             "model": model,
             "messages": self._messages(messages),
@@ -80,8 +80,8 @@ class OpenAICompatProvider:
         latency_ms = int((time.monotonic() - started) * 1000)
         choices = body.get("choices") if isinstance(body, dict) else None
         text = ""
-        finish = "stop"
-        tool_calls: list[dict] = []
+        finish: Literal["stop", "length", "tool", "error", "cancelled"] = "stop"
+        tool_calls: list[dict[str, Any]] = []
         if isinstance(choices, list) and choices:
             message = choices[0].get("message") if isinstance(choices[0], dict) else None
             if isinstance(message, dict):

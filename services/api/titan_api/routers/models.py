@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Request, status
 from pydantic import BaseModel, ConfigDict
@@ -45,14 +45,14 @@ def _registry(request: Request) -> ModelsRegistry:
             "Models registry is not configured.",
             dependency="ollama",
         )
-    return registry
+    return cast(ModelsRegistry, registry)
 
 
 def _jobs(request: Request) -> PullJobRunner:
     runner = request.app.state.pull_jobs
     if runner is None:
         raise TitanError(ErrorCode.INTERNAL, "Pull job runner is not configured.")
-    return runner
+    return cast(PullJobRunner, runner)
 
 
 @router.get("")

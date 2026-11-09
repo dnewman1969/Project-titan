@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -21,7 +21,7 @@ class ToolSpec(BaseModel):
 
     name: str
     description: str
-    parameters: dict
+    parameters: dict[str, Any]
 
 
 class GenerationParams(BaseModel):
@@ -32,7 +32,7 @@ class GenerationParams(BaseModel):
     max_tokens: int = 256
     stop: list[str] = Field(default_factory=list)
     seed: int | None = None
-    json_schema: dict | None = None
+    json_schema: dict[str, Any] | None = None
     tools: list[ToolSpec] = Field(default_factory=list)
     keep_alive: str | None = None
 
@@ -41,7 +41,7 @@ class ChatResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     text: str
-    tool_calls: list[dict]
+    tool_calls: list[dict[str, Any]]
     model: str
     provider: str
     prompt_tokens: int

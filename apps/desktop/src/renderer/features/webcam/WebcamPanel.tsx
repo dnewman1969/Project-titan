@@ -2,52 +2,66 @@ import VideocamOffOutlinedIcon from "@mui/icons-material/VideocamOffOutlined";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 import Typography from "@mui/material/Typography";
-import { Meter, StatusPill, type Status } from "@titan/ui-kit";
+import { Meter, StatusPill } from "@titan/ui-kit";
+import { useEffect, useRef } from "react";
 
-import { useGetActiveRecordingQuery, useGetObsCaptureStatusQuery } from "../../app/api";
-import { useAppSelector } from "../../app/hooks";
+import { useGetObsCaptureStatusQuery, type ObsCaptureStatus } from "../../app/api";
 import { Panel } from "../operations/Panel";
 
-export const TRACKS = [
-  { id: "gameplay_video", label: "Gameplay video" },
-  { id: "game_audio", label: "Game audio" },
-  { id: "mic_audio", label: "Mic audio" },
-  { id: "webcam_video", label: "Webcam video" },
-] as const;
+import { captureTrackViews } from "./devices";
+import { useCaptureDevices } from "./useCaptureDevices";
 
-function trackStatus(state: string | undefined, recordingActive: boolean): { status: Status; label: string } {
-  if (!recordingActive) return { status: "off", label: "idle" };
-  if (state === "stub") return { status: "degraded", label: "stub" };
-  if (state === "recording") return { status: "ok", label: "rec" };
-  return { status: "unknown", label: state ?? "idle" };
+function versionLabel(obs: ObsCaptureStatus | undefined): string {
+  const versionRaw = obs?.version?.obsVersion ?? obs?.version?.obs_version;
+  return typeof versionRaw === "string" || typeof versionRaw === "number" ? String(versionRaw) : "online";
 }
 
-/** Capture panel: OBS probe + per-track stub/OBS state from the active recording manifest. */
-export function WebcamPanel() {
-  const sessionId = useAppSelector((s) => s.sessions.activeSessionId);
-  const recordingActive = useAppSelector((s) => s.sessions.recordingActive);
-  const { data: obs } = useGetObsCaptureStatusQuery(undefined, { pollingInterval: 5000 });
-  const { data: active } = useGetActiveRecordingQuery(sessionId ?? "", {
-    skip: !sessionId,
-    pollingInterval: 4000,
-  });
+function obsSubtitle(obs: ObsCaptureStatus | undefined, loading: boolean): string {
+  if (!obs) return loading ? "Checking OBS…" : "OBS not running";
+  if (obs.connected) {
+    const version = versionLabel(obs);
+    return obs.record?.active ? `OBS ${version} · recording` : `OBS ${version}`;
+  }
+  if (obs.state === "degraded") return obs.detail ?? "OBS handshake failed";
+  return obs.detail ?? "OBS not running";
+}
 
-  const tracksById = new Map((active?.item?.tracks ?? []).map((t) => [t.id, t] as const));
-  const obsConnected = obs?.connected === true || active?.item?.obs?.connected === true;
+/** Webcam tile: OBSBOT Tiny preview, mic meter, and OBS record state. */
+export function WebcamPanel() {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const { data: obs, isLoading, isError } = useGetObsCaptureStatusQuery(undefined, { pollingInterval: 5000 });
+  const devices = useCaptureDevices();
+  const webcam = obs?.webcam;
+  const obsDevice =
+    webcam?.selected === true && typeof webcam.device_name === "string" ? webcam.device_name : null;
+  const cameraLabel = devices.cameraLabel ?? obsDevice;
+  const obsConnected = obs?.connected === true;
   const obsRecording = obs?.record?.active === true;
-  const versionRaw = obs?.version?.obsVersion ?? obs?.version?.obs_version;
-  const versionLabel =
-    typeof versionRaw === "string" || typeof versionRaw === "number" ? String(versionRaw) : "online";
-  const subtitle = obsConnected
-    ? obsRecording
-      ? `OBS ${versionLabel} · recording`
-      : `OBS ${versionLabel}`
-    : obs?.state === "up"
-      ? "OBS port up (handshake pending)"
-      : "OBS offline — stub tracks on REC";
+  const rows = captureTrackViews({
+    obsConnected,
+    obsRecording,
+    cameraLabel,
+    micLive: devices.micLive,
+  });
+  const previewChip = devices.cameraStream
+    ? (devices.cameraLabel ?? "Camera")
+    : obsDevice
+      ? `${obsDevice} in OBS`
+      : "No camera";
+
+  useEffect(() => {
+    const node = videoRef.current;
+    if (!node) return;
+    node.srcObject = devices.cameraStream;
+    if (!devices.cameraStream || typeof node.play !== "function") return;
+    const played: unknown = node.play();
+    if (played instanceof Promise) {
+      void played.catch(() => undefined);
+    }
+  }, [devices.cameraStream]);
 
   return (
-    <Panel title="Webcam" subtitle={subtitle} gridArea="webcam">
+    <Panel title="Webcam" subtitle={obsSubtitle(obs, isLoading && !isError)} gridArea="webcam">
       <Box
         sx={{
           display: "grid",
@@ -57,8 +71,7 @@ export function WebcamPanel() {
         }}
       >
         <Box
-          aria-label="Webcam preview"
-          role="img"
+          aria-label={devices.cameraStream ? undefined : "Webcam preview"}
           sx={{
             borderRadius: 2,
             border: 1,
@@ -69,53 +82,64 @@ export function WebcamPanel() {
             minHeight: 120,
             aspectRatio: "16 / 9",
             alignSelf: "start",
+            overflow: "hidden",
+            position: "relative",
           }}
         >
-          <Box sx={{ textAlign: "center", px: 2 }}>
-            <VideocamOffOutlinedIcon sx={{ color: "text.disabled", fontSize: 36 }} />
-            <Typography variant="caption" display="block" color="text.disabled">
-              {obsConnected ? "OBS connected — gameplay preview lands with capture worker" : "Preview off"}
-            </Typography>
-            <Chip
-              size="small"
-              sx={{ mt: 1 }}
-              label={obsConnected ? (obsRecording ? "OBS recording" : "OBS live") : "Stub mode"}
-              color={obsConnected ? (obsRecording ? "error" : "success") : "default"}
-              variant="outlined"
+          {devices.cameraStream ? (
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              aria-label="Webcam preview"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
-          </Box>
+          ) : (
+            <Box sx={{ textAlign: "center", px: 2 }}>
+              <VideocamOffOutlinedIcon sx={{ color: "text.disabled", fontSize: 36 }} />
+              <Typography variant="caption" display="block" color="text.disabled">
+                {obsDevice ? `${obsDevice} is selected in OBS` : "No camera"}
+              </Typography>
+            </Box>
+          )}
+          <Chip
+            size="small"
+            sx={{ position: "absolute", left: 8, bottom: 8 }}
+            label={previewChip}
+            color={devices.cameraStream || obsDevice ? "success" : "default"}
+            variant="outlined"
+          />
         </Box>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, minWidth: 0 }}>
-          <Meter label="Mic level" value={null} min={-60} max={0} unit=" dBFS" />
+          <Meter
+            label="Mic level"
+            value={devices.micLive ? devices.micDb : null}
+            emptyLabel="no device"
+            min={-60}
+            max={0}
+            unit=" dBFS"
+          />
           <Box
             role="list"
             aria-label="Recording tracks"
             sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}
           >
-            {TRACKS.map((track) => {
-              const live = tracksById.get(track.id);
-              const { status, label } = trackStatus(live?.state, recordingActive);
-              const source = live?.source ?? (recordingActive ? "stub" : "idle");
-              return (
-                <Box role="listitem" key={track.id} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }} noWrap>
-                    {track.label}
-                  </Typography>
-                  <StatusPill
-                    status={status}
-                    label={label}
-                    detail={`${track.label}: ${source}${live?.path ? ` → ${live.path}` : ""}`}
-                  />
-                </Box>
-              );
-            })}
+            {rows.map((track) => (
+              <Box role="listitem" key={track.id} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }} noWrap>
+                  {track.label}
+                </Typography>
+                <StatusPill status={track.status} label={track.pill} detail={track.detail} />
+              </Box>
+            ))}
           </Box>
           <Typography variant="caption" color="text.disabled">
-            {recordingActive
-              ? obsConnected
-                ? "Tracks bound to OBS outputs"
-                : "Stub files under session recording/tracks/"
-              : "Start REC to allocate track stubs or OBS outputs"}
+            {obsConnected
+              ? obsRecording
+                ? "OBS StartRecord is running"
+                : "REC calls OBS StartRecord"
+              : "OBS not running"}
           </Typography>
         </Box>
       </Box>

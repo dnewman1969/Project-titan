@@ -23,7 +23,7 @@ const STEPS = [
   },
   {
     title: "OBS Studio",
-    body: "Install OBS 30+ and enable obs-websocket v5 on port 4455. REC in the top bar writes a manifest always; OBS improves capture when online.",
+    body: "Install OBS 30+ and enable obs-websocket v5 on port 4455. REC calls StartRecord when OBS is running, and shows OBS not running when it is not.",
     href: "https://obsproject.com/",
   },
   {

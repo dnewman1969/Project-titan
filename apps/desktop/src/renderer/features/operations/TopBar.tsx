@@ -69,13 +69,14 @@ export function TopBar({ status }: { status: ApiStatus }) {
     if ("data" in result && result.data) {
       dispatch(setRecordingActive(true));
       dispatch(setRecordingRootDir(result.data.root_dir ?? null));
-      const degraded =
-        typeof result.data.error === "string" && result.data.error.length > 0
-          ? ` (OBS degraded: ${result.data.error})`
-          : "";
-      dispatch(showNotice(`Recording started — manifest + timeline ready${degraded}.`));
+      dispatch(showNotice("Recording started — OBS StartRecord."));
     } else {
-      dispatch(showNotice(`Could not start recording: ${formatApiError(result.error)}`));
+      const message = formatApiError(result.error);
+      dispatch(
+        showNotice(
+          message.includes("OBS not running") ? "OBS not running" : `Could not start recording: ${message}`,
+        ),
+      );
     }
   }, [activeSessionId, dispatch, recordingActive, startRec, stopRec]);
 
@@ -221,7 +222,11 @@ export function TopBar({ status }: { status: ApiStatus }) {
       />
       <StatusPill status={status.postgres} label="Database" detail={status.postgresDetail} />
       <StatusPill status={status.services} label="Services" detail={status.servicesDetail} />
-      <StatusPill status={status.obs} label="OBS" detail={status.obsDetail} />
+      <StatusPill
+        status={status.obs}
+        label={status.obs === "down" ? "OBS not running" : "OBS"}
+        detail={status.obsDetail}
+      />
       <Tooltip
         title={
           activeSessionId
@@ -231,7 +236,9 @@ export function TopBar({ status }: { status: ApiStatus }) {
                 : "Stop session recording"
               : status.obs === "ok"
                 ? `Start OBS recording via websocket (${status.obsDetail})`
-                : "Start session recording (OBS offline → stub tracks)"
+                : status.obs === "degraded"
+                  ? status.obsDetail
+                  : "OBS not running"
             : "Start a session first"
         }
       >

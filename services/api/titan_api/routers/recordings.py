@@ -16,7 +16,7 @@ from titan_api.deps import db_session
 from titan_api.recording_ops import recording_json, start_session_recording
 from titan_core.clock import utc_now
 from titan_core.errors import ErrorCode, TitanError
-from titan_core.obs_ws import make_obs_client
+from titan_core.obs_ws import ObsConnectionError, make_obs_client, obs_connection_failure
 from titan_core.recording_manifest import (
     append_timeline_event,
     read_manifest,
@@ -104,7 +104,10 @@ async def stop_recording(session_id: UUID, db: AsyncSession = SessionDep) -> dic
         finally:
             await client.close()
     except (OSError, RuntimeError) as exc:
-        obs_error = str(exc)
+        if isinstance(exc, ObsConnectionError):
+            obs_error = exc.detail
+        else:
+            _state, obs_error = obs_connection_failure(exc)
     row.state = "complete"
     row.stopped_at = utc_now()
     if row.started_at is not None and row.stopped_at is not None:
@@ -138,6 +141,7 @@ async def stop_recording(session_id: UUID, db: AsyncSession = SessionDep) -> dic
             {
                 "t": utc_now().isoformat(),
                 "kind": "recording.stop",
+                "message": "OBS StopRecord" if obs_stopped else (obs_error or "OBS not running"),
                 "recording_id": str(row.id),
                 "duration_ms": row.duration_ms,
                 "obs_stopped": obs_stopped,

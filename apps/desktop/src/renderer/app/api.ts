@@ -95,6 +95,16 @@ export const ObsCaptureStatusSchema = z
         duration_ms: z.number().nullable().optional(),
       })
       .optional(),
+    webcam: z
+      .object({
+        selected: z.boolean(),
+        input_name: z.string().nullable().optional(),
+        device_name: z.string().nullable().optional(),
+        device_id: z.string().nullable().optional(),
+        detail: z.string().nullable().optional(),
+      })
+      .passthrough()
+      .optional(),
   })
   .passthrough();
 export type ObsCaptureStatus = z.infer<typeof ObsCaptureStatusSchema>;
@@ -194,6 +204,7 @@ const SESSION_MUTATION_TIMEOUT_MS = 30_000;
 function requestTimeoutMs(args: string | FetchArgs): number {
   const url = typeof args === "string" ? args : args.url;
   if (typeof url !== "string") return DEFAULT_TIMEOUT_MS;
+  if (url.includes("/capture/obs") || url.includes("/recordings/")) return 15_000;
   if (url.includes("/sessions/") && url.endsWith("/start")) return SESSION_START_TIMEOUT_MS;
   // POST /sessions with auto_start may wait for kRPC after launch (~60s+).
   if (url === "/sessions" || url.endsWith("/sessions")) return SESSION_START_TIMEOUT_MS;

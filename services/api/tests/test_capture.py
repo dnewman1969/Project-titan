@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 from titan_api.auth import LAUNCH_TOKEN_ENV
 from titan_api.main import create_app
 from titan_core.config import TitanConfig
-from titan_core.health import DependencyState
 from titan_core.obs_ws import ObsRecordStatus
 from titan_core.protocol.system import SupervisorStatus
 from titan_testing.db import TempDatabase
@@ -44,21 +43,28 @@ def api_client(migrated_db: TempDatabase, monkeypatch: pytest.MonkeyPatch) -> It
 
 
 def test_obs_capture_down(api_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _down(*_args: Any, **_kwargs: Any) -> DependencyState:
-        return DependencyState(state="down", detail="refused")
+    class _DownObs:
+        host = "127.0.0.1"
+        port = 4455
+        timeout_s = 1.0
 
-    monkeypatch.setattr("titan_api.routers.capture.check_obs", _down)
+        async def connect(self) -> None:
+            raise ConnectionRefusedError(111, "refused")
+
+        async def close(self) -> None:
+            return None
+
+    monkeypatch.setattr("titan_api.routers.capture.make_obs_client", lambda: _DownObs())
     res = api_client.get("/api/v1/capture/obs", headers=AUTH)
     assert res.status_code == 200
     body = res.json()
     assert body["state"] == "down"
     assert body["connected"] is False
+    assert body["detail"] == "OBS not running"
+    assert body["webcam"]["selected"] is False
 
 
 def test_obs_capture_connected(api_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _up(*_args: Any, **_kwargs: Any) -> DependencyState:
-        return DependencyState(state="up")
-
     class _FakeObs:
         host = "127.0.0.1"
         port = 4455
@@ -85,7 +91,14 @@ def test_obs_capture_connected(api_client: TestClient, monkeypatch: pytest.Monke
         async def get_record_status(self) -> ObsRecordStatus:
             return ObsRecordStatus(active=True, paused=False, duration_ms=1500)
 
-    monkeypatch.setattr("titan_api.routers.capture.check_obs", _up)
+        async def select_webcam_source(self) -> dict[str, Any]:
+            return {
+                "selected": True,
+                "input_name": "Titan Webcam",
+                "device_name": "OBSBOT Tiny",
+                "detail": "OBS source Titan Webcam → OBSBOT Tiny",
+            }
+
     monkeypatch.setattr("titan_api.routers.capture.make_obs_client", lambda: _FakeObs())
     res = api_client.get("/api/v1/capture/obs", headers=AUTH)
     assert res.status_code == 200, res.text
@@ -96,12 +109,11 @@ def test_obs_capture_connected(api_client: TestClient, monkeypatch: pytest.Monke
     assert body["provision"]["status"] == "planned"
     assert body["record"]["active"] is True
     assert body["record"]["duration_ms"] == 1500
+    assert body["webcam"]["selected"] is True
+    assert body["webcam"]["device_name"] == "OBSBOT Tiny"
 
 
 def test_obs_capture_handshake_degraded(api_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _up(*_args: Any, **_kwargs: Any) -> DependencyState:
-        return DependencyState(state="up")
-
     class _BadObs:
         host = "127.0.0.1"
         port = 4455
@@ -114,7 +126,6 @@ def test_obs_capture_handshake_degraded(api_client: TestClient, monkeypatch: pyt
         async def close(self) -> None:
             return None
 
-    monkeypatch.setattr("titan_api.routers.capture.check_obs", _up)
     monkeypatch.setattr("titan_api.routers.capture.make_obs_client", lambda: _BadObs())
     res = api_client.get("/api/v1/capture/obs", headers=AUTH)
     assert res.status_code == 200

@@ -12,18 +12,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from titan_core.clock import utc_now
 from titan_core.errors import ErrorCode, TitanError
 from titan_core.ids import uuid7
-from titan_core.obs_ws import make_obs_client
+from titan_core.obs_ws import ObsConnectionError, make_obs_client, obs_connection_failure
 from titan_core.recording_manifest import (
     append_timeline_event,
     build_manifest,
     build_track_entries,
     default_preset,
-    materialize_stub_tracks,
     read_manifest,
     write_manifest,
 )
 from titan_db.models.recording import Recording
 from titan_db.models.sessions import Session
+
+
+def _dependency_detail(exc: BaseException) -> str:
+    if isinstance(exc, ObsConnectionError):
+        return exc.detail
+    return obs_connection_failure(exc)[1]
 
 
 def recording_json(row: Recording) -> dict[str, Any]:
@@ -72,48 +77,42 @@ async def start_session_recording(db: AsyncSession, session_row: Session) -> dic
     preset = default_preset()
     rec_id = uuid7()
     manifest_path = root / "manifest.json"
-    obs_status: dict[str, Any] = {}
-    obs_error: str | None = None
-    obs_connected = False
-    provision: dict[str, str] | None = None
-    state = "recording"
+    client = make_obs_client()
     try:
-        client = make_obs_client()
         await client.connect()
-        try:
-            status = await client.get_record_status()
-            obs_status = {
-                "active": status.active,
-                "paused": status.paused,
-                "duration_ms": status.duration_ms,
-            }
-            provision = await client.provision_titan_profile()
-            obs_status["provision"] = provision
-            await client.start_recording()
-            obs_connected = True
-            obs_status["active"] = True
-        finally:
-            await client.close()
     except (OSError, RuntimeError) as exc:
-        obs_error = str(exc)
-        state = "recording"
-        obs_status = {"degraded": True, "message": obs_error}
+        await client.close()
+        raise TitanError(ErrorCode.DEPENDENCY_UNAVAILABLE, _dependency_detail(exc), dependency="obs") from exc
+    try:
+        try:
+            webcam = await client.select_webcam_source()
+        except (OSError, RuntimeError) as exc:
+            webcam = {"selected": False, "detail": str(exc)}
+        provision = await client.provision_titan_profile()
+        await client.start_recording(directory=str(root))
+        status = await client.get_record_status()
+    except (OSError, RuntimeError) as exc:
+        raise TitanError(ErrorCode.DEPENDENCY_UNAVAILABLE, _dependency_detail(exc), dependency="obs") from exc
+    finally:
+        await client.close()
 
-    if obs_connected:
-        tracks = build_track_entries(obs_connected=True, root_dir=root)
-    else:
-        tracks = await asyncio.to_thread(materialize_stub_tracks, root)
-
+    obs_status: dict[str, Any] = {
+        "active": True,
+        "paused": status.paused,
+        "duration_ms": status.duration_ms,
+        "provision": provision,
+        "webcam": webcam,
+    }
+    tracks = build_track_entries(obs_connected=True, root_dir=root)
     manifest = build_manifest(
         session_id=str(session_row.id),
         recording_id=str(rec_id),
-        obs_active=obs_connected,
+        obs_active=True,
         obs_status=obs_status,
         preset=preset,
         tracks=tracks,
     )
-    if provision is not None:
-        manifest["obs"]["provision"] = provision
+    manifest["obs"]["provision"] = provision
     await asyncio.to_thread(write_manifest, manifest_path, manifest)
     await asyncio.to_thread(
         append_timeline_event,
@@ -121,33 +120,22 @@ async def start_session_recording(db: AsyncSession, session_row: Session) -> dic
         {
             "t": utc_now().isoformat(),
             "kind": "recording.start",
+            "message": "OBS StartRecord",
             "recording_id": str(rec_id),
             "obs": obs_status,
             "tracks": len(tracks),
         },
     )
-    if not obs_connected:
-        await asyncio.to_thread(
-            append_timeline_event,
-            root,
-            {
-                "t": utc_now().isoformat(),
-                "kind": "video.stub",
-                "recording_id": str(rec_id),
-                "message": "OBS unavailable — writing stub track files under recording/tracks/",
-                "tracks": [t["id"] for t in tracks],
-            },
-        )
     row = Recording(
         id=rec_id,
         session_id=session_row.id,
-        state=state,
+        state="recording",
         preset=preset,
         start_mono_ns=session_row.clock_origin_mono_ns,
         started_at=utc_now(),
         root_dir=str(root),
         manifest_path=str(manifest_path),
-        error=obs_error,
+        error=None,
     )
     db.add(row)
     await db.flush()

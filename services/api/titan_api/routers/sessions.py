@@ -312,10 +312,17 @@ async def _activate_created_session(
     if row.settings.get("agents_enabled", True):
         await seed_prior_memories_on_blackboard(db, session_id=session_id, game_slug=game_slug)
     recording_payload: dict[str, object] | None = None
+    recording_error: str | None = None
     if row.settings.get("record_on_start"):
         from titan_api.recording_ops import start_session_recording
 
-        recording_payload = await start_session_recording(db, row)
+        try:
+            recording_payload = await start_session_recording(db, row)
+        except TitanError as exc:
+            if exc.dependency != "obs":
+                raise
+            # Session start still succeeds. REC does not write a stub timeline when OBS is down.
+            recording_error = exc.detail
     # Persist live state before the HTTP response so follow-up GETs never race.
     await db.commit()
     await db.refresh(row)
@@ -329,6 +336,8 @@ async def _activate_created_session(
         payload["launch_error"] = launch_error
     if recording_payload is not None:
         payload["recording"] = recording_payload
+    if recording_error is not None:
+        payload["recording_error"] = recording_error
     return payload
 
 

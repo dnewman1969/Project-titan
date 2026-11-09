@@ -234,7 +234,12 @@ export function NewSessionDialog() {
               ? "Live observe (play waiting on attach)"
               : "Live install";
       const attachNote = attach?.message ? ` — ${attach.message}` : "";
-      dispatch(showNotice(`${kind}: ${liveTitle}${attachNote}`));
+      const recordingError = Reflect.get(started, "recording_error");
+      const recNote =
+        recordOnStart && typeof recordingError === "string" && recordingError.length > 0
+          ? ` — ${recordingError}`
+          : "";
+      dispatch(showNotice(`${kind}: ${liveTitle}${attachNote}${recNote}`));
       if (agentPlay && attachReady === false) {
         const modHint =
           attach?.detail?.krpc_mod_hint === true ||
@@ -444,7 +449,7 @@ export function NewSessionDialog() {
               }}
             />
           }
-          label="Record session (manifest + timeline; OBS optional)"
+          label="Record with OBS when the session starts"
         />
         <FormControlLabel
           control={

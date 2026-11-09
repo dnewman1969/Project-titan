@@ -23,6 +23,7 @@ import {
 import { IPC, type KillSwitchEvent, type SupervisorUpdate, type TitanRuntime } from "../shared/ipc";
 import { DOCS_URL } from "../shared/menu";
 import { resolveMainConfig } from "./config";
+import { allowCapturePermission } from "./permissions";
 import { postKill, registerKillSwitch } from "./killSwitch";
 import { buildMenuTemplate } from "./menu";
 import { APP_INDEX_URL, APP_ORIGIN, APP_SCHEME, isAppUrl, resolveAppFile } from "./navigation";
@@ -121,11 +122,13 @@ function harden(): void {
     });
     contents.setWindowOpenHandler(() => ({ action: "deny" }));
   });
-  // Camera and screen capture arrive with the webcam and game preview panels (M7); deny until then.
-  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => {
-    callback(false);
+  // Webcam preview and the mic meter need getUserMedia. Screen capture and everything else stay denied.
+  session.defaultSession.setPermissionRequestHandler((_contents, permission, callback) => {
+    callback(allowCapturePermission(permission));
   });
-  session.defaultSession.setPermissionCheckHandler(() => false);
+  session.defaultSession.setPermissionCheckHandler((_contents, permission) =>
+    allowCapturePermission(permission),
+  );
 }
 
 ipcMain.on(IPC.runtime, (event) => {

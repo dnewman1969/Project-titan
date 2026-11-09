@@ -63,6 +63,54 @@ def game_slug(migrated_db: TempDatabase) -> str:
     return asyncio.run(_load())
 
 
+def _patch_obs(monkeypatch: pytest.MonkeyPatch, calls: list[str] | None = None) -> None:
+    from typing import Any
+
+    from titan_core.obs_ws import ObsRecordStatus
+
+    seen = calls if calls is not None else []
+
+    class _FakeObs:
+        async def connect(self) -> None:
+            seen.append("connect")
+
+        async def close(self) -> None:
+            seen.append("close")
+
+        async def get_record_status(self) -> ObsRecordStatus:
+            return ObsRecordStatus(active=False, paused=False, duration_ms=0)
+
+        async def provision_titan_profile(self) -> dict[str, str]:
+            return {
+                "profile": "Titan",
+                "collection": "Titan",
+                "scene": "Titan Gameplay",
+                "status": "planned",
+                "obs_version": "30.0.0",
+            }
+
+        async def select_webcam_source(self) -> dict[str, Any]:
+            seen.append("select_webcam")
+            return {
+                "selected": True,
+                "input_name": "Titan Webcam",
+                "device_name": "OBSBOT Tiny",
+                "detail": "OBS source Titan Webcam → OBSBOT Tiny",
+            }
+
+        async def start_recording(self, *, directory: str | None = None) -> None:
+            seen.append(f"start:{directory}")
+
+        async def stop_recording(self) -> None:
+            seen.append("stop")
+
+        async def get_version(self) -> dict[str, Any]:
+            return {"obsVersion": "30.0.0"}
+
+    monkeypatch.setattr("titan_api.recording_ops.make_obs_client", lambda: _FakeObs())
+    monkeypatch.setattr("titan_api.routers.recordings.make_obs_client", lambda: _FakeObs())
+
+
 def _live_session(client: TestClient, game_slug: str) -> str:
     created = client.post(
         "/api/v1/sessions",
@@ -76,7 +124,7 @@ def _live_session(client: TestClient, game_slug: str) -> str:
     return sid
 
 
-def test_record_on_start_setting(api_client: TestClient, game_slug: str) -> None:
+def test_record_on_start_without_obs_does_not_stub(api_client: TestClient, game_slug: str) -> None:
     created = api_client.post(
         "/api/v1/sessions",
         headers=AUTH,
@@ -92,9 +140,10 @@ def test_record_on_start_setting(api_client: TestClient, game_slug: str) -> None
     assert started.status_code == 202
     active = api_client.get(f"/api/v1/sessions/{sid}/recordings/active", headers=AUTH)
     assert active.status_code == 200
-    item = active.json()["item"]
-    assert item is not None
-    assert item["state"] == "recording"
+    assert active.json()["item"] is None
+    started_body = started.json()
+    assert started_body.get("recording") is None
+    assert started_body.get("recording_error") == "OBS not running"
 
 
 def test_recording_start_stop_without_obs(api_client: TestClient, game_slug: str) -> None:
@@ -104,29 +153,24 @@ def test_recording_start_stop_without_obs(api_client: TestClient, game_slug: str
     assert empty.json()["item"] is None
 
     started = api_client.post(f"/api/v1/sessions/{sid}/recordings/start", headers=AUTH)
-    assert started.status_code == 201, started.text
+    assert started.status_code == 503, started.text
     body = started.json()
-    assert body["state"] == "recording"
-    assert body["manifest_path"]
-    assert body["obs"]["connected"] is False
-    assert len(body["tracks"]) == 4
-    assert body["tracks"][0]["source"] == "stub"
-    from pathlib import Path
-
-    stub = Path(body["root_dir"]) / body["tracks"][0]["path"]
-    assert stub.is_file()
+    assert body["detail"] == "OBS not running"
+    assert body["dependency"] == "obs"
 
     active = api_client.get(f"/api/v1/sessions/{sid}/recordings/active", headers=AUTH)
     assert active.status_code == 200
-    assert active.json()["item"]["id"] == body["id"]
-    assert active.json()["item"]["tracks"]
+    assert active.json()["item"] is None
+    timeline = api_client.get(f"/api/v1/sessions/{sid}/recordings/timeline", headers=AUTH)
+    assert timeline.status_code == 200
+    assert timeline.json()["events"] == []
+    assert "video.stub" not in timeline.text
 
-    stopped = api_client.post(f"/api/v1/sessions/{sid}/recordings/stop", headers=AUTH)
-    assert stopped.status_code == 200, stopped.text
-    assert stopped.json()["state"] == "complete"
 
-
-def test_recording_start_is_idempotent(api_client: TestClient, game_slug: str) -> None:
+def test_recording_start_is_idempotent(
+    api_client: TestClient, game_slug: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_obs(monkeypatch)
     sid = _live_session(api_client, game_slug)
     first = api_client.post(f"/api/v1/sessions/{sid}/recordings/start", headers=AUTH)
     assert first.status_code == 201, first.text
@@ -135,7 +179,10 @@ def test_recording_start_is_idempotent(api_client: TestClient, game_slug: str) -
     assert second.json()["id"] == first.json()["id"]
 
 
-def test_recording_timeline_endpoint(api_client: TestClient, game_slug: str) -> None:
+def test_recording_timeline_endpoint(
+    api_client: TestClient, game_slug: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_obs(monkeypatch)
     sid = _live_session(api_client, game_slug)
     empty = api_client.get(f"/api/v1/sessions/{sid}/recordings/timeline", headers=AUTH)
     assert empty.status_code == 200, empty.text
@@ -148,8 +195,11 @@ def test_recording_timeline_endpoint(api_client: TestClient, game_slug: str) -> 
     body = timeline.json()
     assert body["recording"] is not None
     assert body["recording"]["id"] == started.json()["id"]
-    assert any(ev.get("kind") == "recording.start" for ev in body["events"])
-    assert any(ev.get("kind") == "video.stub" for ev in body["events"])
+    assert any(
+        ev.get("kind") == "recording.start" and ev.get("message") == "OBS StartRecord"
+        for ev in body["events"]
+    )
+    assert "video.stub" not in {ev.get("kind") for ev in body["events"]}
 
 
 def test_capture_obs_endpoint(api_client: TestClient) -> None:
@@ -164,40 +214,8 @@ def test_capture_obs_endpoint(api_client: TestClient) -> None:
 def test_recording_start_with_fake_obs(
     api_client: TestClient, game_slug: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from typing import Any
-
-    from titan_core.obs_ws import ObsRecordStatus
-
-    class _FakeObs:
-        async def connect(self) -> None:
-            return None
-
-        async def close(self) -> None:
-            return None
-
-        async def get_record_status(self) -> ObsRecordStatus:
-            return ObsRecordStatus(active=False, paused=False, duration_ms=0)
-
-        async def provision_titan_profile(self) -> dict[str, str]:
-            return {
-                "profile": "Titan",
-                "collection": "Titan",
-                "scene": "Titan Gameplay",
-                "status": "planned",
-                "obs_version": "30.0.0",
-            }
-
-        async def start_recording(self) -> None:
-            return None
-
-        async def stop_recording(self) -> None:
-            return None
-
-        async def get_version(self) -> dict[str, Any]:
-            return {"obsVersion": "30.0.0"}
-
-    monkeypatch.setattr("titan_api.recording_ops.make_obs_client", lambda: _FakeObs())
-    monkeypatch.setattr("titan_api.routers.recordings.make_obs_client", lambda: _FakeObs())
+    calls: list[str] = []
+    _patch_obs(monkeypatch, calls)
     sid = _live_session(api_client, game_slug)
     started = api_client.post(f"/api/v1/sessions/{sid}/recordings/start", headers=AUTH)
     assert started.status_code == 201, started.text
@@ -205,6 +223,9 @@ def test_recording_start_with_fake_obs(
     assert body["obs"]["connected"] is True
     assert body["obs"]["status"]["active"] is True
     assert body["tracks"][0]["source"] == "obs"
+    assert body["obs"]["status"]["webcam"]["device_name"] == "OBSBOT Tiny"
+    assert any(call.startswith("start:") for call in calls)
+    assert "select_webcam" in calls
     assert "video.stub" not in {
         ev.get("kind")
         for ev in api_client.get(f"/api/v1/sessions/{sid}/recordings/timeline", headers=AUTH).json()["events"]

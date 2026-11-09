@@ -7,18 +7,21 @@ import contextlib
 import json
 from typing import Any
 
-from titan_core.protocol.envelope import Address
+from titan_core.ids import uuid7
+from titan_core.protocol.envelope import Address, make_envelope
 from titan_core.protocol.events import GameEvent
+from titan_core.protocol.payloads import ActionPropose
 from titan_core.protocol.telemetry import TelemetryFrameUI
 from titan_core.streams import entry_data, session_events_stream, session_telemetry_stream
+from titan_orchestrator.play_policy import play_proposal_for_event
 from titan_orchestrator.runtime import SessionRuntime
 from titan_orchestrator.world_state import WorldStateUpdater
 
 
-async def run_session_loops(runtime: SessionRuntime) -> None:
+async def run_session_loops(runtime: SessionRuntime, *, play_enabled: bool = False) -> None:
     """Run until runtime.stop() is called."""
     telemetry_task = asyncio.create_task(_telemetry_loop(runtime), name="telemetry-loop")
-    events_task = asyncio.create_task(_events_loop(runtime), name="events-loop")
+    events_task = asyncio.create_task(_events_loop(runtime, play_enabled=play_enabled), name="events-loop")
     try:
         await asyncio.gather(telemetry_task, events_task)
     finally:
@@ -60,7 +63,7 @@ async def _telemetry_loop(runtime: SessionRuntime) -> None:
             await db.commit()
 
 
-async def _events_loop(runtime: SessionRuntime) -> None:
+async def _events_loop(runtime: SessionRuntime, *, play_enabled: bool) -> None:
     stream = session_events_stream(str(runtime.session_id))
     last_id = "$"
     seq = 0
@@ -93,6 +96,29 @@ async def _events_loop(runtime: SessionRuntime) -> None:
                         expected_version=-1,
                         confidence=0.85,
                     )
+                    if play_enabled:
+                        proposal = play_proposal_for_event(event)
+                        if proposal is not None:
+                            await runtime.bus.publish(
+                                make_envelope(
+                                    type="action.propose",
+                                    session_id=runtime.session_id,
+                                    sender=Address(kind="agent", id="director"),
+                                    recipients=["role:actions"],
+                                    visibility="internal",
+                                    priority=6,
+                                    payload=ActionPropose.model_validate(proposal),
+                                    correlation_id=uuid7(),
+                                )
+                            )
+                            await bb.put(
+                                section="lessons",
+                                key=f"play.{lesson_key}",
+                                value={"text": proposal["rationale"], "action_id": proposal["action_id"]},
+                                author=Address(kind="agent", id="director"),
+                                expected_version=-1,
+                                confidence=0.9,
+                            )
             await db.commit()
 
 

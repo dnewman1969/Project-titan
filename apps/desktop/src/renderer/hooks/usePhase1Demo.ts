@@ -69,7 +69,7 @@ export function usePhase1Demo(): void {
         game_slug: "ksp",
         title,
         mode: "observe",
-        settings: { agents_enabled: true, demo_telemetry: true },
+        settings: { agents_enabled: true, demo_telemetry: true, play_enabled: true },
       });
       if (!("data" in created) || !created.data) {
         dispatch(showNotice("Demo session could not start — check Redis/Postgres in the boot splash."));

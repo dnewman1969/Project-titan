@@ -4,14 +4,24 @@ version = "0.1.0"
 description = "Project Titan multi-agent runtime"
 requires-python = ">=3.12,<3.13"
 license = "Apache-2.0"
-dependencies = ["titan-core"]
+dependencies = [
+    "langgraph>=1.2.20",
+    "titan-core",
+    "titan-db",
+    "titan-models",
+]
 
 [build-system]
 requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
+
+[project.scripts]
+titan-orchestrator = "titan_orchestrator.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["titan_orchestrator"]
 
 [tool.uv.sources]
 titan-core = { workspace = true }
+titan-db = { workspace = true }
+titan-models = { workspace = true }

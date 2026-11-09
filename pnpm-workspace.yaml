@@ -3,8 +3,9 @@ packages:
   - packages/ts/*
 
 # pnpm 10 skips dependency install scripts unless allowed. esbuild installs its platform binary in
-# postinstall. Electron 45+ has no install script: it downloads its binary on first launch.
+# postinstall. Electron is downloaded via install.js (Start-Titan / install-electron), not postinstall.
 onlyBuiltDependencies:
   - esbuild
+  - electron
 ignoredBuiltDependencies:
   - electron-winstaller

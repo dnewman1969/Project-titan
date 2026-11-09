@@ -54,23 +54,49 @@ function Add-ToolchainDirsToPath {
     }
 }
 
+function Get-NodeVersionString {
+    if (-not (Test-Command node)) { return $null }
+    return (& node -p "process.versions.node").Trim()
+}
+
+function Test-NodeVersionSupported {
+    $ver = Get-NodeVersionString
+    if (-not $ver) { return $false }
+    $parts = $ver.Split(".")
+    if ($parts.Count -lt 2) { return $false }
+    $major = [int]$parts[0]
+    $minor = [int]$parts[1]
+    if ($major -lt 22) { return $false }
+    if ($major -eq 22 -and $minor -lt 12) { return $false }
+    if ($major -ge 25) { return $false }
+    return $true
+}
+
 function Ensure-Node {
-    if (Test-Command node) { return }
-    if (Test-Command winget) {
-        Write-Host "Node.js not found. Installing Node.js LTS with winget (one-time)..." -ForegroundColor Yellow
-        try {
-            winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements
-        } catch {
-            Write-Host "winget install did not complete: $_" -ForegroundColor DarkYellow
+    if (-not (Test-Command node)) {
+        if (Test-Command winget) {
+            Write-Host "Node.js not found. Installing Node.js 22 LTS with winget (one-time)..." -ForegroundColor Yellow
+            Invoke-External winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements | Out-Null
+            Refresh-SessionPath
         }
-        Refresh-SessionPath
     }
     if (-not (Test-Command node)) {
         Show-Error @"
-Node.js 22+ LTS is required.
-Install: https://nodejs.org/ (choose LTS)
-Or in PowerShell: winget install OpenJS.NodeJS.LTS
+Node.js 22.12+ is required (22.x or 24.x supported; see .nvmrc for the team default 22).
+Install: https://nodejs.org/
+Or: winget install OpenJS.NodeJS.LTS
 "@
+    }
+    $ver = Get-NodeVersionString
+    if (-not (Test-NodeVersionSupported)) {
+        Show-Error @"
+Unsupported Node.js $ver (need >= 22.12.0 and < 25).
+Install Node 22 LTS from https://nodejs.org/ or use nvm-windows: nvm install 22
+"@
+    }
+    $major = [int]($ver.Split(".")[0])
+    if ($major -ne 22) {
+        Write-Host "Node $ver detected (Titan team default is 22 per .nvmrc; 24.x is supported)." -ForegroundColor DarkGray
     }
 }
 
@@ -136,6 +162,54 @@ function Ensure-Pnpm {
             $env:Path = "$npmPrefix;$env:Path"
         }
         Refresh-SessionPath
+    }
+}
+
+function Find-ElectronPackageRoot {
+    $candidates = @(
+        (Join-Path $RepoRoot "node_modules\electron"),
+        (Join-Path $RepoRoot "apps\desktop\node_modules\electron")
+    )
+    foreach ($dir in $candidates) {
+        if (Test-Path (Join-Path $dir "install.js")) { return $dir }
+    }
+    return $null
+}
+
+function Test-ElectronBinaryReady {
+    $root = Find-ElectronPackageRoot
+    if (-not $root) { return $false }
+    $pathFile = Join-Path $root "path.txt"
+    if (-not (Test-Path $pathFile)) { return $false }
+    $rel = (Get-Content $pathFile -Raw).Trim()
+    if (-not $rel) { return $false }
+    $exe = Join-Path $root "dist\$rel"
+    return (Test-Path $exe)
+}
+
+function Ensure-ElectronBinary {
+    if (Test-ElectronBinaryReady) { return }
+    Write-Host "Downloading Electron binary for the desktop shell (~110 MB, one-time)..." -ForegroundColor Cyan
+    $root = Find-ElectronPackageRoot
+    if ($root) {
+        $installJs = Join-Path $root "install.js"
+        $prev = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        & node $installJs
+        $code = $LASTEXITCODE
+        $ErrorActionPreference = $prev
+        if ($code -eq 0 -and (Test-ElectronBinaryReady)) { return }
+        Write-Host "install.js exited $code; trying pnpm install-electron..." -ForegroundColor DarkYellow
+    }
+    Invoke-Pnpm --filter @titan/desktop exec install-electron
+    if (-not (Test-ElectronBinaryReady)) {
+        Show-Error @"
+Electron binary is missing (electron-vite needs node_modules/electron/dist).
+
+From the repo root run:
+  pnpm --filter @titan/desktop exec install-electron
+Then re-run Start-Titan.bat.
+"@
     }
 }
 
@@ -381,6 +455,7 @@ Write-Host "Installing dependencies (first run may take several minutes)..." -Fo
 Invoke-Pnpm install --frozen-lockfile
 uv sync --frozen --all-packages
 Invoke-Pnpm codegen
+Ensure-ElectronBinary
 
 Write-Host "Launching Titan Operations Center..." -ForegroundColor Green
 Write-Host "If the window is blank for >60s, check the boot splash for Redis/Postgres/API status." -ForegroundColor DarkGray

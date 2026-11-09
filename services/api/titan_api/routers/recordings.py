@@ -13,37 +13,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from titan_api.auth import Authenticated
 from titan_api.deps import db_session
+from titan_api.recording_ops import recording_json, start_session_recording
 from titan_core.clock import utc_now
 from titan_core.errors import ErrorCode, TitanError
-from titan_core.ids import uuid7
 from titan_core.obs_ws import ObsClient
-from titan_core.recording_manifest import (
-    append_timeline_event,
-    build_manifest,
-    default_preset,
-    write_manifest,
-)
+from titan_core.recording_manifest import append_timeline_event
 from titan_db.models.recording import Recording
 from titan_db.models.sessions import Session
 
 router = APIRouter(tags=["recordings"], dependencies=[Authenticated])
 SessionDep = Depends(db_session)
-
-
-def _recording_json(row: Recording) -> dict[str, Any]:
-    return {
-        "id": row.id,
-        "session_id": row.session_id,
-        "state": row.state,
-        "preset": row.preset,
-        "start_mono_ns": row.start_mono_ns,
-        "started_at": row.started_at,
-        "stopped_at": row.stopped_at,
-        "duration_ms": row.duration_ms,
-        "root_dir": row.root_dir,
-        "manifest_path": row.manifest_path,
-        "error": row.error,
-    }
 
 
 async def _session_or_404(db: AsyncSession, session_id: UUID) -> Session:
@@ -65,17 +44,12 @@ async def active_recording(session_id: UUID, db: AsyncSession = SessionDep) -> d
     )
     if row is None:
         return {"item": None}
-    return {"item": _recording_json(row)}
+    return {"item": recording_json(row)}
 
 
 @router.post("/sessions/{session_id}/recordings/start", status_code=status.HTTP_201_CREATED)
 async def start_recording(session_id: UUID, db: AsyncSession = SessionDep) -> dict[str, Any]:
     session_row = await _session_or_404(db, session_id)
-    if session_row.state not in {"live", "paused", "starting"}:
-        raise TitanError(
-            ErrorCode.INVALID_STATE_TRANSITION,
-            f"start recording requires a live session (state={session_row.state!r})",
-        )
     existing = await db.scalar(
         select(Recording)
         .where(Recording.session_id == session_id)
@@ -83,65 +57,7 @@ async def start_recording(session_id: UUID, db: AsyncSession = SessionDep) -> di
     )
     if existing is not None:
         raise TitanError(ErrorCode.CONFLICT, "recording already active")
-    root = Path(session_row.data_dir) / "recording"
-    await asyncio.to_thread(root.mkdir, parents=True, exist_ok=True)
-    preset = default_preset()
-    rec_id = uuid7()
-    manifest_path = root / "manifest.json"
-    obs_status: dict[str, Any] = {}
-    obs_error: str | None = None
-    state = "recording"
-    try:
-        client = ObsClient()
-        await client.connect()
-        try:
-            status = await client.get_record_status()
-            obs_status = {"active": status.active, "paused": status.paused, "duration_ms": status.duration_ms}
-            await client.start_recording()
-        finally:
-            await client.close()
-    except (OSError, RuntimeError) as exc:
-        obs_error = str(exc)
-        state = "recording"
-        obs_status = {"degraded": True, "message": obs_error}
-    manifest = build_manifest(
-        session_id=str(session_id),
-        recording_id=str(rec_id),
-        obs_active=obs_error is None,
-        obs_status=obs_status,
-        preset=preset,
-    )
-    await asyncio.to_thread(write_manifest, manifest_path, manifest)
-    await asyncio.to_thread(
-        append_timeline_event,
-        root,
-        {
-            "t": utc_now().isoformat(),
-            "kind": "recording.start",
-            "recording_id": str(rec_id),
-            "obs": obs_status,
-        },
-    )
-    placeholder = root / "tracks" / "game-placeholder.txt"
-    await asyncio.to_thread(
-        _write_placeholder_track,
-        placeholder,
-        "Game video lands when OBS is connected; this session still records metadata and timeline.",
-    )
-    row = Recording(
-        id=rec_id,
-        session_id=session_id,
-        state=state,
-        preset=preset,
-        start_mono_ns=session_row.clock_origin_mono_ns,
-        started_at=utc_now(),
-        root_dir=str(root),
-        manifest_path=str(manifest_path),
-        error=obs_error,
-    )
-    db.add(row)
-    await db.flush()
-    return _recording_json(row)
+    return await start_session_recording(db, session_row)
 
 
 @router.post("/sessions/{session_id}/recordings/stop", status_code=status.HTTP_200_OK)
@@ -182,9 +98,4 @@ async def stop_recording(session_id: UUID, db: AsyncSession = SessionDep) -> dic
             },
         )
     await db.flush()
-    return _recording_json(row)
-
-
-def _write_placeholder_track(path: Path, message: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(message + "\n", encoding="utf-8")
+    return recording_json(row)

@@ -38,3 +38,8 @@ these checks cover the installed app on real hardware.
       (`GET /api/v1/safety/state`); Resume clears it.
 
 Later milestones (game discovery, telemetry, recording clap test, soak tests) add their sections here.
+
+### Learn-and-play beta (software HIL vs this checklist)
+
+- **Software HIL (CI / no game):** `TITAN_PLAY_BACKEND=hil` and `tests/integration/test_play_hil_loop.py` — see [docs/learn-and-play-beta.md](../docs/learn-and-play-beta.md).
+- **Reference PC (KSP kRPC or ETS2/ATS + ViGEm):** when validating on the gaming machine, record install paths, kRPC port reachability, and whether throttle/brake changed in-game after salient events. Sign off here; do not treat software HIL as substitute for these rows.

@@ -162,7 +162,7 @@ async def start_session(
     if row.settings.get("agents_enabled", True):
         controller.start_orchestrator(session_id, game_slug=game_slug, play_enabled=play_enabled)
     if play_enabled:
-        controller.start_actions(session_id, game_slug=game_slug)
+        controller.start_actions(session_id, game_slug=game_slug, data_dir=row.data_dir)
     row.state = "live"
     await db.flush()
     profile: GameProfile | None = None
@@ -194,6 +194,10 @@ async def start_session(
                 subprocess.Popen([exe])  # noqa: S603
 
         await asyncio.to_thread(_launch)
+    if row.settings.get("record_on_start"):
+        from titan_api.recording_ops import start_session_recording
+
+        await start_session_recording(db, row)
     return _session_json(row)
 
 

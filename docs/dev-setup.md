@@ -177,3 +177,9 @@ When you have OBS running, enable obs-websocket v5 and confirm the API dependenc
 - **`the cluster exists but the keyring has no titan/postgres password`:** the managed data directory
   was created with a password that is no longer in Credential Manager. Set
   `TITAN__POSTGRES__PASSWORD`, or delete `%LOCALAPPDATA%\Titan\data\pg` to start over.
+
+## Learn-and-play beta
+
+Closed-loop agent play, HIL (no game), and real KSP / ETS2 paths are documented in
+[learn-and-play-beta.md](learn-and-play-beta.md). Hardware sign-off remains in
+[tests/hil/CHECKLIST.md](../tests/hil/CHECKLIST.md).

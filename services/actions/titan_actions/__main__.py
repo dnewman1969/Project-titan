@@ -6,10 +6,12 @@ import argparse
 import asyncio
 import os
 import sys
+from pathlib import Path
 from uuid import UUID
 
 from titan_actions.executor import PlayExecutor
 from titan_actions.play_env import PlaySettings
+from titan_actions.rec_timeline import append_play_event
 from titan_core.bus import SessionBus
 from titan_core.config import load_config
 from titan_core.logging import configure_logging, get_logger
@@ -37,7 +39,13 @@ async def _run(session_id: UUID, game_slug: str | None) -> int:
     bus = SessionBus(redis, session_id)
     await bus.ensure_group(ACTIONS_GROUP)
     play_settings = PlaySettings.from_environ()
-    executor = PlayExecutor(session_id=session_id, settings=play_settings)
+    data_dir = os.environ.get("TITAN_SESSION_DATA_DIR")
+    session_dir = Path(data_dir) if data_dir else None
+    executor = PlayExecutor(
+        session_id=session_id,
+        data_dir=session_dir,
+        settings=play_settings,
+    )
     try:
         while True:
             batch = await bus.read_group(ACTIONS_GROUP, ACTIONS_CONSUMER, block_ms=2000)
@@ -49,7 +57,15 @@ async def _run(session_id: UUID, game_slug: str | None) -> int:
                 if payload.risk not in ("low", "medium"):
                     await bus.ack(ACTIONS_GROUP, entry_id)
                     continue
-                ok, err = executor.execute(payload.action_id, dict(payload.params))
+                params = dict(payload.params)
+                ok, err = executor.execute(payload.action_id, params)
+                append_play_event(
+                    data_dir,
+                    action_id=payload.action_id,
+                    ok=ok,
+                    err=err,
+                    params=params,
+                )
                 log.info(
                     "action_executed",
                     action_id=payload.action_id,

@@ -47,7 +47,9 @@ async def test_ollama_list_models_shape() -> None:
 @pytest.mark.asyncio
 @respx.mock
 async def test_ollama_health_and_embed() -> None:
-    respx.get("http://127.0.0.1:11434/api/version").mock(return_value=httpx.Response(200, json={"version": "0.12.0"}))
+    respx.get("http://127.0.0.1:11434/api/version").mock(
+        return_value=httpx.Response(200, json={"version": "0.12.0"})
+    )
     respx.post("http://127.0.0.1:11434/api/embed").mock(
         return_value=httpx.Response(200, json={"embeddings": [[0.1, 0.2]]})
     )

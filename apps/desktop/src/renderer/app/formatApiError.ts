@@ -54,17 +54,12 @@ export function formatApiError(error: unknown): string {
   }
   if (isFetchBaseQueryError(error)) {
     if (error.status === "PARSING_ERROR" || error.status === "CUSTOM_ERROR") {
-      const err = error.error;
-      if (typeof err === "string") {
-        return `Invalid API response: ${err}`;
+      const parseErr: unknown = error.error;
+      if (typeof parseErr === "string") {
+        return `Invalid API response: ${parseErr}`;
       }
-      if (
-        typeof err === "object" &&
-        err !== null &&
-        "message" in err &&
-        typeof (err as { message: unknown }).message === "string"
-      ) {
-        return `Invalid API response: ${(err as { message: string }).message}`;
+      if (isRecord(parseErr) && typeof parseErr.message === "string") {
+        return `Invalid API response: ${parseErr.message}`;
       }
       return "Invalid API response (schema parse failed)";
     }

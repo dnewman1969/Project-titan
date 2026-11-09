@@ -134,9 +134,7 @@ class OllamaProvider:
                 tool_calls = [t for t in raw_tools if isinstance(t, dict)]
         prompt_tokens = int((body.get("prompt_eval_count") if isinstance(body, dict) else 0) or 0)
         completion_tokens = int((body.get("eval_count") if isinstance(body, dict) else 0) or 0)
-        finish: Literal["stop", "length", "tool", "error", "cancelled"] = (
-            "tool" if tool_calls else "stop"
-        )
+        finish: Literal["stop", "length", "tool", "error", "cancelled"] = "tool" if tool_calls else "stop"
         if isinstance(body, dict) and body.get("done_reason") == "length":
             finish = "length"
         return ChatResult(

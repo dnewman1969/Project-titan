@@ -16,6 +16,10 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["titan_game_ets2"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"titan-game.yaml" = "titan-game.yaml"
+"controls_default.yaml" = "controls_default.yaml"
+
 [tool.uv.sources]
 titan-game-scs-common = { workspace = true }
 titan-sdk-games = { workspace = true }

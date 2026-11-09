@@ -117,9 +117,7 @@ def _serialize_profile(row: GameProfile) -> dict[str, Any]:
 
 
 async def _game_or_404(session: AsyncSession, game_id: UUID) -> Game:
-    row = await session.scalar(
-        select(Game).options(selectinload(Game.profiles)).where(Game.id == game_id)
-    )
+    row = await session.scalar(select(Game).options(selectinload(Game.profiles)).where(Game.id == game_id))
     if row is None:
         raise TitanError(ErrorCode.NOT_FOUND, f"Game {game_id} not found.")
     return row
@@ -127,9 +125,7 @@ async def _game_or_404(session: AsyncSession, game_id: UUID) -> Game:
 
 async def _profile_or_404(session: AsyncSession, profile_id: UUID) -> GameProfile:
     row = await session.scalar(
-        select(GameProfile)
-        .options(selectinload(GameProfile.game))
-        .where(GameProfile.id == profile_id)
+        select(GameProfile).options(selectinload(GameProfile.game)).where(GameProfile.id == profile_id)
     )
     if row is None:
         raise TitanError(ErrorCode.NOT_FOUND, f"Game profile {profile_id} not found.")
@@ -244,9 +240,7 @@ async def patch_profile(
     profile = await _profile_or_404(session, profile_id)
     if body.is_default is True:
         await session.execute(
-            update(GameProfile)
-            .where(GameProfile.game_id == profile.game_id)
-            .values(is_default=False)
+            update(GameProfile).where(GameProfile.game_id == profile.game_id).values(is_default=False)
         )
         profile.is_default = True
     if body.launch_args is not None:

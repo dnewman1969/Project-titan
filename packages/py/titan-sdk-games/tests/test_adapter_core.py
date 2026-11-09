@@ -60,12 +60,12 @@ def test_hash_mismatch_reports_outdated(tmp_path: Path) -> None:
     Ets2Adapter.manifest = manifest
     try:
         profile = GameProfile(
-        id=None,
-        game_id=None,
-        store="steam",
-        install_path=str(install),
-        executable_path=str(install / "game.exe"),
-    )
+            id=None,
+            game_id=None,
+            store="steam",
+            install_path=str(install),
+            executable_path=str(install / "game.exe"),
+        )
         status = Ets2Adapter().check_integration(profile)
         assert status.status == "outdated"
     finally:

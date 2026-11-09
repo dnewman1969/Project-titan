@@ -68,9 +68,7 @@ class GameAdapter(ABC):
         installs = scan_all_stores(ctx, stores)
         found: list[DetectedInstall] = []
         for inst in installs:
-            if inst.store == "steam" and str(inst.app_id) not in {
-                str(x) for x in detection.steam_app_ids
-            }:
+            if inst.store == "steam" and str(inst.app_id) not in {str(x) for x in detection.steam_app_ids}:
                 continue
             if inst.store == "epic" and inst.app_id not in detection.epic_catalog_ids:
                 continue

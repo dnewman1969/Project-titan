@@ -15,9 +15,7 @@ def test_detect_skips_unmatched_steam_app_id(tmp_path: Path) -> None:
     common = lib / "common" / "Other"
     common.mkdir(parents=True)
     (common / "game.exe").write_bytes(b"MZ")
-    manifest = (
-        '"AppState"\n{\n\t"appid"\t\t"1"\n\t"buildid"\t\t"1"\n\t"installdir"\t\t"Other"\n}\n'
-    )
+    manifest = '"AppState"\n{\n\t"appid"\t\t"1"\n\t"buildid"\t\t"1"\n\t"installdir"\t\t"Other"\n}\n'
     (steamapps / "appmanifest_1.acf").write_text(manifest, encoding="utf-8")
     ctx = DiscoveryContext(platform="linux", steam_libraries=[lib])
     assert KspAdapter.detect(ctx) == []

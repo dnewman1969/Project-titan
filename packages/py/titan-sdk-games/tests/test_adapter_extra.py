@@ -20,9 +20,7 @@ def test_standalone_scanner_and_detect(tmp_path: Path) -> None:
     ctx = DiscoveryContext(platform="linux", extra_paths=[exe])
     hits = StandaloneScanner().scan(ctx)
     assert hits
-    detected = Ets2Adapter.detect(
-        DiscoveryContext(platform="linux", extra_paths=[exe.parent.parent])
-    )
+    detected = Ets2Adapter.detect(DiscoveryContext(platform="linux", extra_paths=[exe.parent.parent]))
     assert any(d.game_slug == "ets2" for d in detected)
 
 

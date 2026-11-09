@@ -41,9 +41,7 @@ def test_ets2_detect_from_fixture(tmp_path: Path) -> None:
     common = lib / "common" / "Euro Truck Simulator 2"
     common.mkdir(parents=True)
     (common / "eurotrucks2.exe").write_bytes(b"MZ")
-    manifest = (
-        '"AppState"\n{\n\t"appid"\t\t"227300"\n\t"buildid"\t\t"42"\n\t"installdir"\t\t"Euro Truck Simulator 2"\n}\n'
-    )
+    manifest = '"AppState"\n{\n\t"appid"\t\t"227300"\n\t"buildid"\t\t"42"\n\t"installdir"\t\t"Euro Truck Simulator 2"\n}\n'
     (steamapps / "appmanifest_227300.acf").write_text(manifest, encoding="utf-8")
     ctx = DiscoveryContext(platform="linux", steam_libraries=[lib])
     hits = Ets2Adapter.detect(ctx)

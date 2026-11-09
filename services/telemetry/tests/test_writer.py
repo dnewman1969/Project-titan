@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-
-from titan_core.protocol.telemetry import TELEMETRY_SCHEMA, TelemetryFrame, Vehicle, Velocity
-from titan_telemetry.writer import FrameWriter
 from uuid import UUID
+
+from titan_core.protocol.telemetry import TELEMETRY_SCHEMA, TelemetryFrame
+from titan_telemetry.writer import FrameWriter
 
 
 def _frame() -> TelemetryFrame:

@@ -15,10 +15,25 @@ SESSION = UUID(int=0)
 ROOT = Path(__file__).resolve().parents[2]
 
 CASES = [
-    ("ksp", KspAdapter, "games/ksp/fixtures/launch-to-orbit.ndjson", "games/ksp/fixtures/golden/launch-to-orbit.events.ndjson"),
+    (
+        "ksp",
+        KspAdapter,
+        "games/ksp/fixtures/launch-to-orbit.ndjson",
+        "games/ksp/fixtures/golden/launch-to-orbit.events.ndjson",
+    ),
     ("ksp", KspAdapter, "games/ksp/fixtures/crash.ndjson", "games/ksp/fixtures/golden/crash.events.ndjson"),
-    ("ets2", Ets2Adapter, "games/ets2/fixtures/delivery-fine.ndjson", "games/ets2/fixtures/golden/delivery-fine.events.ndjson"),
-    ("ats", AtsAdapter, "games/ats/fixtures/short-haul-low-fuel.ndjson", "games/ats/fixtures/golden/short-haul-low-fuel.events.ndjson"),
+    (
+        "ets2",
+        Ets2Adapter,
+        "games/ets2/fixtures/delivery-fine.ndjson",
+        "games/ets2/fixtures/golden/delivery-fine.events.ndjson",
+    ),
+    (
+        "ats",
+        AtsAdapter,
+        "games/ats/fixtures/short-haul-low-fuel.ndjson",
+        "games/ats/fixtures/golden/short-haul-low-fuel.events.ndjson",
+    ),
 ]
 
 

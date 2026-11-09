@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from titan_telemetry.loader import adapter_for, rules_path
 from titan_game_ksp.adapter import KspAdapter
+
+from titan_telemetry.loader import adapter_for, rules_path
 
 
 def test_load_ksp_adapter() -> None:

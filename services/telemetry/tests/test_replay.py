@@ -5,6 +5,7 @@ from pathlib import Path
 from uuid import UUID
 
 from titan_game_ksp.adapter import KspAdapter
+
 from titan_telemetry.loader import rules_path
 from titan_telemetry.replay import drain_fixture
 

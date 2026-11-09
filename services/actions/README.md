@@ -4,13 +4,13 @@ Sole input owner for Project Titan (Section 6.9). Learn-and-play beta routes `ac
 
 ## Backends (`TITAN_PLAY_BACKEND`)
 
-| Value            | Use                                                                                                          |
-| ---------------- | ------------------------------------------------------------------------------------------------------------ |
-| `auto` (default) | `ksp` → kRPC (`127.0.0.1:50000/50001`); `ets2`/`ats` → ViGEm virtual gamepad, then keyboard brake on Windows |
-| `krpc`           | Force kRPC (KSP)                                                                                             |
-| `scs`            | Force SCS path (ViGEm / keyboard)                                                                            |
-| `hil`            | **Honest HIL:** in-memory state + optional `hil.ndjson` trace — no game attached                             |
-| `keyboard`       | SCS keyboard fallback on Windows                                                                             |
+| Value            | Use                                                                                                            |
+| ---------------- | -------------------------------------------------------------------------------------------------------------- |
+| `auto` (default) | `ksp` → kRPC (`127.0.0.1:50000/50001`); `ets2`/`ats` → ViGEm virtual X360 (no physical pad), else keyboard W/S |
+| `krpc`           | Force kRPC (KSP)                                                                                               |
+| `scs`            | Force SCS path (ViGEm preferred, keyboard fallback)                                                            |
+| `hil`            | **Honest HIL:** in-memory state + optional `hil.ndjson` trace — no game attached                               |
+| `keyboard`       | Force SCS keyboard path on Windows (`W` throttle / `S` brake via SendInput)                                    |
 
 Also set `TITAN_PLAY_HIL=1` to force HIL.
 
@@ -26,10 +26,11 @@ Environment set by the session controller when play is enabled:
 
 Failed kRPC/SCS connections return `ok: false` on `action.executed` (no silent stub success).
 
-## HIL loop test
+## HIL / ViGEm tests
 
 ```bash
-TITAN_PLAY_BACKEND=hil uv run pytest tests/integration/test_play_hil_loop.py
+TITAN_PLAY_BACKEND=hil uv run pytest tests/integration/test_learn_play_smoke.py
+uv run pytest services/actions/tests/test_scs_driver.py
 ```
 
-On a Windows PC with KSP + kRPC running, use `auto` (default) and enable agent play on a new session.
+Cloud CI mocks ViGEm via `ScsDriver(pad_factory=...)`. On a Windows PC with ETS2/ATS + ViGEmBus, use `auto`/`scs`; without ViGEm, keyboard W/S still drives.

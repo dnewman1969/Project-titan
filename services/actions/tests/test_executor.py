@@ -53,10 +53,13 @@ def test_driver_exception_is_surfaced() -> None:
     assert "boom" in err
 
 
-@pytest.mark.skipif(__import__("sys").platform != "win32", reason="SCS driver needs Windows")
+@pytest.mark.skipif(__import__("sys").platform != "win32", reason="SCS real input needs Windows")
 def test_scs_brake_on_windows() -> None:
-    executor = PlayExecutor(session_id=UUID(int=4), data_dir=None)
+    """Optional Windows-real path; cloud coverage lives in test_scs_driver.py mocks."""
+    from titan_actions.drivers.scs_driver import ScsDriver
+
+    executor = PlayExecutor(session_id=UUID(int=4), data_dir=None, driver=ScsDriver())
     ok, err, _latency = executor.execute("scs.brake", {"brake": 0.2})
-    if not ok and err and "ViGEm" in err:
-        pytest.skip(err)
-    assert ok or err is not None
+    if not ok:
+        pytest.skip(err or "SCS input unavailable on this host")
+    assert ok and err is None

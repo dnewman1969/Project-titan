@@ -49,11 +49,11 @@ Env overrides: `TITAN_KRPC_HOST`, `TITAN_KRPC_RPC_PORT`, `TITAN_KRPC_STREAM_PORT
 
 ## Real ETS2 / ATS (SCS)
 
-| Step      | Detail                                                                                                   |
-| --------- | -------------------------------------------------------------------------------------------------------- |
-| Telemetry | scs-sdk plugin (read via shared memory — Windows)                                                        |
-| Control   | ViGEm virtual gamepad (`scs.brake` / `scs.throttle` triggers), else keyboard brake (`S`) via `SendInput` |
-| Titan     | New session → truck sim → **agent play** → game focused                                                  |
+| Step      | Detail                                                                                                             |
+| --------- | ------------------------------------------------------------------------------------------------------------------ |
+| Telemetry | scs-sdk plugin (read via shared memory — Windows)                                                                  |
+| Control   | ViGEm virtual X360 (`scs.brake` / `scs.throttle` triggers; no physical pad), else keyboard `S`/`W` via `SendInput` |
+| Titan     | New session → truck sim → **agent play** → game focused                                                            |
 
 Linux dev hosts cannot drive SCS; use HIL or a Windows machine.
 

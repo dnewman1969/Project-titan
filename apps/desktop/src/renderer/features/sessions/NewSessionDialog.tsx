@@ -248,8 +248,8 @@ export function NewSessionDialog() {
             }
           >
             No install for <strong>{game?.label ?? gameSlug}</strong>. View → Games → Browse… for{" "}
-            <code>KSP_x64.exe</code> (or Scan), Register install path, then reopen New session. Without a profile,
-            Launch and live play stay off (fixture/demo telemetry only).
+            <code>KSP_x64.exe</code> (or Scan), Register install path, then reopen New session. Without a
+            profile, Launch and live play stay off (fixture/demo telemetry only).
           </Alert>
         )}
         <FormControlLabel

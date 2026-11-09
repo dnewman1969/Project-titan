@@ -11,7 +11,7 @@ import { LearnFeedbackStrip } from "../../src/renderer/features/learn/LearnFeedb
 import { setActiveSession } from "../../src/renderer/features/sessions/sessionsSlice";
 
 const BOARD =
-  "funds 25000, science 12. Offered: Reach 11,000 m [AltitudeRecord] — Reach an altitude of 11,000 m (open), completion 22000 funds | Test the Mk16 Parachute [PartTest] — Test the Mk16 Parachute while flying (open); Land and recover (open), 2 science. Active: Reach 11,000 m [AltitudeRecord] — Reach an altitude of 11,000 m (done), completion 22000 funds.";
+  'Career (funds 12000, science 8, reputation 5). Offered: Reach an altitude of 5,000m [AltitudeRecord] — Reach an altitude of 5,000m (open), advance 1000 funds, completion 5000 funds, 2 science, 1 reputation | Test the LV-T30 "Reliant" Liquid Fuel Engine while landed at Kerbin [PartTest] — Test the LV-T30 "Reliant" Liquid Fuel Engine while landed at Kerbin (open), advance 1000 funds, completion 5000 funds, 2 science, 1 reputation. Active: Reach an altitude of 5,000m [AltitudeRecord] — Reach an altitude of 5,000m (done), advance 1000 funds, completion 5000 funds, 2 science, 1 reputation.';
 
 const CAREER_ENTRIES: BoardEntry[] = [
   {
@@ -23,10 +23,10 @@ const CAREER_ENTRIES: BoardEntry[] = [
     section: "lessons",
     key: "career.accept.reach-11000",
     value: {
-      text: "Accepted 'Reach 11,000 m' because the vessel can climb that high, and the steps are climb to 11,000 m.",
+      text: "Accepted 'Reach an altitude of 5,000m' because the vessel can climb that high, and the steps are climb to 5,000 m.",
       ok: true,
-      contract_key: "altituderecord|reach 11000 m",
-      contract_title: "Reach 11,000 m",
+      contract_key: "altituderecord|reach an altitude of 5000m",
+      contract_title: "Reach an altitude of 5,000m",
       contract_type: "AltitudeRecord",
       action_id: "ksp.contract.accept",
     },
@@ -35,8 +35,8 @@ const CAREER_ENTRIES: BoardEntry[] = [
     section: "goals",
     key: "career.current",
     value: {
-      text: "Reach 11,000 m: climb to 11,000 m",
-      contract_key: "altituderecord|reach 11000 m",
+      text: "Reach an altitude of 5,000m: climb to 5,000 m",
+      contract_key: "altituderecord|reach an altitude of 5000m",
     },
   },
   {
@@ -115,17 +115,21 @@ function renderBoard(entries: BoardEntry[], emptyMessage = "No contracts yet.") 
 describe("contract board", () => {
   it("reads offered contracts, the accepted one, its goal and parameters, and a miss", () => {
     const model = renderBoard(CAREER_ENTRIES);
-    expect(model.economy).toBe("Funds 25000 · Science 12");
-    expect(model.offered.map((row) => row.title)).toEqual(["Reach 11,000 m", "Test the Mk16 Parachute"]);
-    expect(model.offered[1]?.parameters.map((row) => row.label)).toEqual([
-      "Test the Mk16 Parachute while flying",
-      "Land and recover",
+    expect(model.economy).toBe("Career · Funds 12000 · Science 8 · Reputation 5");
+    expect(model.offered.map((row) => row.title)).toEqual([
+      "Reach an altitude of 5,000m",
+      'Test the LV-T30 "Reliant" Liquid Fuel Engine while landed at Kerbin',
     ]);
-    expect(model.offered[1]?.reward).toBe("2 science");
-    expect(model.accepted?.title).toBe("Reach 11,000 m");
-    expect(model.accepted?.goals).toEqual(["Reach 11,000 m: climb to 11,000 m"]);
+    expect(model.offered[1]?.parameters.map((row) => row.label)).toEqual([
+      'Test the LV-T30 "Reliant" Liquid Fuel Engine while landed at Kerbin',
+    ]);
+    expect(model.offered[1]?.reward).toBe(
+      "advance 1000 funds, completion 5000 funds, 2 science, 1 reputation",
+    );
+    expect(model.accepted?.title).toBe("Reach an altitude of 5,000m");
+    expect(model.accepted?.goals).toEqual(["Reach an altitude of 5,000m: climb to 5,000 m"]);
     expect(model.accepted?.parameters).toEqual([
-      { label: "Reach an altitude of 11,000 m", state: "done", optional: false },
+      { label: "Reach an altitude of 5,000m", state: "done", optional: false },
     ]);
     expect(model.misses[0]?.lesson).toBe(
       "Test the Mk16 Parachute will not be accepted again. Out of fuel at 800 m with the parachute test still open.",
@@ -139,8 +143,11 @@ describe("contract board", () => {
     expect(board).toHaveTextContent("Lessons from misses");
     expect(board).toHaveTextContent("Altitude record");
     expect(board).toHaveTextContent("Part test");
-    expect(board).toHaveTextContent("climb to 11,000 m");
-    expect(board).toHaveTextContent("Reward: completion 22000 funds");
+    expect(board).toHaveTextContent("climb to 5,000 m");
+    expect(board).toHaveTextContent("Reliant");
+    expect(board).toHaveTextContent(
+      "Reward: advance 1000 funds, completion 5000 funds, 2 science, 1 reputation",
+    );
     expect(board).toHaveTextContent("will not be accepted again");
     expect(board).not.toHaveTextContent("Waiting for discoveries");
     expect(board.textContent).not.toMatch(/ksp\.|career\.|contract key|`|stub/i);
@@ -251,7 +258,7 @@ describe("Operations Center contract strip", () => {
     );
     expect(await screen.findByRole("heading", { name: "Accepted" })).toBeInTheDocument();
     const region = screen.getByLabelText("Contracts");
-    expect(region).toHaveTextContent("Reach 11,000 m");
+    expect(region).toHaveTextContent("Reach an altitude of 5,000m");
     expect(region).toHaveTextContent("Lessons from misses");
     expect(region).toHaveTextContent("will not be accepted again");
     expect(region.textContent).not.toMatch(/ksp\.|career\.|contract key|`/);

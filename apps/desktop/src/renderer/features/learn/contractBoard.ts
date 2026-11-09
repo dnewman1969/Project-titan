@@ -425,15 +425,24 @@ function missLesson(text: string, title: string | null): MissLesson {
 function plainEconomy(raw: string): string | null {
   const trimmed = raw.trim().replace(/\.+$/, "").trim();
   if (!trimmed) return null;
+  const wrapped = /^([A-Za-z][A-Za-z ]*)\s*\((.*)\)\s*$/.exec(trimmed);
+  if (wrapped?.[1] && wrapped[2]) {
+    const bits = wrapped[2]
+      .split(",")
+      .map((part) => capitalize(part.trim()))
+      .filter((part) => part.length > 0);
+    return [wrapped[1].trim(), ...bits].join(" · ");
+  }
   return trimmed
     .split(",")
-    .map((part) => {
-      const bit = part.trim();
-      if (!bit) return "";
-      return `${bit.charAt(0).toUpperCase()}${bit.slice(1)}`;
-    })
+    .map((part) => capitalize(part.trim()))
     .filter((part) => part.length > 0)
     .join(" · ");
+}
+
+function capitalize(text: string): string {
+  if (!text) return "";
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 }
 
 function stripCodes(text: string): string {

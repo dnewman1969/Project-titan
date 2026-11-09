@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite
 
 import type { KillSwitchEvent, SupervisorUpdate, TitanBridge } from "../../src/shared/ipc";
 import { App } from "../../src/renderer/app/App";
+import { markFirstRunComplete } from "../../src/renderer/features/first-run/FirstRunWizard";
 import { makeStore } from "../../src/renderer/app/store";
 import { gridTemplate } from "../../src/renderer/features/operations/OperationsCenter";
 import { formatMetrics } from "../../src/renderer/features/telemetry/TelemetryBar";
@@ -187,6 +188,7 @@ let shell: FakeBridge;
 let fetchMock: Mock<(input: Request) => Promise<Response>>;
 
 beforeEach(() => {
+  markFirstRunComplete();
   shell = fakeBridge();
   window.titan = shell.bridge;
   FakeWebSocket.instances = [];

@@ -122,6 +122,10 @@ disallow_any_generics = false
 module = ["sentence_transformers"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["websockets", "websockets.*"]
+ignore_missing_imports = true
+
 [tool.pydantic-mypy]
 init_forbid_extra = true
 init_typed = true

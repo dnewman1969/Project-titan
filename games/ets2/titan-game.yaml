@@ -1,0 +1,38 @@
+id: ets2
+name: Euro Truck Simulator 2
+adapter: titan_game_scs.adapter:ScsAdapter
+adapter_version: 1.0.0
+domain: ground_vehicle
+genre: [simulation, driving]
+detection:
+  steam_app_ids: [227300]
+  epic_catalog_ids: []
+  gog_product_ids: []
+  executables: ["bin/win_x64/eurotrucks2.exe"]
+  registry_keys: []
+launch:
+  steam_uri: "steam://rungameid/227300"
+  args: []
+telemetry:
+  provider: scs_shared_memory
+  requires_plugin: true
+  plugin:
+    name: scs-sdk-plugin
+    version: "1.12.1"
+    install_to: "bin/win_x64/plugins/scs-telemetry.dll"
+    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+  native_rate_hz: 20
+capabilities:
+  telemetry: true
+  control: none
+  anti_cheat: false
+  multiplayer_modes: [convoy]
+config_files:
+  - path: "%USERPROFILE%/Documents/Euro Truck Simulator 2/profiles/*/controls.sii"
+    kind: controls
+    parser: scs_sii
+save_files: ["%USERPROFILE%/Documents/Euro Truck Simulator 2/profiles/*/save/**"]
+event_rules: events.yaml
+teams: teams/
+controls_default: controls_default.yaml
+fixtures: fixtures/

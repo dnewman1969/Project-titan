@@ -8,11 +8,13 @@ from contextlib import asynccontextmanager
 import redis.asyncio as aioredis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from titan_api import API_PREFIX
 from titan_api.auth import launch_token_from_env
 from titan_api.errors import install_error_handlers
-from titan_api.routers import safety, system
+from titan_api.persister import StreamPersister
+from titan_api.routers import safety, settings, system
 from titan_api.safety import SafetyController
 from titan_api.supervisor_client import SupervisorProbe, supervisor_probe
 from titan_api.ws import router as ws_router
@@ -22,6 +24,7 @@ from titan_core.health import Check, check_chroma, check_obs, check_ollama, chec
 from titan_core.logging import get_logger
 from titan_core.protocol.system import DependencyState
 from titan_core.streams import redis_client
+from titan_db.session import create_engine, create_session_factory
 
 log = get_logger(__name__)
 
@@ -57,18 +60,44 @@ def create_app(
     checks: Mapping[str, Check] | None = None,
     supervisor: SupervisorProbe | None = None,
     redis: aioredis.Redis | None = None,
+    engine: AsyncEngine | None = None,
+    session_factory: async_sessionmaker[AsyncSession] | None = None,
+    start_persister: bool = True,
+    enable_database: bool = True,
 ) -> FastAPI:
     cfg = config if config is not None else load_config()
     token = launch_token if launch_token is not None else launch_token_from_env()
     client = redis if redis is not None else redis_client(cfg.redis)
     controller = SafetyController(client)
 
+    owns_engine = enable_database and engine is None
+    db_engine: AsyncEngine | None
+    session_maker: async_sessionmaker[AsyncSession] | None
+    if session_factory is not None:
+        db_engine = engine
+        session_maker = session_factory
+    elif enable_database:
+        db_engine = engine if engine is not None else create_engine(cfg.postgres)
+        session_maker = create_session_factory(db_engine)
+    else:
+        db_engine = None
+        session_maker = None
+    persister = (
+        StreamPersister(client, session_maker) if start_persister and session_maker is not None else None
+    )
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await controller.load()
+        if persister is not None:
+            await persister.start()
         log.info("api_started", host=cfg.api.host, port=cfg.api.port)
         yield
+        if persister is not None:
+            await persister.stop()
         await controller.drain()
+        if owns_engine and db_engine is not None:
+            await db_engine.dispose()
         if redis is None:
             await client.aclose()
         log.info("api_stopped")
@@ -90,6 +119,9 @@ def create_app(
     )
     app.state.redis = client
     app.state.safety = controller
+    app.state.engine = db_engine
+    app.state.session_factory = session_maker
+    app.state.persister = persister
 
     # The renderer runs on a different origin. Auth is the bearer token, never cookies.
     app.add_middleware(
@@ -104,5 +136,6 @@ def create_app(
     app.include_router(system.public, prefix=API_PREFIX)
     app.include_router(system.router, prefix=API_PREFIX)
     app.include_router(safety.router, prefix=API_PREFIX)
+    app.include_router(settings.router, prefix=API_PREFIX)
     app.include_router(ws_router, prefix=API_PREFIX)
     return app

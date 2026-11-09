@@ -1,0 +1,35 @@
+id: ksp
+name: Kerbal Space Program
+adapter: titan_game_ksp.adapter:KspAdapter
+adapter_version: 1.0.0
+domain: space
+genre: [simulation, space]
+detection:
+  steam_app_ids: [2202000, 97000]
+  epic_catalog_ids: []
+  gog_product_ids: []
+  executables: ["KSP_x64.exe", "KSP.exe"]
+  registry_keys: []
+launch:
+  steam_uri: "steam://rungameid/2202000"
+  args: []
+telemetry:
+  provider: krpc
+  requires_plugin: true
+  plugin:
+    name: kRPC
+    version: "0.5.3"
+    install_to: "GameData/kRPC"
+    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+  native_rate_hz: 20
+capabilities:
+  telemetry: true
+  control: none
+  anti_cheat: false
+  multiplayer_modes: []
+config_files: []
+save_files: []
+event_rules: events.yaml
+teams: teams/
+controls_default: controls_default.yaml
+fixtures: fixtures/

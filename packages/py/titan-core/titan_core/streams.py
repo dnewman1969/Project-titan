@@ -14,6 +14,12 @@ from pydantic import BaseModel
 from titan_core.config import RedisConfig
 from titan_core.secrets import resolve_secret
 
+SESSION_STREAM_PREFIX = "titan:s:"
+PERSIST_GROUP = "persist"
+PERSIST_CONSUMER = "api"
+BUS_TAIL = ":bus"
+EVENTS_TAIL = ":events"
+
 SYS_METRICS = "titan:sys:metrics"
 SYS_METRICS_MAXLEN = 3600
 SAFETY_STATE = "titan:safety:state"
@@ -49,6 +55,22 @@ def entry_data(fields: Mapping[Any, Any]) -> str:
     if not isinstance(value, str):
         raise ValueError(f"stream entry has no {DATA_FIELD!r} field")
     return value
+
+
+def session_bus_stream(session_id: str) -> str:
+    return f"{SESSION_STREAM_PREFIX}{session_id}{BUS_TAIL}"
+
+
+def session_events_stream(session_id: str) -> str:
+    return f"{SESSION_STREAM_PREFIX}{session_id}{EVENTS_TAIL}"
+
+
+def parse_session_stream(stream: str, *, tail: str) -> str | None:
+    prefix = SESSION_STREAM_PREFIX
+    if not stream.startswith(prefix) or not stream.endswith(tail):
+        return None
+    body = stream[len(prefix) : -len(tail)]
+    return body or None
 
 
 async def latest_entry(client: aioredis.Redis, stream: str) -> tuple[str, str] | None:

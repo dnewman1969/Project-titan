@@ -31,7 +31,15 @@ def server() -> fakeredis.FakeServer:
 
 def make_client(server: fakeredis.FakeServer) -> TestClient:
     redis = fakeredis.FakeAsyncRedis(server=server, decode_responses=True)
-    app = create_app(TitanConfig(), launch_token=TOKEN, checks={}, supervisor=no_supervisor, redis=redis)
+    app = create_app(
+        TitanConfig(),
+        launch_token=TOKEN,
+        checks={},
+        supervisor=no_supervisor,
+        redis=redis,
+        start_persister=False,
+        enable_database=False,
+    )
     return TestClient(app)
 
 

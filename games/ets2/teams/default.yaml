@@ -1,0 +1,34 @@
+name: Haulage Crew
+purpose: Default ETS2 crew template (shared SCS adapter).
+template_slug: ets2.default
+agents:
+  - role: director
+    persona_slug: scs.director.rosa
+    is_director: true
+    tick_interval_ms: 15000
+    event_subscriptions: [scs.job.*, vehicle.collision]
+    topics: [job status, priorities]
+  - role: driver_coach
+    persona_slug: scs.driver_coach.max
+    tick_interval_ms: 10000
+    event_subscriptions: [vehicle.speeding, vehicle.collision, scs.player.fined]
+    topics: [driving, road rules, traffic]
+  - role: route_planner
+    persona_slug: scs.route_planner.ingrid
+    tick_interval_ms: 12000
+    event_subscriptions: [scs.job.started, vehicle.fuel_low, scs.ferry, scs.train]
+    topics: [route, ETA, fuel stops]
+  - role: economy_manager
+    persona_slug: scs.economy_manager.penny
+    tick_interval_ms: 12000
+    event_subscriptions:
+      - scs.job.delivered
+      - scs.player.fined
+      - scs.player.refuel
+      - vehicle.cargo_damage
+    topics: [income, costs, fines]
+  - role: maintenance
+    persona_slug: scs.maintenance.wrench
+    tick_interval_ms: 20000
+    event_subscriptions: [vehicle.collision, vehicle.cargo_damage]
+    topics: [wear, damage, repairs]

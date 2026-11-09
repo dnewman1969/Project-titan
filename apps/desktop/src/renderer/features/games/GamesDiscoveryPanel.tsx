@@ -49,8 +49,7 @@ export function GamesDiscoveryPanel() {
     if ("data" in result && result.data) {
       const detected = Array.isArray(result.data.detected) ? result.data.detected : [];
       setLastDetected(detected);
-      const ctx = result.data.scan_context as
-        { steam_libraries?: string[]; extra_paths?: string[] } | undefined;
+      const ctx = result.data.scan_context;
       const steamRoots = ctx?.steam_libraries?.length ?? 0;
       const notice =
         detected.length > 0

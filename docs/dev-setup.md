@@ -33,6 +33,10 @@ pnpm test               # Vitest + pytest
 pnpm lint               # ruff, mypy, import boundaries, eslint, prettier, tsc
 ```
 
+On a day-to-day Windows gaming PC (not full dev clone workflow), **`Update-Titan.bat`** pulls
+`origin/main`, explains dirty-tree and pull failures, refreshes `pnpm`/`uv` only when lockfiles
+change, then runs **`Start-Titan.bat`**.
+
 `pnpm test` passes without any services: database and service tests skip when nothing is listening.
 Set `TITAN_REQUIRE_POSTGRES=1` and `TITAN_REQUIRE_SERVICES=1` to make them fail instead, as CI does.
 `TITAN_REQUIRE_SUPERVISOR_E2E=1` also runs the M1 acceptance test

@@ -203,6 +203,8 @@ Ensure-Pnpm
 Ensure-Uv
 
 $env:TITAN__REDIS__PASSWORD = if ($env:TITAN__REDIS__PASSWORD) { $env:TITAN__REDIS__PASSWORD } else { "titan-dev" }
+$RedisWinVersion = "5.0.14.1"
+$RedisWinSha256 = "018ea18a35876383cbb5f4cd0258adfc87747cf9d619bce1cf73a2e36f720ccf"
 
 function Test-RedisUp() {
     try {
@@ -215,23 +217,135 @@ function Test-RedisUp() {
     }
 }
 
-if (-not (Test-RedisUp)) {
-    if (Test-Command docker) {
-        Write-Host "Starting Redis via Docker (one container only)..." -ForegroundColor Yellow
-        docker compose up -d redis --wait 2>&1 | Out-Host
-        if (-not (Test-RedisUp)) {
-            Show-Error "Redis still not reachable on 127.0.0.1:63790.`nInstall Memurai Developer (port 63790, password titan-dev) or fix Docker."
-        }
-    } else {
-        Show-Error @"
-Redis is required on 127.0.0.1:63790 with password '$($env:TITAN__REDIS__PASSWORD)'.
+function Wait-RedisUp {
+    param([int]$Seconds = 45)
+    for ($i = 0; $i -lt $Seconds; $i++) {
+        if (Test-RedisUp) { return $true }
+        Start-Sleep -Seconds 1
+    }
+    return $false
+}
 
-Option A — Memurai Developer: https://www.memurai.com/get-memurai
-Option B — Docker Desktop, then run this script again (Redis container starts automatically).
-Docker is NOT required for Postgres/Chroma (those are portable/managed).
-"@
+function Get-PortableRedisDir {
+    $cacheRoot = Join-Path $RepoRoot "third_party\cache\redis-win"
+    if (-not (Test-Path $cacheRoot)) { return $null }
+    $exe = Get-ChildItem -Path $cacheRoot -Filter redis-server.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($exe) { return $exe.DirectoryName }
+    return $null
+}
+
+function Start-PortableRedis {
+    $binDir = Get-PortableRedisDir
+    if (-not $binDir) {
+        Write-Host "Downloading portable Redis for Windows (one-time, ~12 MB)..." -ForegroundColor Cyan
+        $cacheParent = Join-Path $RepoRoot "third_party\cache"
+        if (-not (Test-Path $cacheParent)) {
+            New-Item -ItemType Directory -Force -Path $cacheParent | Out-Null
+        }
+        $zipPath = Join-Path $cacheParent "Redis-x64-$RedisWinVersion.zip"
+        $extractRoot = Join-Path $cacheParent "redis-win"
+        try {
+            $uri = "https://github.com/tporadowski/redis/releases/download/v$RedisWinVersion/Redis-x64-$RedisWinVersion.zip"
+            Invoke-WebRequest -Uri $uri -OutFile $zipPath -UseBasicParsing
+            if ((Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $RedisWinSha256) {
+                Write-Host "Portable Redis zip hash mismatch." -ForegroundColor DarkYellow
+                return $false
+            }
+            if (Test-Path $extractRoot) {
+                Remove-Item $extractRoot -Recurse -Force -ErrorAction SilentlyContinue
+            }
+            Expand-Archive -Path $zipPath -DestinationPath $extractRoot -Force
+        } catch {
+            Write-Host "Portable Redis download failed: $_" -ForegroundColor DarkYellow
+            return $false
+        }
+        $binDir = Get-PortableRedisDir
+        if (-not $binDir) { return $false }
+    }
+
+    $server = Join-Path $binDir "redis-server.exe"
+    $cli = Join-Path $binDir "redis-cli.exe"
+    $pass = $env:TITAN__REDIS__PASSWORD
+    Write-Host "Starting portable Redis on 127.0.0.1:63790..." -ForegroundColor Yellow
+    Start-Process -FilePath $server -WindowStyle Hidden -ArgumentList @(
+        "--port", "63790",
+        "--bind", "127.0.0.1",
+        "--requirepass", $pass
+    ) | Out-Null
+    for ($i = 0; $i -lt 30; $i++) {
+        if (Test-Path $cli) {
+            $pong = & $cli -p 63790 -a $pass --no-auth-warning ping 2>$null
+            if ($pong -eq "PONG") { return $true }
+        } elseif (Test-RedisUp) {
+            return $true
+        }
+        Start-Sleep -Seconds 1
+    }
+    return (Test-RedisUp)
+}
+
+function Test-DockerDaemon {
+    if (-not (Test-Command docker)) { return $false }
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & docker info 2>$null | Out-Null
+        return ($LASTEXITCODE -eq 0)
+    } finally {
+        $ErrorActionPreference = $prev
     }
 }
+
+function Start-DockerDesktopIfPresent {
+    if (Test-DockerDaemon) { return $true }
+    $desktop = @(
+        (Join-Path ${env:ProgramFiles} "Docker\Docker\Docker Desktop.exe"),
+        (Join-Path ${env:ProgramFiles(x86)} "Docker\Docker\Docker Desktop.exe")
+    ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+    if (-not $desktop) {
+        return (Test-Command docker)
+    }
+    Write-Host "Starting Docker Desktop (first launch may take 1-2 minutes)..." -ForegroundColor Yellow
+    Start-Process -FilePath $desktop | Out-Null
+    $deadline = (Get-Date).AddMinutes(4)
+    while ((Get-Date) -lt $deadline) {
+        Start-Sleep -Seconds 4
+        if (Test-DockerDaemon) { return $true }
+    }
+    return $false
+}
+
+function Start-RedisViaDocker {
+    if (-not (Test-Command docker)) { return $false }
+    if (-not (Start-DockerDesktopIfPresent)) {
+        Write-Host "Docker CLI found but engine not reachable." -ForegroundColor DarkYellow
+        return $false
+    }
+    Write-Host "Starting Redis via Docker Compose (redis service only)..." -ForegroundColor Yellow
+    Push-Location $RepoRoot
+    try {
+        Invoke-External docker compose up -d redis --wait | Out-Null
+    } finally {
+        Pop-Location
+    }
+    return (Wait-RedisUp)
+}
+
+function Ensure-Redis {
+    if (Test-RedisUp) { return }
+    Write-Host "Redis not listening on 127.0.0.1:63790; starting automatically..." -ForegroundColor Cyan
+    if (Start-PortableRedis) { return }
+    if (Start-RedisViaDocker) { return }
+    Show-Error @"
+Could not start Redis on 127.0.0.1:63790 (password: $($env:TITAN__REDIS__PASSWORD)).
+
+Start-Titan tried portable Redis and Docker. Check firewall/proxy, install Docker Desktop, or run your own Redis on port 63790 with that password.
+Optional always-on service: Memurai Developer — https://www.memurai.com/get-memurai (bind 127.0.0.1:63790, requirepass $($env:TITAN__REDIS__PASSWORD)).
+Postgres/Chroma are still managed by Titan without Docker.
+"@
+}
+
+Ensure-Redis
 
 $pgCtl = Join-Path $RepoRoot "third_party\cache\postgresql\pgsql\bin\pg_ctl.exe"
 if (-not (Test-Path $pgCtl)) {

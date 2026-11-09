@@ -51,7 +51,7 @@ export function GamesDiscoveryPanel() {
     }
     const msg = formatApiError(result.error);
     dispatch(showNotice(`Game scan failed: ${msg}`));
-    dispatch(logEvent({ type: "games.scan_failed", category: "system", severity: "error", text: msg }));
+    dispatch(logEvent({ type: "games.scan_failed", category: "system", severity: "critical", text: msg }));
   };
 
   const onBrowseExecutable = async () => {
@@ -76,7 +76,7 @@ export function GamesDiscoveryPanel() {
     }
     const msg = formatApiError(result.error);
     dispatch(showNotice(`Register install failed: ${msg}`));
-    dispatch(logEvent({ type: "games.register_failed", category: "system", severity: "error", text: msg }));
+    dispatch(logEvent({ type: "games.register_failed", category: "system", severity: "critical", text: msg }));
   };
 
   return (

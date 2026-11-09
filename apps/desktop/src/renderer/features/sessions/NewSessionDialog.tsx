@@ -113,8 +113,8 @@ export function NewSessionDialog() {
       dispatch(
         logEvent({
           type: "session.start_failed",
-          category: "session",
-          severity: "error",
+          category: "system",
+          severity: "critical",
           text: startMsg,
         }),
       );
@@ -135,8 +135,8 @@ export function NewSessionDialog() {
     dispatch(
       logEvent({
         type: "session.create_failed",
-        category: "session",
-        severity: "error",
+        category: "system",
+        severity: "critical",
         text: createMsg,
       }),
     );

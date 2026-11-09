@@ -58,20 +58,28 @@ export function formatApiError(error: unknown): string {
       if (typeof err === "string") {
         return `Invalid API response: ${err}`;
       }
-      if (isRecord(err) && typeof err.message === "string") {
-        return `Invalid API response: ${err.message}`;
+      if (
+        typeof err === "object" &&
+        err !== null &&
+        "message" in err &&
+        typeof (err as { message: unknown }).message === "string"
+      ) {
+        return `Invalid API response: ${(err as { message: string }).message}`;
       }
       return "Invalid API response (schema parse failed)";
     }
     if (typeof error.status === "number") {
       const detail = detailFromData(error.data);
       if (detail) {
-        return `HTTP ${error.status}: ${detail}`;
+        return `HTTP ${String(error.status)}: ${detail}`;
       }
-      if (typeof error.error === "string") {
-        return `HTTP ${error.status}: ${error.error}`;
+      if ("error" in error) {
+        const errField = (error as { error?: unknown }).error;
+        if (typeof errField === "string") {
+          return `HTTP ${String(error.status)}: ${errField}`;
+        }
       }
-      return `HTTP ${error.status}`;
+      return `HTTP ${String(error.status)}`;
     }
   }
   if ("message" in error && typeof error.message === "string") {

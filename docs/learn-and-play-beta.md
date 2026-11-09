@@ -25,10 +25,10 @@ $env:TITAN_PLAY_BACKEND = "hil"
 pnpm dev
 ```
 
-Or run the integration test:
+Or run the cloud learn→play smoke (New session → learn → HIL play → feedback):
 
 ```powershell
-uv run pytest tests/integration/test_play_hil_loop.py
+uv run pytest tests/integration/test_learn_play_smoke.py
 ```
 
 HIL does **not** touch the game; it updates in-memory state and optional `hil.ndjson` (see `services/actions/README.md`).

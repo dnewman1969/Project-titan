@@ -16,8 +16,13 @@ from titan_api.deps import db_session
 from titan_api.recording_ops import recording_json, start_session_recording
 from titan_core.clock import utc_now
 from titan_core.errors import ErrorCode, TitanError
-from titan_core.obs_ws import ObsClient
-from titan_core.recording_manifest import append_timeline_event, read_timeline_events
+from titan_core.obs_ws import make_obs_client
+from titan_core.recording_manifest import (
+    append_timeline_event,
+    read_manifest,
+    read_timeline_events,
+    write_manifest,
+)
 from titan_db.models.recording import Recording
 from titan_db.models.sessions import Session
 
@@ -89,11 +94,13 @@ async def stop_recording(session_id: UUID, db: AsyncSession = SessionDep) -> dic
         raise TitanError(ErrorCode.NOT_FOUND, "no active recording")
     row.state = "stopping"
     obs_error: str | None = None
+    obs_stopped = False
     try:
-        client = ObsClient()
+        client = make_obs_client()
         await client.connect()
         try:
             await client.stop_recording()
+            obs_stopped = True
         finally:
             await client.close()
     except (OSError, RuntimeError) as exc:
@@ -105,6 +112,25 @@ async def stop_recording(session_id: UUID, db: AsyncSession = SessionDep) -> dic
         row.duration_ms = int(delta.total_seconds() * 1000)
     if obs_error and row.error is None:
         row.error = obs_error
+    if row.manifest_path:
+        manifest = await asyncio.to_thread(read_manifest, Path(row.manifest_path))
+        if manifest is not None:
+            obs_block = manifest.get("obs")
+            if not isinstance(obs_block, dict):
+                obs_block = {"connected": obs_stopped, "status": {}}
+                manifest["obs"] = obs_block
+            status = obs_block.get("status")
+            if not isinstance(status, dict):
+                status = {}
+                obs_block["status"] = status
+            status["active"] = False
+            status["stopped"] = True
+            if obs_error:
+                status["stop_error"] = obs_error
+            else:
+                status.pop("stop_error", None)
+            obs_block["connected"] = obs_stopped or bool(obs_block.get("connected"))
+            await asyncio.to_thread(write_manifest, Path(row.manifest_path), manifest)
     if row.root_dir:
         await asyncio.to_thread(
             append_timeline_event,
@@ -114,6 +140,8 @@ async def stop_recording(session_id: UUID, db: AsyncSession = SessionDep) -> dic
                 "kind": "recording.stop",
                 "recording_id": str(row.id),
                 "duration_ms": row.duration_ms,
+                "obs_stopped": obs_stopped,
+                "obs_error": obs_error,
             },
         )
     await db.flush()

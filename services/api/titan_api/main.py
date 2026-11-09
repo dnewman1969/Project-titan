@@ -67,7 +67,10 @@ def dependency_checks(cfg: TitanConfig) -> dict[str, Check]:
     async def chroma() -> DependencyState:
         return await check_chroma(cfg.chroma)
 
-    return {"postgres": postgres, "redis": redis, "chroma": chroma, "ollama": check_ollama, "obs": check_obs}
+    async def obs() -> DependencyState:
+        return await check_obs(cfg.obs.host, cfg.obs.port)
+
+    return {"postgres": postgres, "redis": redis, "chroma": chroma, "ollama": check_ollama, "obs": obs}
 
 
 def create_app(

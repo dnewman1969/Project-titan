@@ -196,13 +196,14 @@ def test_recording_start_with_fake_obs(
         async def get_version(self) -> dict[str, Any]:
             return {"obsVersion": "30.0.0"}
 
-    monkeypatch.setattr("titan_api.recording_ops.ObsClient", _FakeObs)
-    monkeypatch.setattr("titan_api.routers.recordings.ObsClient", _FakeObs)
+    monkeypatch.setattr("titan_api.recording_ops.make_obs_client", lambda: _FakeObs())
+    monkeypatch.setattr("titan_api.routers.recordings.make_obs_client", lambda: _FakeObs())
     sid = _live_session(api_client, game_slug)
     started = api_client.post(f"/api/v1/sessions/{sid}/recordings/start", headers=AUTH)
     assert started.status_code == 201, started.text
     body = started.json()
     assert body["obs"]["connected"] is True
+    assert body["obs"]["status"]["active"] is True
     assert body["tracks"][0]["source"] == "obs"
     assert "video.stub" not in {
         ev.get("kind")
@@ -210,3 +211,10 @@ def test_recording_start_with_fake_obs(
     }
     stopped = api_client.post(f"/api/v1/sessions/{sid}/recordings/stop", headers=AUTH)
     assert stopped.status_code == 200, stopped.text
+    stop_body = stopped.json()
+    assert stop_body["obs"]["status"]["stopped"] is True
+    assert stop_body["obs"]["status"]["active"] is False
+    timeline = api_client.get(f"/api/v1/sessions/{sid}/recordings/timeline", headers=AUTH).json()
+    assert any(
+        ev.get("kind") == "recording.stop" and ev.get("obs_stopped") is True for ev in timeline["events"]
+    )

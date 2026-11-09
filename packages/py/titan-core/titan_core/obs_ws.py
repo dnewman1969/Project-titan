@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import uuid
 from dataclasses import dataclass
@@ -12,6 +14,7 @@ from websockets.asyncio.client import connect as ws_connect
 
 from titan_core.http import local_client
 
+OP_HELLO = 0
 OP_IDENTIFY = 1
 OP_IDENTIFIED = 2
 OP_REQUEST = 6
@@ -19,6 +22,12 @@ OP_REQUEST_RESPONSE = 7
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 4455
+
+
+def obs_auth_string(password: str, salt: str, challenge: str) -> str:
+    """obs-websocket v5 authentication string (base64 SHA-256 chain)."""
+    secret = base64.b64encode(hashlib.sha256((password + salt).encode("utf-8")).digest())
+    return base64.b64encode(hashlib.sha256(secret + challenge.encode("utf-8")).digest()).decode("ascii")
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,10 +61,23 @@ class ObsClient:
     async def connect(self) -> None:
         self._ws = await ws_connect(self.ws_url, open_timeout=self.timeout_s)
         hello = await self._recv()
-        if hello.get("op") != 0:
+        if hello.get("op") != OP_HELLO:
             msg = "expected obs-websocket Hello"
             raise RuntimeError(msg)
-        await self._send({"op": OP_IDENTIFY, "d": {"rpcVersion": 1, "authentication": self.password}})
+        hello_d = hello.get("d")
+        auth_info = hello_d.get("authentication") if isinstance(hello_d, dict) else None
+        identify_d: dict[str, Any] = {"rpcVersion": 1}
+        if isinstance(auth_info, dict):
+            if not self.password:
+                msg = "OBS websocket authentication required; set TITAN__OBS__PASSWORD"
+                raise RuntimeError(msg)
+            salt = auth_info.get("salt")
+            challenge = auth_info.get("challenge")
+            if not isinstance(salt, str) or not isinstance(challenge, str):
+                msg = "OBS Hello authentication missing salt/challenge"
+                raise RuntimeError(msg)
+            identify_d["authentication"] = obs_auth_string(self.password, salt, challenge)
+        await self._send({"op": OP_IDENTIFY, "d": identify_d})
         identified = await self._recv()
         if identified.get("op") != OP_IDENTIFIED:
             msg = "obs-websocket did not accept Identify"
@@ -138,3 +160,12 @@ class ObsClient:
             raise RuntimeError(msg)
         body = json.loads(raw)
         return body if isinstance(body, dict) else {}
+
+
+def make_obs_client() -> ObsClient:
+    """Build a client from TitanConfig.obs (host/port/password via yaml + TITAN__OBS__*)."""
+    from titan_core.config import load_config
+
+    obs = load_config().obs
+    password = obs.password.get_secret_value() if obs.password is not None else ""
+    return ObsClient(host=obs.host, port=obs.port, password=password, timeout_s=obs.timeout_s)

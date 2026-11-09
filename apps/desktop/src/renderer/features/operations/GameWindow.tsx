@@ -13,6 +13,7 @@ export function GameWindow() {
   const sessionSource = useAppSelector((s) => s.sessions.sessionSource);
   const playEnabled = useAppSelector((s) => s.sessions.playEnabled);
   const playBackend = useAppSelector((s) => s.sessions.playBackend);
+  const playReady = useAppSelector((s) => s.sessions.playReady);
   const playAttachMessage = useAppSelector((s) => s.sessions.playAttachMessage);
   const activeTitle = useAppSelector((s) => s.sessions.activeTitle);
 
@@ -42,7 +43,7 @@ export function GameWindow() {
         {sessionSource ? (
           <Chip
             size="small"
-            color={live ? "success" : "default"}
+            color={live ? (playEnabled && playReady === false ? "warning" : "success") : "default"}
             label={live ? "Live install" : "Fixture telemetry"}
           />
         ) : (
@@ -63,11 +64,17 @@ export function GameWindow() {
       ) : null}
       {sessionId && live && playAttachMessage ? (
         <Alert
-          severity="success"
+          severity={playReady === false ? "warning" : "success"}
           variant="outlined"
           sx={{ position: "absolute", top: 52, left: 12, right: 12, zIndex: 1 }}
         >
-          Live install attached. {playAttachMessage}
+          {playReady === false ? (
+            <>
+              <strong>Live play waiting on game/mod.</strong> {playAttachMessage}
+            </>
+          ) : (
+            <>Live install ready. {playAttachMessage}</>
+          )}
         </Alert>
       ) : null}
       <Box sx={{ textAlign: "center", maxWidth: 420, px: 2 }}>

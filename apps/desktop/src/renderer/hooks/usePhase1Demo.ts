@@ -85,6 +85,7 @@ export function usePhase1Demo(): void {
           setActiveSession({
             id: started.data.id,
             title: started.data.title?.trim() || title,
+            gameSlug: "ksp",
             sessionSource: "fixture",
             playEnabled: true,
           }),

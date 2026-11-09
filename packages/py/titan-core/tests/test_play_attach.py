@@ -48,7 +48,9 @@ def test_probe_krpc_open_port(monkeypatch: object) -> None:
         def __exit__(self, *_a: object) -> None:
             return None
 
-    def fake_connect(*_a: object, **_k: object) -> _Sock:
+    def fake_connect(address: object, **_k: object) -> _Sock:
+        _host, port = address
+        assert port in {50000, 50001}
         return _Sock()
 
     import titan_core.play_attach as mod
@@ -57,6 +59,29 @@ def test_probe_krpc_open_port(monkeypatch: object) -> None:
     attach = probe_krpc(host="127.0.0.1", rpc_port=50000, stream_port=50001)
     assert attach.ready is True
     assert attach.backend == "krpc"
+    assert attach.detail.get("stream_reachable") is True
+
+
+def test_probe_krpc_rpc_open_stream_closed(monkeypatch: object) -> None:
+    class _Sock:
+        def __enter__(self) -> _Sock:
+            return self
+
+        def __exit__(self, *_a: object) -> None:
+            return None
+
+    def fake_connect(address: object, **_k: object) -> _Sock:
+        _host, port = address
+        if port == 50000:
+            return _Sock()
+        raise ConnectionRefusedError
+
+    import titan_core.play_attach as mod
+
+    monkeypatch.setattr(mod.socket, "create_connection", fake_connect)  # type: ignore[attr-defined]
+    attach = probe_krpc(host="127.0.0.1", rpc_port=50000, stream_port=50001)
+    assert attach.ready is False
+    assert "stream" in attach.message.lower()
 
 
 def test_probe_scs_and_keyboard_backend(monkeypatch: object) -> None:
@@ -68,13 +93,20 @@ def test_probe_scs_and_keyboard_backend(monkeypatch: object) -> None:
     assert linux.backend == "scs"
 
     monkeypatch.setattr(mod.sys, "platform", "win32")  # type: ignore[attr-defined]
+    monkeypatch.setattr(mod, "_scs_telemetry_shm_open", lambda: True)
     win = probe_scs()
     assert win.ready is True
-    assert "Windows" in win.message
+    assert "telemetry" in win.message.lower()
 
-    # Force keyboard backend branch via resolve_backend override path in probe_attach.
-    # resolve_backend never returns keyboard; exercise via probe_attach after monkeypatch.
+    monkeypatch.setattr(mod, "_scs_telemetry_shm_open", lambda: False)
+    waiting = probe_scs()
+    assert waiting.ready is False
+    assert "SCSTelemetry" in waiting.message or "scs-telemetry" in waiting.message
+
+    # resolve_backend never returns keyboard; exercise probe_attach remap after monkeypatch.
+    monkeypatch.setattr(mod.sys, "platform", "linux")  # type: ignore[attr-defined]
     monkeypatch.setattr(mod, "resolve_backend", lambda *_a, **_k: "keyboard")
     kb = probe_attach(game_slug="ets2", source="live")
     assert kb.backend == "keyboard"
-    assert kb.ready is True
+    assert kb.ready is False
+    assert "scs" in kb.message.lower() or "windows" in kb.message.lower()

@@ -213,6 +213,7 @@ export function NewSessionDialog() {
           setActiveSession({
             id: started.data.id,
             title: liveTitle,
+            gameSlug,
             recordingActive,
             recordingRootDir: recordingRoot,
             sessionSource: resolvedSource,

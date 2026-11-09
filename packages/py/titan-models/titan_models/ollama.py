@@ -164,11 +164,14 @@ class OllamaProvider:
         completion_tokens = 0
         finish: Literal["stop", "length", "tool", "error", "cancelled"] = "stop"
         try:
-            async with local_client(timeout_s=self.timeout_s) as client, client.stream(
-                "POST",
-                f"{self.base_url}/api/chat",
-                json=self._chat_body(model, messages, params, stream=True),
-            ) as response:
+            async with (
+                local_client(timeout_s=self.timeout_s) as client,
+                client.stream(
+                    "POST",
+                    f"{self.base_url}/api/chat",
+                    json=self._chat_body(model, messages, params, stream=True),
+                ) as response,
+            ):
                 response.raise_for_status()
                 async for line in response.aiter_lines():
                     if cancel is not None and cancel.is_set():
@@ -261,11 +264,14 @@ class OllamaProvider:
             return False
 
     async def pull(self, model: str) -> None:
-        async with local_client(timeout_s=self.timeout_s) as client, client.stream(
-            "POST",
-            f"{self.base_url}/api/pull",
-            json={"name": model, "stream": True},
-        ) as response:
+        async with (
+            local_client(timeout_s=self.timeout_s) as client,
+            client.stream(
+                "POST",
+                f"{self.base_url}/api/pull",
+                json={"name": model, "stream": True},
+            ) as response,
+        ):
             response.raise_for_status()
             async for line in response.aiter_lines():
                 if not line:

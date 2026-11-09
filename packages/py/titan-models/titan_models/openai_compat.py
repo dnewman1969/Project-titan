@@ -120,11 +120,14 @@ class OpenAICompatProvider:
         ttft_ms = 0
         parts: list[str] = []
         try:
-            async with local_client(timeout_s=self.timeout_s) as client, client.stream(
-                "POST",
-                f"{self.base_url}/v1/chat/completions",
-                json=self._body(model, messages, params, stream=True),
-            ) as response:
+            async with (
+                local_client(timeout_s=self.timeout_s) as client,
+                client.stream(
+                    "POST",
+                    f"{self.base_url}/v1/chat/completions",
+                    json=self._body(model, messages, params, stream=True),
+                ) as response,
+            ):
                 response.raise_for_status()
                 async for line in response.aiter_lines():
                     if cancel is not None and cancel.is_set():

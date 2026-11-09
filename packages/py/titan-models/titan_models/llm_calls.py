@@ -11,6 +11,18 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from titan_db.models.realtime import LlmCall
 from titan_models.types import ChatResult
 
+_LLM_STATUS = {
+    "stop": "ok",
+    "length": "ok",
+    "tool": "ok",
+    "error": "error",
+    "cancelled": "cancelled",
+}
+
+
+def _llm_status(finish_reason: str) -> str:
+    return _LLM_STATUS.get(finish_reason, "error")
+
 
 def make_llm_call_logger(
     session_factory: async_sessionmaker[AsyncSession],
@@ -33,7 +45,7 @@ def make_llm_call_logger(
             completion_tokens=result.completion_tokens,
             ttft_ms=result.ttft_ms,
             latency_ms=result.latency_ms,
-            status=result.finish_reason,
+            status=_llm_status(result.finish_reason),
             error=None if result.finish_reason != "error" else "provider error",
             prompt_hash=prompt_hash,
         )

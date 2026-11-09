@@ -5,11 +5,9 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from titan_core.config import load_config
-from titan_core.http import HTTPError
 from titan_core.logging import get_logger
 from titan_db.repositories.blackboard import BlackboardRepository
 from titan_memory.chroma_store import ChromaVectorStore
@@ -120,17 +118,13 @@ async def seed_prior_memories_on_blackboard(
         return 0
     store = memory_store()
     embedder = FakeEmbedder()
-    try:
-        lines = await fetch_prior_memory_lines(
-            store,
-            embedder,
-            game_slug=game_slug,
-            query=f"{game_slug} session lessons discoveries play",
-            n_results=5,
-        )
-    except (OSError, HTTPError, httpx.HTTPError) as exc:
-        log.debug("prior_memory_seed_degraded", session_id=str(session_id), error=type(exc).__name__)
-        return 0
+    lines = await fetch_prior_memory_lines(
+        store,
+        embedder,
+        game_slug=game_slug,
+        query=f"{game_slug} session lessons discoveries play",
+        n_results=5,
+    )
     if not lines:
         return 0
     for index, line in enumerate(lines):

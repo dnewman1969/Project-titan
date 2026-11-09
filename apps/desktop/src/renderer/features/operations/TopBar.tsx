@@ -9,7 +9,12 @@ import Typography from "@mui/material/Typography";
 import { MONO_FONT, StatusPill } from "@titan/ui-kit";
 import { useCallback, useEffect } from "react";
 
-import { useKillMutation, useStartRecordingMutation, useStopRecordingMutation } from "../../app/api";
+import {
+  useKillMutation,
+  useStartRecordingMutation,
+  useStopRecordingMutation,
+  useStopSessionMutation,
+} from "../../app/api";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { getTitan } from "../../app/runtime";
 import type { ApiStatus } from "../../app/useApiStatus";
@@ -24,6 +29,7 @@ import {
 export function TopBar({ status }: { status: ApiStatus }) {
   const dispatch = useAppDispatch();
   const [kill] = useKillMutation();
+  const [stopSession] = useStopSessionMutation();
   const [startRec] = useStartRecordingMutation();
   const [stopRec] = useStopRecordingMutation();
   const activeSessionId = useAppSelector((s) => s.sessions.activeSessionId);
@@ -159,8 +165,15 @@ export function TopBar({ status }: { status: ApiStatus }) {
           size="small"
           startIcon={<PowerSettingsNewIcon />}
           onClick={() => {
-            triggerKill(dispatch, { source: "button", at: new Date().toISOString() });
-            if (backend !== "none") void kill("button");
+            const at = new Date().toISOString();
+            const sid = activeSessionId;
+            triggerKill(dispatch, { source: "button", at });
+            if (backend !== "none") {
+              if (sid) {
+                void stopSession({ sessionId: sid, outcome: "aborted" });
+              }
+              void kill("button");
+            }
           }}
           sx={{ fontWeight: 800, letterSpacing: 1.5, px: 2 }}
         >

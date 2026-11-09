@@ -147,7 +147,8 @@ jobs:
   test-windows:
     name: test-windows
     runs-on: windows-latest
-    timeout-minutes: 30
+    # Hosted runners sometimes exceed 30m during frozen lockfile sync + portable Postgres bootstrap.
+    timeout-minutes: 45
     env:
       TITAN__POSTGRES__PASSWORD: titan
       TITAN_REQUIRE_POSTGRES: "1"
@@ -215,7 +216,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [lint, codegen-check, test-py-linux, test-ts, test-windows]
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup

@@ -1,3 +1,4 @@
+import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import Dialog from "@mui/material/Dialog";
@@ -7,12 +8,14 @@ import DialogTitle from "@mui/material/DialogTitle";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useCreateSessionMutation, useListGamesQuery, useStartSessionMutation } from "../../app/api";
+import { formatApiError } from "../../app/formatApiError";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
+import { logEvent } from "../events/eventsSlice";
 import { showNotice } from "../operations/layoutSlice";
-import { closeSessionDialog, setActiveSession, setRecordingActive, setRecordingRootDir } from "./sessionsSlice";
+import { closeSessionDialog, setActiveSession } from "./sessionsSlice";
 
 const FALLBACK_GAMES = [
   { slug: "ksp", label: "Kerbal Space Program" },
@@ -34,9 +37,16 @@ export function NewSessionDialog() {
   const [gameSlug, setGameSlug] = useState<string>("ksp");
   const [profileId, setProfileId] = useState<string>("");
   const [launchGame, setLaunchGame] = useState(false);
-  const [agentPlay, setAgentPlay] = useState(false);
+  const [agentPlay, setAgentPlay] = useState(true);
   const [recordOnStart, setRecordOnStart] = useState(true);
-  const { data: gamesList } = useListGamesQuery(undefined);
+  const { data: gamesList, refetch: refetchGames } = useListGamesQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+  useEffect(() => {
+    if (open) {
+      void refetchGames();
+    }
+  }, [open, refetchGames]);
   const [createSession, { isLoading: creating }] = useCreateSessionMutation();
   const [startSession, { isLoading: starting }] = useStartSessionMutation();
 
@@ -60,6 +70,9 @@ export function NewSessionDialog() {
 
   const onCreate = async () => {
     if (!game) return;
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("titan.skipAutoDemo", "1");
+    }
     const sessionTitle = title.trim() || "Observe session";
     const result = await createSession({
       game_slug: game.slug,
@@ -70,6 +83,7 @@ export function NewSessionDialog() {
         agents_enabled: true,
         ...(agentPlay ? { play_enabled: true } : {}),
         ...(recordOnStart ? { record_on_start: true } : {}),
+        demo_telemetry: !effectiveProfileId,
       },
     });
     if ("data" in result && result.data) {
@@ -78,25 +92,32 @@ export function NewSessionDialog() {
         launch_game: launchGame && Boolean(effectiveProfileId),
       });
       if ("data" in started && started.data) {
+        const dataDir = Reflect.get(started.data, "data_dir");
+        const recordingRoot =
+          recordOnStart && typeof dataDir === "string" && dataDir.length > 0 ? `${dataDir}/recording` : null;
+        const liveTitle = started.data.title?.trim() || sessionTitle;
         dispatch(
           setActiveSession({
             id: started.data.id,
-            title: started.data.title,
+            title: liveTitle,
+            recordingActive: recordOnStart,
+            recordingRootDir: recordingRoot,
           }),
         );
-        if (recordOnStart) {
-          dispatch(setRecordingActive(true));
-          const dataDir = Reflect.get(started.data, "data_dir");
-          if (typeof dataDir === "string" && dataDir.length > 0) {
-            dispatch(setRecordingRootDir(`${dataDir}/recording`));
-          }
-        }
-        dispatch(showNotice(`Live session: ${started.data.title}`));
+        dispatch(showNotice(`Live session: ${liveTitle}`));
         dispatch(closeSessionDialog());
         return;
       }
-      dispatch(showNotice(`Session created but could not start: check API logs.`));
-      dispatch(closeSessionDialog());
+      const startMsg = formatApiError(started.error);
+      dispatch(showNotice(`Session start failed: ${startMsg}`));
+      dispatch(
+        logEvent({
+          type: "session.start_failed",
+          category: "system",
+          severity: "critical",
+          text: startMsg,
+        }),
+      );
       return;
     }
     const status = rtkMutationStatus(result.error);
@@ -109,7 +130,16 @@ export function NewSessionDialog() {
       dispatch(closeSessionDialog());
       return;
     }
-    dispatch(showNotice("Could not create a session. Check the API logs and try again."));
+    const createMsg = formatApiError(result.error);
+    dispatch(showNotice(`Could not create session: ${createMsg}`));
+    dispatch(
+      logEvent({
+        type: "session.create_failed",
+        category: "system",
+        severity: "critical",
+        text: createMsg,
+      }),
+    );
   };
 
   return (
@@ -141,6 +171,7 @@ export function NewSessionDialog() {
           {games.map((g) => (
             <MenuItem key={g.slug} value={g.slug}>
               {g.label}
+              {(g.profiles?.length ?? 0) > 0 ? ` (${g.profiles?.length} install(s))` : ""}
             </MenuItem>
           ))}
         </TextField>
@@ -153,7 +184,7 @@ export function NewSessionDialog() {
               setProfileId(e.target.value);
             }}
             fullWidth
-            helperText="Use Scan installed games first if your copy is missing."
+            helperText="Registered paths work even when Scan finds nothing."
           >
             {profiles.map((p) => (
               <MenuItem key={p.id} value={p.id}>
@@ -162,10 +193,10 @@ export function NewSessionDialog() {
             ))}
           </TextField>
         ) : (
-          <FormControlLabel
-            control={<Checkbox disabled checked={false} />}
-            label="No install detected — session will use fixture/demo telemetry until you scan."
-          />
+          <Alert severity="warning" sx={{ width: "100%" }}>
+            No install for this game. Open View - Games, run Scan, or Register install path, then reopen New
+            session. Without a profile, this session uses fixture telemetry only (not live play).
+          </Alert>
         )}
         <FormControlLabel
           control={

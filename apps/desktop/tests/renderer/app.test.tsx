@@ -151,6 +151,7 @@ function fakeBridge(snapshot: SupervisorUpdate | null = null): FakeBridge {
       },
       getSupervisorStatus: () => Promise.resolve(snapshot),
       openPath: () => Promise.resolve(""),
+      pickExecutable: () => Promise.resolve(null),
       openExternal: () => Promise.resolve(),
     },
     kill: (e) => {

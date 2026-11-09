@@ -6,7 +6,19 @@ import type { ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { app, BrowserWindow, globalShortcut, ipcMain, Menu, net, protocol, session, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  globalShortcut,
+  ipcMain,
+  Menu,
+  net,
+  protocol,
+  session,
+  shell,
+  type OpenDialogOptions,
+} from "electron";
 
 import { IPC, type KillSwitchEvent, type SupervisorUpdate, type TitanRuntime } from "../shared/ipc";
 import { DOCS_URL } from "../shared/menu";
@@ -134,6 +146,25 @@ ipcMain.handle(IPC.openExternal, (event, url: unknown) => {
   if (!isAppUrl(event.senderFrame?.url, devServerUrl)) return;
   if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return;
   void shell.openExternal(url);
+});
+
+ipcMain.handle(IPC.pickExecutable, async (event) => {
+  if (!isAppUrl(event.senderFrame?.url, devServerUrl)) return null;
+  const parent =
+    (mainWindow && !mainWindow.isDestroyed() ? mainWindow : null) ?? BrowserWindow.getFocusedWindow();
+  const dialogOpts: OpenDialogOptions = {
+    title: "Select game executable",
+    properties: ["openFile"],
+    filters: [
+      { name: "Game executable", extensions: ["exe"] },
+      { name: "All files", extensions: ["*"] },
+    ],
+  };
+  const result = parent
+    ? await dialog.showOpenDialog(parent, dialogOpts)
+    : await dialog.showOpenDialog(dialogOpts);
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths[0] ?? null;
 });
 
 function launchSupervisor(): void {

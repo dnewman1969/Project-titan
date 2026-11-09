@@ -7,6 +7,7 @@ export const IPC = {
   supervisorSnapshot: "titan:supervisor-snapshot",
   openPath: "titan:open-path",
   openExternal: "titan:open-external",
+  pickExecutable: "titan:pick-executable",
 } as const;
 
 /**
@@ -53,4 +54,6 @@ export interface TitanBridge extends TitanRuntime {
   /** Open a local folder in the OS file manager (recording dir, logs, etc.). */
   openPath(path: string): Promise<string>;
   openExternal(url: string): Promise<void>;
+  /** Native file picker for a game .exe (Windows). Returns null when cancelled. */
+  pickExecutable(): Promise<string | null>;
 }

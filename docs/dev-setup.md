@@ -9,14 +9,14 @@ mechanics.
 
 Install these once. Run the commands in PowerShell.
 
-| Tool            | Version                    | Install                                                                                |
-| --------------- | -------------------------- | -------------------------------------------------------------------------------------- |
-| Git and Git LFS | current                    | `winget install Git.Git GitHub.GitLFS`, then `git lfs install`                         |
-| Node.js         | 22 LTS (`.nvmrc`)          | `winget install OpenJS.NodeJS.LTS`, or nvm-windows with `nvm install 22`               |
-| pnpm            | 10.33.4 (`packageManager`) | `corepack enable` (bundled with Node), then `corepack prepare pnpm@10.33.4 --activate` |
-| uv              | 0.13.7 or newer            | `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 \| iex"`  |
-| Python          | 3.12 (`.python-version`)   | `uv python install 3.12` (uv also installs it on first `uv sync`)                      |
-| Docker Desktop  | optional                   | Only for `docker-compose.yml`; see section 3 for native alternatives                   |
+| Tool            | Version                         | Install                                                                                |
+| --------------- | ------------------------------- | -------------------------------------------------------------------------------------- |
+| Git and Git LFS | current                         | `winget install Git.Git GitHub.GitLFS`, then `git lfs install`                         |
+| Node.js         | 22.12+ (`.nvmrc` → 22; 24.x OK) | `winget install OpenJS.NodeJS.LTS`, or nvm-windows with `nvm install 22`               |
+| pnpm            | 10.33.4 (`packageManager`)      | `corepack enable` (bundled with Node), then `corepack prepare pnpm@10.33.4 --activate` |
+| uv              | 0.13.7 or newer                 | `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 \| iex"`  |
+| Python          | 3.12 (`.python-version`)        | `uv python install 3.12` (uv also installs it on first `uv sync`)                      |
+| Docker Desktop  | optional                        | Only for `docker-compose.yml`; see section 3 for native alternatives                   |
 
 Visual Studio Build Tools are **not** needed: every Python and Node dependency ships Windows wheels or
 prebuilt binaries.

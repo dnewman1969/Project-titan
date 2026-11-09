@@ -5,7 +5,7 @@ adapter_version: 1.0.0
 domain: space
 genre: [simulation, space]
 detection:
-  steam_app_ids: [2202000, 97000]
+  steam_app_ids: [2202000, 220200, 97000]
   epic_catalog_ids: []
   gog_product_ids: []
   executables: ["KSP_x64.exe", "KSP.exe"]

@@ -98,7 +98,8 @@ function KillBanner() {
         </Button>
       }
     >
-      Kill switch engaged {at} ({safety.last_kill_source}). AI control is off; Phase 1 has no input path.
+      Kill switch engaged {at} ({safety.last_kill_source}). AI control is off. Tap Resume to clear the kill
+      state and release any sticky live session before File → New session.
     </Alert>
   );
 }

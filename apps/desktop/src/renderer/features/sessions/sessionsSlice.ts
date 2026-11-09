@@ -26,15 +26,26 @@ export const sessionsSlice = createSlice({
   reducers: {
     openSessionDialog(state, action: PayloadAction<SessionDialogKind>) {
       state.dialog = action.payload;
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem("titan.skipAutoDemo", "1");
+      }
     },
     closeSessionDialog(state) {
       state.dialog = null;
     },
-    setActiveSession(state, action: PayloadAction<{ id: string; title: string }>) {
+    setActiveSession(
+      state,
+      action: PayloadAction<{
+        id: string;
+        title: string;
+        recordingActive?: boolean;
+        recordingRootDir?: string | null;
+      }>,
+    ) {
       state.activeSessionId = action.payload.id;
       state.activeTitle = action.payload.title;
-      state.recordingActive = false;
-      state.recordingRootDir = null;
+      state.recordingActive = action.payload.recordingActive ?? false;
+      state.recordingRootDir = action.payload.recordingRootDir ?? null;
     },
     setRecordingActive(state, action: PayloadAction<boolean>) {
       state.recordingActive = action.payload;

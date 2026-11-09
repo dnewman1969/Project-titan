@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, BackgroundTasks, Request
 
 from titan_api.auth import Authenticated
 from titan_api.safety import SafetyController
+from titan_api.session_lifecycle import end_live_sessions_for_app
 from titan_core.errors import ErrorCode, TitanError
 from titan_core.protocol.system import SafetyArmRequest, SafetyKillRequest, SafetyResumeRequest
 from titan_core.protocol.ws import SafetyState
@@ -24,13 +25,21 @@ async def safety_state(request: Request) -> SafetyState:
 
 
 @router.post("/kill")
-async def safety_kill(body: SafetyKillRequest, request: Request) -> SafetyState:
+async def safety_kill(
+    body: SafetyKillRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+) -> SafetyState:
     """Must answer in under 50 ms: no awaits before the response."""
-    return _safety(request).kill(body.source)
+    state = _safety(request).kill(body.source)
+    background_tasks.add_task(end_live_sessions_for_app, request.app)
+    return state
 
 
 @router.post("/resume")
 async def safety_resume(body: SafetyResumeRequest, request: Request) -> SafetyState:
+    """Clear kill switch and release ux_sessions_one_live so File → New session can start."""
+    await end_live_sessions_for_app(request.app)
     return _safety(request).resume()
 
 

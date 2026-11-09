@@ -49,9 +49,7 @@ export function NewSessionDialog() {
     })) ?? [...FALLBACK_GAMES];
   const game = games.find((g) => g.slug === gameSlug) ?? games[0];
   const profiles = game?.profiles ?? [];
-  const effectiveProfileId = profiles.some((p) => p.id === profileId)
-    ? profileId
-    : (profiles[0]?.id ?? "");
+  const effectiveProfileId = profiles.some((p) => p.id === profileId) ? profileId : (profiles[0]?.id ?? "");
 
   const isLoading = creating || starting;
   const onClose = () => {

@@ -34,6 +34,8 @@ export function TopBar({ status }: { status: ApiStatus }) {
   const [stopRec] = useStopRecordingMutation();
   const activeSessionId = useAppSelector((s) => s.sessions.activeSessionId);
   const activeTitle = useAppSelector((s) => s.sessions.activeTitle);
+  const sessionSource = useAppSelector((s) => s.sessions.sessionSource);
+  const playEnabled = useAppSelector((s) => s.sessions.playEnabled);
   const recordingActive = useAppSelector((s) => s.sessions.recordingActive);
   const recordingMenuRequest = useAppSelector((s) => s.sessions.recordingMenuRequest);
   const { killHotkey, backend } = getTitan();
@@ -115,6 +117,23 @@ export function TopBar({ status }: { status: ApiStatus }) {
         label={activeTitle ?? "No session"}
         sx={{ ml: 1, maxWidth: 220 }}
       />
+      {activeSessionId && sessionSource ? (
+        <Chip
+          size="small"
+          variant="outlined"
+          color={sessionSource === "live" ? "success" : "default"}
+          label={
+            sessionSource === "live"
+              ? playEnabled
+                ? "Live + play"
+                : "Live install"
+              : playEnabled
+                ? "Fixture + HIL play"
+                : "Fixture telemetry"
+          }
+          sx={{ maxWidth: 160 }}
+        />
+      ) : null}
       <Box sx={{ flex: 1 }} />
       <StatusPill
         status={status.api}

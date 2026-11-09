@@ -338,7 +338,9 @@ describe("Operations Center", () => {
       shell.menu("file.newSession");
     });
     const sessionDialog = await screen.findByRole("dialog", { name: "New session" });
-    await userEvent.setup().click(within(sessionDialog).getByRole("button", { name: "Create" }));
+    await userEvent
+      .setup()
+      .click(within(sessionDialog).getByRole("button", { name: "Start learn and play" }));
     expect(await screen.findByText(/Session API is not on this backend yet/)).toBeInTheDocument();
   });
 

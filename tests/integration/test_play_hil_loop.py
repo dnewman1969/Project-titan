@@ -23,9 +23,9 @@ def test_learn_and_play_hil_sequence(hil_env: None) -> None:
     settings = PlaySettings.from_environ()
     sid = UUID(int=99)
     ex = PlayExecutor(session_id=sid, settings=settings)
-    ok, err = ex.execute("ksp.throttle", {"throttle": 0.75})
+    ok, err, _lat1 = ex.execute("ksp.throttle", {"throttle": 0.75})
     assert ok and err is None
-    ok, err = ex.execute("ksp.stage", {})
+    ok, err, _lat2 = ex.execute("ksp.stage", {})
     assert ok and err is None
     state = hil_state()
     assert state["ksp"]["throttle"] == 0.75

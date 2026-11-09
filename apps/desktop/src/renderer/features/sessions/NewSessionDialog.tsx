@@ -6,8 +6,10 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import FormControlLabel from "@mui/material/FormControlLabel";
+import FormHelperText from "@mui/material/FormHelperText";
 import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
 import { useEffect, useState } from "react";
 
 import { useCreateSessionMutation, useListGamesQuery, useStartSessionMutation } from "../../app/api";
@@ -29,11 +31,16 @@ function rtkMutationStatus(error: unknown): number | null {
   return typeof status === "number" ? status : null;
 }
 
+function defaultTitle(play: boolean, gameLabel: string): string {
+  return play ? `Learn and play - ${gameLabel}` : `Observe - ${gameLabel}`;
+}
+
 /** Create a live session against a scanned install (or fixture fallback when none selected). */
 export function NewSessionDialog() {
   const open = useAppSelector((s) => s.sessions.dialog === "new");
   const dispatch = useAppDispatch();
-  const [title, setTitle] = useState("Observe session");
+  const [title, setTitle] = useState("Learn and play - Kerbal Space Program");
+  const [titleTouched, setTitleTouched] = useState(false);
   const [gameSlug, setGameSlug] = useState<string>("ksp");
   const [profileId, setProfileId] = useState<string>("");
   const [launchGame, setLaunchGame] = useState(false);
@@ -62,10 +69,17 @@ export function NewSessionDialog() {
   const game = games.find((g) => g.slug === gameSlug) ?? games[0];
   const profiles = game?.profiles ?? [];
   const effectiveProfileId = profiles.some((p) => p.id === profileId) ? profileId : (profiles[0]?.id ?? "");
+  const sessionSource: "live" | "fixture" = effectiveProfileId ? "live" : "fixture";
 
   const isLoading = creating || starting;
   const onClose = () => {
     dispatch(closeSessionDialog());
+  };
+
+  const syncTitle = (play: boolean, slug: string) => {
+    if (titleTouched) return;
+    const label = games.find((g) => g.slug === slug)?.label ?? slug;
+    setTitle(defaultTitle(play, label));
   };
 
   const onCreate = async () => {
@@ -73,17 +87,18 @@ export function NewSessionDialog() {
     if (typeof localStorage !== "undefined") {
       localStorage.setItem("titan.skipAutoDemo", "1");
     }
-    const sessionTitle = title.trim() || "Observe session";
+    const sessionTitle = title.trim() || defaultTitle(agentPlay, game.label);
     const result = await createSession({
       game_slug: game.slug,
       game_profile_id: effectiveProfileId || undefined,
       title: sessionTitle,
-      mode: "observe",
+      mode: agentPlay ? "autonomous" : "observe",
       settings: {
         agents_enabled: true,
         ...(agentPlay ? { play_enabled: true } : {}),
         ...(recordOnStart ? { record_on_start: true } : {}),
-        demo_telemetry: !effectiveProfileId,
+        demo_telemetry: sessionSource === "fixture",
+        session_source: sessionSource,
       },
     });
     if ("data" in result && result.data) {
@@ -102,9 +117,17 @@ export function NewSessionDialog() {
             title: liveTitle,
             recordingActive: recordOnStart,
             recordingRootDir: recordingRoot,
+            sessionSource,
+            playEnabled: agentPlay,
           }),
         );
-        dispatch(showNotice(`Live session: ${liveTitle}`));
+        const kind =
+          sessionSource === "fixture"
+            ? "Fixture session"
+            : agentPlay
+              ? "Learn-and-play session"
+              : "Live observe session";
+        dispatch(showNotice(`${kind}: ${liveTitle}`));
         dispatch(closeSessionDialog());
         return;
       }
@@ -146,10 +169,20 @@ export function NewSessionDialog() {
     <Dialog open={open} onClose={onClose} aria-labelledby="new-session-title" maxWidth="sm" fullWidth>
       <DialogTitle id="new-session-title">New session</DialogTitle>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+        <Typography variant="body2" color="text.secondary">
+          Agents watch telemetry, write lessons, and (when play is on) propose controls that{" "}
+          <code>titan-actions</code> executes via kRPC, SCS, or HIL.
+        </Typography>
+        <Alert severity={sessionSource === "live" ? "success" : "info"} sx={{ width: "100%" }}>
+          {sessionSource === "live"
+            ? "Live install attached - telemetry and play target this profile."
+            : "No install attached - fixture/demo telemetry only (software HIL path for play)."}
+        </Alert>
         <TextField
           label="Title"
           value={title}
           onChange={(e) => {
+            setTitleTouched(true);
             setTitle(e.target.value);
           }}
           fullWidth
@@ -165,6 +198,7 @@ export function NewSessionDialog() {
             const picked = games.find((g) => g.slug === slug);
             setProfileId(picked?.profiles?.[0]?.id ?? "");
             setLaunchGame(false);
+            syncTitle(agentPlay, slug);
           }}
           fullWidth
         >
@@ -203,12 +237,21 @@ export function NewSessionDialog() {
             <Checkbox
               checked={agentPlay}
               onChange={(e) => {
-                setAgentPlay(e.target.checked);
+                const next = e.target.checked;
+                setAgentPlay(next);
+                syncTitle(next, gameSlug);
               }}
             />
           }
-          label="Enable agent play (beta)"
+          label="Enable agent play (learn-and-play beta)"
         />
+        {agentPlay ? (
+          <FormHelperText sx={{ mt: -1.5, mx: 0 }}>
+            {sessionSource === "live"
+              ? "Starts the actions worker against the selected install (kRPC/SCS when available)."
+              : "Starts the actions worker with TITAN_PLAY_BACKEND=hil for software play without a game."}
+          </FormHelperText>
+        ) : null}
         <FormControlLabel
           control={
             <Checkbox
@@ -236,7 +279,7 @@ export function NewSessionDialog() {
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="contained" disabled={isLoading} onClick={() => void onCreate()}>
-          Create
+          {agentPlay ? "Start learn and play" : "Create"}
         </Button>
       </DialogActions>
     </Dialog>

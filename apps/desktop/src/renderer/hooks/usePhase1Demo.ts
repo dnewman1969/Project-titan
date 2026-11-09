@@ -81,8 +81,15 @@ export function usePhase1Demo(): void {
       }
       const started = await startSession({ sessionId: created.data.id });
       if ("data" in started && started.data) {
-        dispatch(setActiveSession({ id: started.data.id, title: started.data.title?.trim() || title }));
-        dispatch(showNotice("Demo session live — fixture telemetry driving the bar; crew is listening."));
+        dispatch(
+          setActiveSession({
+            id: started.data.id,
+            title: started.data.title?.trim() || title,
+            sessionSource: "fixture",
+            playEnabled: true,
+          }),
+        );
+        dispatch(showNotice("Demo session live - fixture telemetry driving the bar; crew is listening."));
       }
     })();
   }, [activeId, backend, createSession, dispatch, health, startSession]);

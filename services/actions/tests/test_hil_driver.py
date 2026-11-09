@@ -22,6 +22,6 @@ def test_hil_ksp_throttle_and_stage() -> None:
 def test_executor_uses_injected_hil_driver() -> None:
     driver = HilDriver(session_id=UUID(int=2), trace_path=None, trace=False)
     ex = PlayExecutor(session_id=UUID(int=2), driver=driver)
-    ok, err = ex.execute("scs.brake", {"fraction": 0.8})
+    ok, err, _latency = ex.execute("scs.brake", {"fraction": 0.8})
     assert ok and err is None
     assert hil_state()["scs"]["brake"] == 0.8

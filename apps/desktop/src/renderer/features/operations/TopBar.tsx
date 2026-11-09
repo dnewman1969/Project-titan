@@ -226,8 +226,12 @@ export function TopBar({ status }: { status: ApiStatus }) {
         title={
           activeSessionId
             ? recordingActive
-              ? "Stop session recording"
-              : "Start session recording (writes manifest; OBS improves quality)"
+              ? status.obs === "ok"
+                ? `Stop session recording (${status.obsDetail})`
+                : "Stop session recording"
+              : status.obs === "ok"
+                ? `Start OBS recording via websocket (${status.obsDetail})`
+                : "Start session recording (OBS offline → stub tracks)"
             : "Start a session first"
         }
       >

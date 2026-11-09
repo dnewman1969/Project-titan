@@ -44,7 +44,7 @@ def api_client(migrated_db: TempDatabase, monkeypatch: pytest.MonkeyPatch) -> It
 
 
 def test_obs_capture_down(api_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _down(*, timeout_s: float = 0.8) -> DependencyState:
+    async def _down(*_args: Any, **_kwargs: Any) -> DependencyState:
         return DependencyState(state="down", detail="refused")
 
     monkeypatch.setattr("titan_api.routers.capture.check_obs", _down)
@@ -56,12 +56,13 @@ def test_obs_capture_down(api_client: TestClient, monkeypatch: pytest.MonkeyPatc
 
 
 def test_obs_capture_connected(api_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _up(*, timeout_s: float = 0.8) -> DependencyState:
+    async def _up(*_args: Any, **_kwargs: Any) -> DependencyState:
         return DependencyState(state="up")
 
     class _FakeObs:
         host = "127.0.0.1"
         port = 4455
+        timeout_s = 5.0
 
         async def connect(self) -> None:
             return None
@@ -82,10 +83,10 @@ def test_obs_capture_connected(api_client: TestClient, monkeypatch: pytest.Monke
             }
 
         async def get_record_status(self) -> ObsRecordStatus:
-            return ObsRecordStatus(active=False, paused=False, duration_ms=None)
+            return ObsRecordStatus(active=True, paused=False, duration_ms=1500)
 
     monkeypatch.setattr("titan_api.routers.capture.check_obs", _up)
-    monkeypatch.setattr("titan_api.routers.capture.ObsClient", _FakeObs)
+    monkeypatch.setattr("titan_api.routers.capture.make_obs_client", lambda: _FakeObs())
     res = api_client.get("/api/v1/capture/obs", headers=AUTH)
     assert res.status_code == 200, res.text
     body = res.json()
@@ -93,16 +94,18 @@ def test_obs_capture_connected(api_client: TestClient, monkeypatch: pytest.Monke
     assert body["connected"] is True
     assert body["version"]["obsVersion"] == "30.1.0"
     assert body["provision"]["status"] == "planned"
-    assert body["record"]["active"] is False
+    assert body["record"]["active"] is True
+    assert body["record"]["duration_ms"] == 1500
 
 
 def test_obs_capture_handshake_degraded(api_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _up(*, timeout_s: float = 0.8) -> DependencyState:
+    async def _up(*_args: Any, **_kwargs: Any) -> DependencyState:
         return DependencyState(state="up")
 
     class _BadObs:
         host = "127.0.0.1"
         port = 4455
+        timeout_s = 5.0
 
         async def connect(self) -> None:
             msg = "handshake failed"
@@ -112,7 +115,7 @@ def test_obs_capture_handshake_degraded(api_client: TestClient, monkeypatch: pyt
             return None
 
     monkeypatch.setattr("titan_api.routers.capture.check_obs", _up)
-    monkeypatch.setattr("titan_api.routers.capture.ObsClient", _BadObs)
+    monkeypatch.setattr("titan_api.routers.capture.make_obs_client", lambda: _BadObs())
     res = api_client.get("/api/v1/capture/obs", headers=AUTH)
     assert res.status_code == 200
     body = res.json()

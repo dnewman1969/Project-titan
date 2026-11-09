@@ -113,6 +113,7 @@ async def test_tcp_and_obs() -> None:
         await server.wait_closed()
     assert (await health.check_tcp("127.0.0.1", free_port())).state == "down"
     assert (await health.check_obs(timeout_s=0.5)).state in {"up", "down"}
+    assert (await health.check_obs("127.0.0.1", 1, timeout_s=0.2)).state == "down"
 
 
 async def test_timed_reports_overruns() -> None:

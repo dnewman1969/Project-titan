@@ -34,11 +34,14 @@ export function WebcamPanel() {
 
   const tracksById = new Map((active?.item?.tracks ?? []).map((t) => [t.id, t] as const));
   const obsConnected = obs?.connected === true || active?.item?.obs?.connected === true;
+  const obsRecording = obs?.record?.active === true;
   const versionRaw = obs?.version?.obsVersion ?? obs?.version?.obs_version;
   const versionLabel =
     typeof versionRaw === "string" || typeof versionRaw === "number" ? String(versionRaw) : "online";
   const subtitle = obsConnected
-    ? `OBS ${versionLabel}`
+    ? obsRecording
+      ? `OBS ${versionLabel} · recording`
+      : `OBS ${versionLabel}`
     : obs?.state === "up"
       ? "OBS port up (handshake pending)"
       : "OBS offline — stub tracks on REC";
@@ -76,8 +79,8 @@ export function WebcamPanel() {
             <Chip
               size="small"
               sx={{ mt: 1 }}
-              label={obsConnected ? "OBS live" : "Stub mode"}
-              color={obsConnected ? "success" : "default"}
+              label={obsConnected ? (obsRecording ? "OBS recording" : "OBS live") : "Stub mode"}
+              color={obsConnected ? (obsRecording ? "error" : "success") : "default"}
               variant="outlined"
             />
           </Box>

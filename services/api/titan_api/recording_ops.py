@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from titan_core.clock import utc_now
 from titan_core.errors import ErrorCode, TitanError
 from titan_core.ids import uuid7
-from titan_core.obs_ws import ObsClient
+from titan_core.obs_ws import make_obs_client
 from titan_core.recording_manifest import (
     append_timeline_event,
     build_manifest,
@@ -78,7 +78,7 @@ async def start_session_recording(db: AsyncSession, session_row: Session) -> dic
     provision: dict[str, str] | None = None
     state = "recording"
     try:
-        client = ObsClient()
+        client = make_obs_client()
         await client.connect()
         try:
             status = await client.get_record_status()
@@ -91,6 +91,7 @@ async def start_session_recording(db: AsyncSession, session_row: Session) -> dic
             obs_status["provision"] = provision
             await client.start_recording()
             obs_connected = True
+            obs_status["active"] = True
         finally:
             await client.close()
     except (OSError, RuntimeError) as exc:

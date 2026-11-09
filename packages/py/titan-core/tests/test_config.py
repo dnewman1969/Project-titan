@@ -48,6 +48,9 @@ def test_shipped_defaults_load_and_match_model_defaults() -> None:
     assert loaded.postgres.port == 54329
     assert loaded.redis.url == "redis://127.0.0.1:63790/0"
     assert loaded.features.actions is False
+    assert loaded.obs.host == "127.0.0.1"
+    assert loaded.obs.port == 4455
+    assert loaded.obs.password is None
 
 
 def test_layer_precedence(app_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

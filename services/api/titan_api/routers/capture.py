@@ -1,4 +1,4 @@
-"""Capture / OBS probe routes for Ops Center (M8 beta stubs)."""
+"""Capture / OBS probe routes for Ops Center (live obs-websocket v5 status)."""
 
 from __future__ import annotations
 
@@ -8,27 +8,27 @@ from fastapi import APIRouter
 
 from titan_api.auth import Authenticated
 from titan_core.health import check_obs
-from titan_core.obs_ws import ObsClient
+from titan_core.obs_ws import make_obs_client
 
 router = APIRouter(prefix="/capture", tags=["capture"], dependencies=[Authenticated])
 
 
 @router.get("/obs")
 async def obs_capture_status() -> dict[str, Any]:
-    """Reachability + optional websocket handshake for the Webcam / REC panels."""
-    tcp = await check_obs(timeout_s=0.8)
+    """Reachability + websocket handshake for the Webcam / REC panels."""
+    client = make_obs_client()
+    tcp = await check_obs(client.host, client.port, timeout_s=min(0.8, client.timeout_s))
     payload: dict[str, Any] = {
         "state": tcp.state,
         "detail": tcp.detail,
-        "host": ObsClient().host,
-        "port": ObsClient().port,
+        "host": client.host,
+        "port": client.port,
         "connected": False,
         "version": None,
         "provision": None,
     }
     if tcp.state != "up":
         return payload
-    client = ObsClient()
     try:
         await client.connect()
         try:

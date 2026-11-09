@@ -3,11 +3,17 @@ import { useEffect, useRef } from "react";
 
 import { logEvent } from "../features/events/eventsSlice";
 import { SERVICE_STATUS } from "../features/system/supervisorSlice";
-import { useGetHealthQuery, useGetSystemStatusQuery, type SystemStatus } from "./api";
+import {
+  useGetHealthQuery,
+  useGetObsCaptureStatusQuery,
+  useGetSystemStatusQuery,
+  type SystemStatus,
+} from "./api";
 import { useAppDispatch } from "./hooks";
 
 export const HEALTH_POLL_MS = 3000;
 export const STATUS_POLL_MS = 5000;
+export const OBS_CAPTURE_POLL_MS = 5000;
 
 export interface ApiStatus {
   api: Status;
@@ -40,6 +46,10 @@ export function useApiStatus(): ApiStatus {
   const health = useGetHealthQuery(undefined, { pollingInterval: HEALTH_POLL_MS });
   const healthy = health.isSuccess && !health.isError;
   const status = useGetSystemStatusQuery(undefined, { pollingInterval: STATUS_POLL_MS, skip: !healthy });
+  const obsLive = useGetObsCaptureStatusQuery(undefined, {
+    pollingInterval: OBS_CAPTURE_POLL_MS,
+    skip: !healthy,
+  });
 
   let api: Status = "unknown";
   let apiDetail = "connecting";
@@ -61,8 +71,32 @@ export function useApiStatus(): ApiStatus {
     : ["unknown", "API offline"];
   const postgresDetail = pg?.detail ?? pg?.version ?? (healthy ? "checking" : "API offline");
   const obsDep = status.data?.dependencies.obs;
-  const obs: Status = healthy && obsDep ? SERVICE_STATUS[obsDep.state] : "unknown";
-  const obsDetail = obsDep?.detail ?? obsDep?.version ?? (healthy ? "obs-websocket :4455" : "API offline");
+  const tcpObs: Status = healthy && obsDep ? SERVICE_STATUS[obsDep.state] : "unknown";
+  let obs: Status = tcpObs;
+  let obsDetail =
+    obsDep?.detail ?? obsDep?.version ?? (healthy ? "obs-websocket :4455" : "API offline");
+  if (healthy && obsLive.data) {
+    const live = obsLive.data;
+    const hostPort = `${live.host ?? "127.0.0.1"}:${live.port ?? 4455}`;
+    if (live.connected) {
+      obs = "ok";
+      const versionRaw = live.version?.obsVersion ?? live.version?.obs_version;
+      const versionLabel =
+        typeof versionRaw === "string" || typeof versionRaw === "number" ? String(versionRaw) : "live";
+      obsDetail = live.record?.active
+        ? `WS ${hostPort} · OBS ${versionLabel} · recording`
+        : `WS ${hostPort} · OBS ${versionLabel}`;
+    } else if (live.state === "degraded") {
+      obs = "degraded";
+      obsDetail = live.detail ?? `WS handshake failed (${hostPort})`;
+    } else if (live.state === "down") {
+      obs = "down";
+      obsDetail = live.detail ?? `obs-websocket ${hostPort} unreachable`;
+    } else if (live.state === "up") {
+      obs = "degraded";
+      obsDetail = `port up, handshake pending (${hostPort})`;
+    }
+  }
 
   const previous = useRef<Status>("unknown");
   useEffect(() => {

@@ -125,6 +125,16 @@ class RecordingConfig(_Section):
     min_free_gb: int = Field(default=20, ge=0)
 
 
+class ObsConfig(_Section):
+    """obs-websocket v5 connection for Ops Center REC (D10). Password via env/keyring only."""
+
+    host: str = "127.0.0.1"
+    port: int = Field(default=4455, ge=1, le=65535)
+    # Prefer TITAN__OBS__PASSWORD or leave empty when OBS authentication is disabled.
+    password: SecretStr | None = None
+    timeout_s: float = Field(default=5.0, gt=0.1, le=30.0)
+
+
 class SafetyConfig(_Section):
     kill_hotkey: str = "Ctrl+Shift+F12"
 
@@ -197,6 +207,7 @@ class TitanConfig(BaseSettings):
     floor: FloorConfig = FloorConfig()
     llm: LlmConfig = LlmConfig()
     recording: RecordingConfig = RecordingConfig()
+    obs: ObsConfig = ObsConfig()
     safety: SafetyConfig = SafetyConfig()
     logging: LoggingConfig = LoggingConfig()
     network: NetworkConfig = NetworkConfig()

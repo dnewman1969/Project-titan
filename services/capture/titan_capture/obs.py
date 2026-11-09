@@ -8,6 +8,8 @@ from titan_core.obs_ws import (
     OP_REQUEST_RESPONSE,
     ObsClient,
     ObsRecordStatus,
+    make_obs_client,
+    obs_auth_string,
 )
 
 __all__ = [
@@ -18,4 +20,6 @@ __all__ = [
     "OP_REQUEST_RESPONSE",
     "ObsClient",
     "ObsRecordStatus",
+    "make_obs_client",
+    "obs_auth_string",
 ]

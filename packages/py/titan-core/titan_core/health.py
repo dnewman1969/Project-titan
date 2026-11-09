@@ -133,9 +133,14 @@ async def check_tcp(host: str, port: int, *, timeout_s: float = 1.0) -> Dependen
     return DependencyState(state="up")
 
 
-async def check_obs(*, timeout_s: float = 1.0) -> DependencyState:
-    """obs-websocket port reachability; the capture worker does the real handshake (M8)."""
-    return await check_tcp(*OBS_WEBSOCKET, timeout_s=timeout_s)
+async def check_obs(
+    host: str = OBS_WEBSOCKET[0],
+    port: int = OBS_WEBSOCKET[1],
+    *,
+    timeout_s: float = 1.0,
+) -> DependencyState:
+    """obs-websocket TCP reachability; Ops Center /capture/obs does the v5 handshake."""
+    return await check_tcp(host, port, timeout_s=timeout_s)
 
 
 async def timed(check: Check, timeout_s: float) -> DependencyState:

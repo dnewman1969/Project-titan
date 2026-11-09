@@ -314,9 +314,7 @@ class ObsClient:
             if created_kind is None:
                 return _webcam_miss()
             target = {"inputName": WEBCAM_INPUT_NAME, "inputKind": created_kind}
-        name = target.get("inputName")
-        if not isinstance(name, str) or not name:
-            return _webcam_miss()
+        name = target["inputName"]
         kind = str(target.get("inputKind") or target.get("unversionedInputKind") or "")
         known_prop = _property_for_kind(kind)
         props = [known_prop] if known_prop is not None else [prop for _kind, prop in _CAPTURE_KINDS]

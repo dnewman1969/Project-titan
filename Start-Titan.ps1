@@ -59,28 +59,67 @@ Or in PowerShell: winget install OpenJS.NodeJS.LTS
     }
 }
 
+function Invoke-External {
+    param(
+        [string]$Exe,
+        [Parameter(ValueFromRemainingArguments = $true)][object[]] $RemainingArgs
+    )
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $out = & $Exe @RemainingArgs 2>&1
+        foreach ($line in $out) {
+            if ($line -is [System.Management.Automation.ErrorRecord]) {
+                Write-Host $line.ToString() -ForegroundColor DarkYellow
+            } else {
+                Write-Host $line
+            }
+        }
+        return $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+}
+
 function Ensure-Pnpm {
     if (Test-Command pnpm) { return }
-    Write-Host "pnpm not on PATH; enabling via corepack (one-time)..." -ForegroundColor Cyan
+    Write-Host "pnpm not on PATH; preparing toolchain (one-time, no admin required)..." -ForegroundColor Cyan
+
+    $corepack = $null
     if (Test-Command corepack) {
-        try {
-            & corepack enable 2>&1 | Out-Host
-            & corepack prepare "pnpm@$PnpmVersion" --activate 2>&1 | Out-Host
-        } catch {
-            Write-Host "corepack setup reported: $_" -ForegroundColor DarkYellow
-        }
-        Refresh-SessionPath
+        $corepack = "corepack"
     } elseif (Test-Command node) {
         $corepackJs = Join-Path (Split-Path (Get-Command node).Source -Parent) "node_modules\corepack\dist\corepack.js"
-        if (Test-Path $corepackJs) {
-            & node $corepackJs enable 2>&1 | Out-Host
-            & node $corepackJs prepare "pnpm@$PnpmVersion" --activate 2>&1 | Out-Host
-            Refresh-SessionPath
-        }
+        if (Test-Path $corepackJs) { $corepack = $corepackJs }
     }
+
+    if ($corepack) {
+        if ($corepack -eq "corepack") {
+            $enableCode = Invoke-External corepack enable
+        } else {
+            $enableCode = Invoke-External node $corepack enable
+        }
+        if ($enableCode -ne 0) {
+            Write-Host "corepack enable skipped (often EPERM under Program Files without admin). Continuing..." -ForegroundColor DarkYellow
+        }
+        if ($corepack -eq "corepack") {
+            Invoke-External corepack prepare "pnpm@$PnpmVersion" --activate | Out-Null
+        } else {
+            Invoke-External node $corepack prepare "pnpm@$PnpmVersion" --activate | Out-Null
+        }
+        Refresh-SessionPath
+    }
+
     if (-not (Test-Command pnpm) -and (Test-Command npm)) {
-        Write-Host "Installing pnpm@$PnpmVersion via npm (fallback)..." -ForegroundColor Cyan
-        & npm install -g "pnpm@$PnpmVersion" 2>&1 | Out-Host
+        Write-Host "Installing pnpm@$PnpmVersion via npm (user install, no admin)..." -ForegroundColor Cyan
+        $npmPrefix = Join-Path $env:APPDATA "npm"
+        if (-not (Test-Path $npmPrefix)) {
+            New-Item -ItemType Directory -Force -Path $npmPrefix | Out-Null
+        }
+        Invoke-External npm install -g "pnpm@$PnpmVersion" --prefix $npmPrefix | Out-Null
+        if ($env:Path -notlike "*$npmPrefix*") {
+            $env:Path = "$npmPrefix;$env:Path"
+        }
         Refresh-SessionPath
     }
 }
@@ -91,13 +130,24 @@ function Invoke-Pnpm {
     Ensure-Pnpm
     if (Test-Command pnpm) {
         & pnpm @RemainingArgs
+        if ($LASTEXITCODE) { exit $LASTEXITCODE }
         return
     }
     if (Test-Command corepack) {
+        $prev = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
         & corepack pnpm @RemainingArgs
+        $code = $LASTEXITCODE
+        $ErrorActionPreference = $prev
+        if ($code -eq 0) { return }
+        Write-Host "corepack pnpm exited $code; trying npx..." -ForegroundColor DarkYellow
+    }
+    if (Test-Command npx) {
+        & npx --yes "pnpm@$PnpmVersion" -- @RemainingArgs
+        if ($LASTEXITCODE) { exit $LASTEXITCODE }
         return
     }
-    Show-Error "pnpm could not be prepared.`nOpen PowerShell in the repo and run:`ncorepack enable; corepack prepare pnpm@$PnpmVersion --activate"
+    Show-Error "pnpm could not be prepared.`nInstall without admin: npm install -g pnpm@$PnpmVersion`nOr: corepack prepare pnpm@$PnpmVersion --activate"
 }
 
 Ensure-Node

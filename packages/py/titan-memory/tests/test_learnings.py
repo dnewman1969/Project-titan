@@ -8,8 +8,24 @@ import pytest
 import respx
 
 from titan_memory.chroma_store import ChromaVectorStore
-from titan_memory.learnings import LearningRow, build_rows, persist_session_learnings
+from titan_memory.learnings import (
+    LearningRow,
+    build_rows,
+    fetch_prior_memory_lines,
+    persist_session_learnings,
+    should_persist_row,
+)
 from titan_models.embedder import FakeEmbedder
+
+
+def test_should_persist_row_filters_sections() -> None:
+    assert should_persist_row(
+        LearningRow("discoveries", "a", {"text": "x"}, 0.8, None),
+    )
+    assert not should_persist_row(LearningRow("world_state", "a", {"text": "x"}, 0.8, None))
+    assert should_persist_row(
+        LearningRow("notes", "prior.01", {"text": "prior", "prior_memory": True}, 0.8, None),
+    )
 
 
 def test_build_rows_includes_summary() -> None:
@@ -71,3 +87,20 @@ async def test_persist_session_learnings_upserts_chroma() -> None:
     )
     assert result["written"] == 2
     assert upsert.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_fetch_prior_empty_when_chroma_errors() -> None:
+    base = "http://127.0.0.1:8766"
+    store = ChromaVectorStore(base)
+    respx.get(f"{base}/api/v1/tenants/titan/databases/default/collections/memories").mock(
+        return_value=httpx.Response(503, json={"error": "down"})
+    )
+    lines = await fetch_prior_memory_lines(
+        store,
+        FakeEmbedder(),
+        game_slug="ksp",
+        query="ksp lessons",
+    )
+    assert lines == []

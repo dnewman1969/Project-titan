@@ -13,13 +13,34 @@ import { SafetyStateSchema, SystemStatusSchema, type SafetyState, type SystemSta
 import { z } from "zod";
 
 import type { KillSwitchEvent } from "../../shared/ipc";
+import { SettingsDocumentSchema, type SettingsDocument } from "./settings";
 import { getTitan } from "./runtime";
 
 export const API_PREFIX = "/api/v1";
 
 export const HealthSchema = z.object({ status: z.literal("ok") });
 export type Health = z.infer<typeof HealthSchema>;
-export type { SystemStatus };
+export type { SystemStatus, SettingsDocument };
+
+/** Minimal create-session body for the New Session dialog (Section 5.2). */
+export const CreateSessionSchema = z
+  .object({
+    game_id: z.string(),
+    game_profile_id: z.string(),
+    title: z.string(),
+    mode: z.enum(["observe", "replay", "autonomous"]),
+  })
+  .strict();
+export type CreateSessionRequest = z.infer<typeof CreateSessionSchema>;
+
+export const SessionCreatedSchema = z
+  .object({
+    id: z.string().uuid(),
+    title: z.string(),
+    state: z.string(),
+  })
+  .passthrough();
+export type SessionCreated = z.infer<typeof SessionCreatedSchema>;
 
 const baseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (args, api, extra) => {
   const { apiBase, token } = getTitan();
@@ -53,7 +74,32 @@ export const titanApi = createApi({
       query: () => ({ url: "/safety/resume", method: "POST", body: { confirm: "RESUME" } }),
       transformResponse: (raw: unknown) => SafetyStateSchema.parse(raw),
     }),
+    getSettings: build.query<SettingsDocument, undefined>({
+      query: () => "/settings",
+      transformResponse: (raw: unknown) => SettingsDocumentSchema.parse(raw),
+    }),
+    patchSettings: build.mutation<SettingsDocument, { version: number; patch: Record<string, unknown> }>({
+      query: ({ version, patch }) => ({
+        url: "/settings",
+        method: "PATCH",
+        body: patch,
+        headers: { "If-Match": String(version) },
+      }),
+      transformResponse: (raw: unknown) => SettingsDocumentSchema.parse(raw),
+    }),
+    createSession: build.mutation<SessionCreated, CreateSessionRequest>({
+      query: (body) => ({ url: "/sessions", method: "POST", body }),
+      transformResponse: (raw: unknown) => SessionCreatedSchema.parse(raw),
+    }),
   }),
 });
 
-export const { useGetHealthQuery, useGetSystemStatusQuery, useKillMutation, useResumeMutation } = titanApi;
+export const {
+  useGetHealthQuery,
+  useGetSystemStatusQuery,
+  useGetSettingsQuery,
+  usePatchSettingsMutation,
+  useCreateSessionMutation,
+  useKillMutation,
+  useResumeMutation,
+} = titanApi;

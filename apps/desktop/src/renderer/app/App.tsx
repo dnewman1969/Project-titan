@@ -14,11 +14,13 @@ import { MONO_FONT } from "@titan/ui-kit";
 import { BootSplash } from "../features/operations/BootSplash";
 import { dismissNotice, setAboutOpen, showNotice } from "../features/operations/layoutSlice";
 import { OperationsCenter } from "../features/operations/OperationsCenter";
+import { SessionDialogs } from "../features/sessions/SessionDialogs";
 import { killAcknowledged, safetyStateReceived } from "../features/safety/safetySlice";
 import { useResumeMutation } from "./api";
 import { useAppDispatch, useAppSelector } from "./hooks";
 import { getTitan } from "./runtime";
 import { useApiStatus } from "./useApiStatus";
+import { useLayoutSettings } from "./useLayoutSettings";
 import { useLiveChannels } from "./useLiveChannels";
 import { useShellBridge } from "./useShellBridge";
 import { useSupervisor } from "./useSupervisor";
@@ -101,6 +103,7 @@ function KillBanner() {
 export function App() {
   useShellBridge();
   useSupervisor();
+  useLayoutSettings();
   useLiveChannels();
   const status = useApiStatus();
   const dispatch = useAppDispatch();
@@ -111,6 +114,7 @@ export function App() {
       <KillBanner />
       <BootSplash />
       <AboutDialog />
+      <SessionDialogs />
       <Snackbar
         key={notice?.id}
         open={notice !== null}

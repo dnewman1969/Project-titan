@@ -1,7 +1,7 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { TelemetryFrameUI } from "@titan/protocol";
 
-/** Latest normalized game frame from `session.*.telemetry` (M5.T6). */
+/** Latest normalized game frame from `session.*.telemetry` (M5.T6 / M7.T4). */
 interface GameTelemetryState {
   latest: TelemetryFrameUI | null;
   speedHistory: number[];

@@ -1,5 +1,6 @@
 import { findMenuItem } from "../../../shared/menu";
 import type { AppDispatch } from "../../app/store";
+import { openSessionDialog } from "../sessions/sessionsSlice";
 import { setAboutOpen, showNotice, togglePanel } from "./layoutSlice";
 
 export function handleMenuCommand(id: string, dispatch: AppDispatch): void {
@@ -11,6 +12,10 @@ export function handleMenuCommand(id: string, dispatch: AppDispatch): void {
   }
   if (item.id === "help.about") {
     dispatch(setAboutOpen(true));
+    return;
+  }
+  if (item.id === "file.newSession") {
+    dispatch(openSessionDialog("new"));
     return;
   }
   if (item.id === "tools.gameDiscovery") {

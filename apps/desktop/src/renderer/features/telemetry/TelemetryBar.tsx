@@ -47,6 +47,7 @@ export function TelemetryBar() {
   if (gameFrame?.vehicle.velocity?.speed_mps != null) {
     const speed = Math.round(gameFrame.vehicle.velocity.speed_mps * 3.6);
     const fpsCell = cells.find((c) => c.key === "fps");
+    if (fpsCell) fpsCell.label = "Speed";
     if (fpsCell) fpsCell.value = `${speed} km/h`;
   }
   const cpuSeries = history.slice(-120).map((m, i) => ({ i, cpu: m.cpu_pct }));

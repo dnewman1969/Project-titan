@@ -3,10 +3,12 @@ import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import { eventsSlice } from "../features/events/eventsSlice";
 import { layoutSlice } from "../features/operations/layoutSlice";
 import { safetySlice } from "../features/safety/safetySlice";
+import { sessionsSlice } from "../features/sessions/sessionsSlice";
 import { supervisorSlice } from "../features/system/supervisorSlice";
 import { gameTelemetrySlice } from "../features/telemetry/gameTelemetrySlice";
 import { systemSlice } from "../features/telemetry/systemSlice";
 import { titanApi } from "./api";
+import { layoutPersistListener } from "./layoutPersistListener";
 
 const rootReducer = combineReducers({
   [titanApi.reducerPath]: titanApi.reducer,
@@ -15,6 +17,7 @@ const rootReducer = combineReducers({
   events: eventsSlice.reducer,
   system: systemSlice.reducer,
   gameTelemetry: gameTelemetrySlice.reducer,
+  sessions: sessionsSlice.reducer,
   supervisor: supervisorSlice.reducer,
 });
 
@@ -24,7 +27,7 @@ export function makeStore(preloadedState?: Partial<RootState>) {
   return configureStore({
     reducer: rootReducer,
     preloadedState,
-    middleware: (getDefault) => getDefault().concat(titanApi.middleware),
+    middleware: (getDefault) => getDefault().concat(titanApi.middleware, layoutPersistListener.middleware),
   });
 }
 

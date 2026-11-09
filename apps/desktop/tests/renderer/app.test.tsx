@@ -194,6 +194,17 @@ beforeEach(() => {
   fetchMock = vi.fn((input: Request) => {
     const url = input.url;
     if (url.endsWith("/api/v1/health")) return Promise.resolve(jsonResponse({ status: "ok" }));
+    if (url.endsWith("/api/v1/settings") && input.method === "GET")
+      return Promise.resolve(jsonResponse({ version: 1, values: {} }));
+    if (url.endsWith("/api/v1/settings") && input.method === "PATCH")
+      return Promise.resolve(
+        jsonResponse({
+          version: 2,
+          values: { "ui.layout": { panels: { agents: true, webcam: false, telemetry: true, events: true, games: false } } },
+        }),
+      );
+    if (url.endsWith("/api/v1/sessions") && input.method === "POST")
+      return Promise.resolve(jsonResponse({ title: "Not Found" }, 404));
     if (url.endsWith("/api/v1/system/status")) return Promise.resolve(jsonResponse(STATUS_BODY));
     if (url.endsWith("/api/v1/safety/kill"))
       return Promise.resolve(
@@ -282,9 +293,20 @@ describe("Operations Center", () => {
   });
 
   it("handles menu commands: panel toggles, About, and milestone notices", async () => {
+    const user = userEvent.setup();
     renderApp();
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([r]) => r.url.endsWith("/settings"))).toBe(true);
+    });
     act(() => {
       shell.menu("view.toggle.webcam");
+    });
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(
+          ([r]) => r.url.endsWith("/settings") && r.method === "PATCH" && r.headers.get("if-match") === "1",
+        ),
+      ).toBe(true);
     });
     expect(screen.queryByRole("region", { name: "Webcam" })).not.toBeInTheDocument();
     act(() => {
@@ -302,6 +324,15 @@ describe("Operations Center", () => {
       shell.menu("view.blackboardInspector");
     });
     expect(await screen.findByText("Blackboard Inspector arrives in M7.T5.")).toBeInTheDocument();
+
+    act(() => {
+      shell.menu("file.newSession");
+    });
+    const sessionDialog = await screen.findByRole("dialog", { name: "New session" });
+    await userEvent.setup().click(within(sessionDialog).getByRole("button", { name: "Create" }));
+    expect(
+      await screen.findByText(/Session API is not on this backend yet/),
+    ).toBeInTheDocument();
   });
 
   it("filters the event log by category", async () => {

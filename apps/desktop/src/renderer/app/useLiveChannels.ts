@@ -8,7 +8,7 @@ import { useAppDispatch } from "./hooks";
 import { getTitan } from "./runtime";
 import { LiveConnection, wsUrl } from "./ws";
 
-/** Live system and session telemetry/events over the WS gateway (M1.T6, M5.T6). */
+/** Live system and session telemetry/events over the WS gateway (M1.T6, M5.T6, M7.T4). */
 export function useLiveChannels(): void {
   const dispatch = useAppDispatch();
   useEffect(() => {

@@ -1066,6 +1066,42 @@
               "type": "null"
             }
           ]
+        },
+        "angular_rate_rad_s": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Magnitude of angular velocity in rad/s. Null when the adapter did not read it."
+        },
+        "prograde_pitch_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Surface-prograde pitch in degrees. Null when velocity is too small to define it."
+        },
+        "prograde_heading_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Surface-prograde heading in degrees. Null when velocity is too small to define it."
         }
       },
       "required": [

@@ -253,7 +253,9 @@ async def test_flight_loop_proposes_heading_hold() -> None:
     assert params["heading_deg"] == 90.0
     assert params.get("stage") is True
     assert any(str(p.get("key", "")).startswith("play.flight.") for p in runtime.bb.puts)
-    assert any(p.get("key") == "flight.launch" for p in runtime.bb.puts)
+    note = next(p for p in runtime.bb.puts if p.get("key") == "flight.decision")
+    assert "Staging once" in str(note["value"]["text"])
+    assert note["value"]["action_id"] == "ksp.fly"
 
 
 @pytest.mark.asyncio
@@ -263,8 +265,9 @@ async def test_flight_loop_reports_missing_vessel() -> None:
     runtime = LoopRuntime(session_id=sid, redis=_LatestRedis(sid, payload))  # type: ignore[arg-type]
     await _run_flight(
         runtime,
-        until=lambda: any(p.get("key") == "flight.no_vessel" for p in runtime.bb.puts),
+        until=lambda: any(p.get("key") == "flight.decision" for p in runtime.bb.puts),
     )
     assert _fly_proposals(runtime) == []
-    note = next(p for p in runtime.bb.puts if p.get("key") == "flight.no_vessel")
+    note = next(p for p in runtime.bb.puts if p.get("key") == "flight.decision")
     assert "not steering" in str(note["value"]["text"])
+    assert note["value"]["action_id"] is None

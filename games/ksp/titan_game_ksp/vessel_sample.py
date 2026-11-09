@@ -6,6 +6,8 @@ already used by titan-actions. This does not require kOS or MechJeb.
 
 from __future__ import annotations
 
+import math
+import time
 from typing import Any
 
 _SCENE = {
@@ -89,6 +91,17 @@ def _vessel_raw(vessel: Any, *, scene: str, paused: bool) -> dict[str, Any]:
     stage = _num(control, "current_stage")
     if stage is not None:
         raw["stage_current"] = int(stage)
+    rate = _angular_rate(vessel, ref)
+    if rate is not None:
+        raw["angular_rate_rad_s"] = rate
+    prograde_pitch, prograde_heading = _surface_prograde(vessel, ref)
+    if prograde_pitch is not None:
+        raw["prograde_pitch_deg"] = prograde_pitch
+    if prograde_heading is not None:
+        raw["prograde_heading_deg"] = prograde_heading
+    hottest = _max_temp_ratio(vessel)
+    if hottest is not None:
+        raw["max_temp_ratio"] = hottest
     if orbit is not None:
         apo = _num(orbit, "apoapsis_altitude")
         if apo is not None:
@@ -156,6 +169,143 @@ def _num(obj: Any, name: str) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     return None
+
+
+def _angular_rate(vessel: Any, ref: Any) -> float | None:
+    """Magnitude of ``vessel.angular_velocity`` in rad/s (kRPC surface frame)."""
+    fn = getattr(vessel, "angular_velocity", None)
+    if not callable(fn):
+        return None
+    try:
+        vector = fn(ref) if ref is not None else fn()
+    except TypeError:
+        try:
+            vector = fn()
+        except Exception:
+            return None
+    except Exception:
+        return None
+    return _magnitude(vector)
+
+
+def _surface_prograde(vessel: Any, ref: Any) -> tuple[float | None, float | None]:
+    """Pitch and heading of surface velocity.
+
+    kRPC ``vessel.surface_reference_frame`` is (up, north, east). Prograde is
+    undefined when the vessel is barely moving — the same case kOS refuses to
+    ``lock steering to srfprograde``.
+    """
+    fn = getattr(vessel, "velocity", None)
+    if not callable(fn) or ref is None:
+        return None, None
+    try:
+        vector = fn(ref)
+    except Exception:
+        return None, None
+    parsed = _vec3(vector)
+    if parsed is None:
+        return None, None
+    up, north, east = parsed
+    horizontal = math.hypot(north, east)
+    if horizontal < 1.0 and abs(up) < 1.0:
+        return None, None
+    pitch = math.degrees(math.atan2(up, horizontal))
+    heading = math.degrees(math.atan2(east, north)) % 360.0
+    return pitch, heading
+
+
+_HEAT_CACHE: tuple[float, float] | None = None
+_HEAT_PERIOD_S = 1.0
+
+
+def _max_temp_ratio(vessel: Any) -> float | None:
+    """Hottest part temperature / max, including skin.
+
+    Part temperature is an RPC per part, so this walks engines first (the parts
+    that actually cook under throttle), caps the walk, and reuses the result for
+    a second. The flight loop only needs it at 1 Hz.
+    """
+    global _HEAT_CACHE
+    now = time.monotonic()
+    if _HEAT_CACHE is not None and now - _HEAT_CACHE[0] < _HEAT_PERIOD_S:
+        return _HEAT_CACHE[1]
+    value = _scan_heat(vessel)
+    if value is not None:
+        _HEAT_CACHE = (now, value)
+    return value
+
+
+def _scan_heat(vessel: Any) -> float | None:
+    parts = getattr(vessel, "parts", None)
+    if parts is None:
+        return None
+    listed = _heat_parts(parts)
+    best: float | None = None
+    for part in listed[:16]:
+        for num_name, den_name in (
+            ("temperature", "max_temperature"),
+            ("skin_temperature", "max_skin_temperature"),
+            ("skin_temperature", "skin_max_temperature"),
+        ):
+            value = _ratio(part, num_name, den_name)
+            if value is None:
+                continue
+            best = value if best is None else max(best, value)
+    return best
+
+
+def _heat_parts(parts: Any) -> list[Any]:
+    engines = getattr(parts, "engines", None)
+    found: list[Any] = []
+    if engines is not None:
+        try:
+            for engine in list(engines)[:16]:
+                part = getattr(engine, "part", None)
+                found.append(engine if part is None else part)
+        except Exception:
+            found = []
+    if found:
+        return found
+    try:
+        all_parts = getattr(parts, "all", None)
+        if all_parts is None:
+            return []
+        return list(all_parts)
+    except Exception:
+        return []
+
+
+def _ratio(obj: Any, num_name: str, den_name: str) -> float | None:
+    num = _num(obj, num_name)
+    den = _num(obj, den_name)
+    if num is None or den is None or den <= 0.0:
+        return None
+    return num / den
+
+
+def _magnitude(vector: Any) -> float | None:
+    parsed = _vec3(vector)
+    if parsed is None:
+        return None
+    x, y, z = parsed
+    return math.sqrt(x * x + y * y + z * z)
+
+
+def _vec3(value: Any) -> tuple[float, float, float] | None:
+    if isinstance(value, (str, bytes)) or value is None:
+        return None
+    try:
+        items = list(value)
+    except TypeError:
+        return None
+    if len(items) < 3:
+        return None
+    nums: list[float] = []
+    for item in items[:3]:
+        if isinstance(item, bool) or not isinstance(item, (int, float)):
+            return None
+        nums.append(float(item))
+    return nums[0], nums[1], nums[2]
 
 
 def _bool(obj: Any, name: str) -> bool | None:

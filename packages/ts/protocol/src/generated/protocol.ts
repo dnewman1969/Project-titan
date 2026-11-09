@@ -766,6 +766,12 @@ export const VehicleSchema = z.object({
   situation: z.string().nullable(),
   stage: StageSchema.nullable(),
   orbit: OrbitSchema.nullable(),
+  /** Magnitude of angular velocity in rad/s. Null when the adapter did not read it. */
+  angular_rate_rad_s: z.number().nullable().optional(),
+  /** Surface-prograde pitch in degrees. Null when velocity is too small to define it. */
+  prograde_pitch_deg: z.number().nullable().optional(),
+  /** Surface-prograde heading in degrees. Null when velocity is too small to define it. */
+  prograde_heading_deg: z.number().nullable().optional(),
 }).strict();
 export type Vehicle = z.infer<typeof VehicleSchema>;
 

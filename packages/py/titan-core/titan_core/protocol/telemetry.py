@@ -100,6 +100,18 @@ class Vehicle(ProtocolModel):
     )
     stage: Stage | None
     orbit: Orbit | None
+    angular_rate_rad_s: float | None = Field(
+        default=None,
+        description="Magnitude of angular velocity in rad/s. Null when the adapter did not read it.",
+    )
+    prograde_pitch_deg: float | None = Field(
+        default=None,
+        description="Surface-prograde pitch in degrees. Null when velocity is too small to define it.",
+    )
+    prograde_heading_deg: float | None = Field(
+        default=None,
+        description="Surface-prograde heading in degrees. Null when velocity is too small to define it.",
+    )
 
 
 class Resource(ProtocolModel):

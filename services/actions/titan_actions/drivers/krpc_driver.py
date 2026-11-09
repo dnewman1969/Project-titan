@@ -115,7 +115,7 @@ class KrpcDriver:
                 control.roll = _clamp_axis(float(params.get("roll", params.get("value", 0.0))))
                 return True, None
             if action_id == "ksp.fly":
-                return _apply_fly(vessel, control, params)
+                return _apply_fly(conn, vessel, control, params)
             return False, f"unknown ksp action {action_id!r}"
         except Exception as exc:
             return False, f"krpc: {exc}"
@@ -137,13 +137,15 @@ class KrpcDriver:
             log.warning("krpc_reset_failed", err=str(exc))
 
 
-def _apply_fly(vessel: Any, control: Any, params: dict[str, Any]) -> tuple[bool, str | None]:
+def _apply_fly(conn: Any, vessel: Any, control: Any, params: dict[str, Any]) -> tuple[bool, str | None]:
     """Hold throttle plus either the kRPC autopilot (pitch/heading) or SAS.
 
     kRPC cannot run SAS and the autopilot together. A heading target engages
-    ``auto_pilot`` in the surface frame (the tutorial's ``target_pitch_and_heading``).
-    Without a target, SAS stays on so the vessel does not tumble. Throttle is
-    applied after staging so a launch stage does not leave the engines at zero.
+    ``auto_pilot`` in the surface frame (the tutorial's ``target_pitch_and_heading``)
+    with a slow stopping time so a tall rocket does not hunt itself into a tumble.
+    Without a target, SAS stays on (stability assist, unless ``sas_mode`` says
+    otherwise) so rotation can damp. Throttle is applied after staging so a
+    launch stage does not leave the engines at zero.
     """
     if params.get("stage"):
         control.activate_next_stage()
@@ -157,6 +159,7 @@ def _apply_fly(vessel: Any, control: Any, params: dict[str, Any]) -> tuple[bool,
             reference = getattr(vessel, "surface_reference_frame", None)
             if reference is not None:
                 autopilot.reference_frame = reference
+            _steady_autopilot(autopilot)
             autopilot.target_pitch_and_heading(
                 max(-90.0, min(90.0, float(pitch))),
                 float(heading) % 360.0,
@@ -169,12 +172,49 @@ def _apply_fly(vessel: Any, control: Any, params: dict[str, Any]) -> tuple[bool,
             log.warning("krpc_autopilot_failed", err=str(exc))
             try:
                 control.sas = True
+                _apply_sas_mode(conn, control, "stability")
             except Exception as sas_exc:
                 log.warning("krpc_sas_fallback_failed", err=str(sas_exc))
             return True, None
     _disengage_autopilot(vessel)
     control.sas = bool(params.get("sas", True))
+    if control.sas:
+        _apply_sas_mode(conn, control, params.get("sas_mode") or "stability")
     return True, None
+
+
+def _steady_autopilot(autopilot: Any) -> None:
+    """Ease kRPC's default gains. A short stopping time over-corrects and tumbles.
+
+    ``stopping_time`` is how long the autopilot allows itself to kill the
+    rotation; larger is gentler. ``attenuation_angle`` (degrees) is where it
+    stops cranking the controls. ``target_roll`` keeps the craft wings-level.
+    """
+    for name, value in (
+        # One value per axis (pitch, roll, yaw). The default 0.5 s hunts.
+        ("stopping_time", (2.0, 2.0, 2.0)),
+        ("attenuation_angle", (1.0, 1.0, 1.0)),
+        ("target_roll", 0.0),
+    ):
+        try:
+            setattr(autopilot, name, value)
+        except Exception as exc:
+            log.warning("krpc_autopilot_gain_failed", gain=name, err=str(exc))
+
+
+def _apply_sas_mode(conn: Any, control: Any, mode: object) -> None:
+    if not isinstance(mode, str) or not mode.strip():
+        return
+    enum_name = {"stability": "stability_assist", "prograde": "prograde"}.get(mode.strip(), mode.strip())
+    center = getattr(conn, "space_center", None)
+    enum = getattr(center, "SASMode", None)
+    value = getattr(enum, enum_name, None) if enum is not None else None
+    if value is None:
+        return
+    try:
+        control.sas_mode = value
+    except Exception as exc:
+        log.warning("krpc_sas_mode_failed", mode=enum_name, err=str(exc))
 
 
 def _disengage_autopilot(vessel: Any) -> None:

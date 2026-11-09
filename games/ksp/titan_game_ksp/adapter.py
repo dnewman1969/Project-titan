@@ -15,6 +15,7 @@ from titan_core.protocol.telemetry import (
     Attitude,
     Controls,
     Damage,
+    Engine,
     Environment,
     Orbit,
     Resource,
@@ -234,7 +235,7 @@ class KspAdapter(GameAdapter):
                 cruise_control_mps=None,
                 lights=None,
             ),
-            engine=None,
+            engine=_engine(raw),
             damage=Damage(overall=None, parts={}),
             situation=situation,
             stage=Stage(
@@ -243,6 +244,9 @@ class KspAdapter(GameAdapter):
                 dv_ms=_float(raw.get("stage_dv_ms")),
             ),
             orbit=_orbit(raw),
+            angular_rate_rad_s=_float(raw.get("angular_rate_rad_s")),
+            prograde_pitch_deg=_float(raw.get("prograde_pitch_deg")),
+            prograde_heading_deg=_float(raw.get("prograde_heading_deg")),
         )
         return TelemetryFrame(
             schema=TELEMETRY_SCHEMA,
@@ -308,6 +312,13 @@ class KspAdapter(GameAdapter):
             "launch_uri": manifest.launch.steam_uri,
             "executable_path": profile.executable_path,
         }
+
+
+def _engine(raw: RawFrame) -> Engine | None:
+    ratio = _float(raw.get("max_temp_ratio"))
+    if ratio is None:
+        return None
+    return Engine(running=None, rpm=None, temp_c=None, max_temp_ratio=ratio)
 
 
 def _attitude(raw: RawFrame) -> Attitude | None:

@@ -43,7 +43,7 @@ HIL does **not** touch the game; it updates in-memory state and optional `hil.nd
 | Driver  | `TITAN_PLAY_BACKEND=auto` (default) + `TITAN_GAME_SLUG=ksp`                                              |
 | Actions | `ksp.fly` (throttle + SAS or autopilot pitch/heading), plus thrust/stage/RCS/brakes/gear and `ksp.steer` |
 
-With play on and the game set to KSP, the orchestrator runs a **flight loop** (about 1 Hz) on the latest telemetry frame. It publishes `ksp.fly`: kRPC's built-in autopilot holds pitch and heading 90° east (gravity turn after 250 m, throttle eased through high dynamic pressure, full throttle and nose-up if the vessel is low and descending, throttle idle and SAS once apoapsis is above 80 km or the craft is in orbit). That is the same hold as the kRPC launch-into-orbit tutorial and kOS `lock steering to heading()`. kOS and MechJeb are not required. The first pre-launch tick also stages once so the engine actually lights. If the scene is not flight, or the frame has no vessel, the loop writes a blackboard discovery (`flight.no_vessel` / `flight.waiting`) and does not send controls. Proposals land in `lessons` (`play.flight.*`) and outcomes in `lessons` (`feedback.*`), which the desktop learn strip already polls.
+With play on and the game set to KSP, the orchestrator runs a **flight loop** (about 1 Hz) on the latest telemetry frame. It publishes `ksp.fly` from the vessel kRPC is already sampling (situation, altitude, speed, throttle, heading, pitch, roll, angular velocity, surface prograde, hottest part). Early in the ascent it holds surface prograde when that is a climb, otherwise a shallow 60° climb on heading 90° east. Higher up it holds heading 90° and, once the nose is there, turns SAS on so the autopilot stops hunting. Throttle is cut if a part exceeds 85% of its max temperature or speed passes 280 m/s below 12 km, and eased through high dynamic pressure. A high angular rate (a tumble) zeros throttle and damps with SAS before any new steering. The first pre-launch tick still stages once; later ticks do not. kOS and MechJeb are not required. If the scene is not flight, the frame has no vessel, or the game is paused, the loop writes the reason and does not send controls. That reason is the blackboard discovery `flight.decision` (what the crew is doing and why). Proposals land in `lessons` (`play.flight.*`) and outcomes in `lessons` (`feedback.*`), which the desktop learn strip polls — a new decision replaces the previous line instead of leaving the strip on “Waiting…”.
 
 If kRPC is down, `action.executed` reports `ok: false` with a connect error (no fake success). Live telemetry retries the port instead of exiting.
 
@@ -83,7 +83,7 @@ Linux dev hosts cannot drive SCS; use HIL or a Windows machine.
 
 - `services/actions/titan_actions/drivers/` — kRPC, SCS, HIL
 - `services/orchestrator/titan_orchestrator/play_policy.py` — event → proposal
-- `services/orchestrator/titan_orchestrator/flight_policy.py` — continuous KSP heading hold
+- `services/orchestrator/titan_orchestrator/flight_policy.py` — KSP ascent: prograde or shallow climb, then a stable heading
 - `services/orchestrator/titan_orchestrator/session_loops.py` — telemetry, learn, flight loop, feedback
 - `services/api/titan_api/youtube_stub.py` — YouTube auth + draft upload stubs
 - `services/actions/README.md` — backend env table

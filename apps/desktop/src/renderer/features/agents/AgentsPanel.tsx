@@ -16,16 +16,15 @@ import { portraitUrl } from "../../services/avatar/portrait";
 import { speakAgentLine } from "../../services/voice/speak";
 import { Panel } from "../operations/Panel";
 import { agentSaid, setSpeaking } from "./agentsChatSlice";
-import { OWL_VOICE_BY_ROLE, pickBanterLine, type BanterKind, type RosterEntry } from "./arrogantLines";
+import {
+  DEMO_ROSTER,
+  OWL_VOICE_BY_ROLE,
+  pickBanterLine,
+  type BanterKind,
+  type RosterEntry,
+} from "./arrogantLines";
 
-/** Appendix A KSP "Mission Control" team — demo chat + voice until live bus (M7.T2). */
-export const PREVIEW_ROSTER: readonly RosterEntry[] = [
-  { persona_slug: "wernher", display_name: "Wernher", role: "director" },
-  { persona_slug: "gene", display_name: "Gene", role: "flight_engineer" },
-  { persona_slug: "linus", display_name: "Linus", role: "mission_planner" },
-  { persona_slug: "val", display_name: "Val", role: "navigator" },
-  { persona_slug: "jeb-radio", display_name: "Jeb Radio", role: "commentator.host" },
-];
+export const PREVIEW_ROSTER = DEMO_ROSTER;
 
 export function AgentsPanel() {
   const dispatch = useAppDispatch();

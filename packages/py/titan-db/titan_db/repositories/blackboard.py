@@ -92,17 +92,18 @@ class BlackboardRepository:
         sections: list[str] | None = None,
         since_bb_version: int | None = None,
     ) -> tuple[int, list[BlackboardEntry]]:
-        query = text(
-            """
+        base = """
             SELECT id, session_id, section, key, version, op, value, author,
                    confidence, evidence, message_id, bb_version, expires_at, created_at
             FROM blackboard_current
             WHERE session_id = :session_id
-              AND (:since IS NULL OR bb_version > :since)
-            ORDER BY section, key
-            """
-        )
-        result = await self._session.execute(query, {"session_id": session_id, "since": since_bb_version})
+        """
+        if since_bb_version is None:
+            query = text(base + " ORDER BY section, key")
+            result = await self._session.execute(query, {"session_id": session_id})
+        else:
+            query = text(base + " AND bb_version > :since ORDER BY section, key")
+            result = await self._session.execute(query, {"session_id": session_id, "since": since_bb_version})
         entries: list[BlackboardEntry] = []
         for row in result.mappings():
             if sections is not None and row["section"] not in sections:

@@ -4,19 +4,22 @@ import { logEvent } from "../features/events/eventsSlice";
 import { safetyStateReceived } from "../features/safety/safetySlice";
 import { telemetryFrameReceived } from "../features/telemetry/gameTelemetrySlice";
 import { metricsReceived } from "../features/telemetry/systemSlice";
-import { useAppDispatch } from "./hooks";
+import { useAppDispatch, useAppSelector } from "./hooks";
 import { getTitan } from "./runtime";
 import { LiveConnection, wsUrl } from "./ws";
 
 /** Live system and session telemetry/events over the WS gateway (M1.T6, M5.T6, M7.T4). */
 export function useLiveChannels(): void {
   const dispatch = useAppDispatch();
+  const activeSessionId = useAppSelector((s) => s.sessions.activeSessionId);
+  const legacyDemo = import.meta.env.VITE_TITAN_DEMO_SESSION?.trim();
+  const sessionId = activeSessionId ?? (legacyDemo && legacyDemo.length > 0 ? legacyDemo : null);
+
   useEffect(() => {
     const titan = getTitan();
     if (titan.backend === "none") return;
-    const demoSession = import.meta.env.VITE_TITAN_DEMO_SESSION;
-    const sessionChannels = demoSession
-      ? [`session.${demoSession}.telemetry`, `session.${demoSession}.events`]
+    const sessionChannels = sessionId
+      ? [`session.${sessionId}.telemetry`, `session.${sessionId}.events`]
       : [];
     const connection = new LiveConnection({
       url: wsUrl(titan.apiBase),
@@ -43,5 +46,5 @@ export function useLiveChannels(): void {
     return () => {
       connection.stop();
     };
-  }, [dispatch]);
+  }, [dispatch, sessionId]);
 }

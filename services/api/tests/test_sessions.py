@@ -106,3 +106,30 @@ def test_session_create_start_stop(api_client: TestClient, game_id: str) -> None
     stopped = api_client.post(f"/api/v1/sessions/{sid}/stop", headers=AUTH, json={"outcome": "success"})
     assert stopped.status_code == 202
     assert stopped.json()["state"] == "ended"
+
+
+def test_demo_session_seeds_director_note(
+    api_client: TestClient, game_slug: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import titan_api.routers.sessions as sessions_routes
+
+    async def noop_replay(_session_id: object) -> None:
+        return None
+
+    monkeypatch.setattr(sessions_routes, "start_demo_replay", noop_replay)
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={
+            "game_slug": game_slug,
+            "title": "demo",
+            "settings": {"agents_enabled": False, "demo_telemetry": True},
+        },
+    )
+    sid = created.json()["id"]
+    started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False})
+    assert started.status_code == 202
+    board = api_client.get(f"/api/v1/sessions/{sid}/blackboard", headers=AUTH)
+    assert board.status_code == 200
+    entries = board.json()["entries"]
+    assert any(e.get("key") == "director.hello" for e in entries)

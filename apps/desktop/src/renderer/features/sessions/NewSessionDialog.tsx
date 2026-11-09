@@ -7,12 +7,12 @@ import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import { useState } from "react";
 
-import { useCreateSessionMutation, useStartSessionMutation } from "../../app/api";
+import { useCreateSessionMutation, useListGamesQuery, useStartSessionMutation } from "../../app/api";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { showNotice } from "../operations/layoutSlice";
 import { closeSessionDialog, setActiveSession } from "./sessionsSlice";
 
-const GAMES = [
+const FALLBACK_GAMES = [
   { slug: "ksp", label: "Kerbal Space Program" },
   { slug: "ets2", label: "Euro Truck Simulator 2" },
   { slug: "ats", label: "American Truck Simulator" },
@@ -29,11 +29,16 @@ export function NewSessionDialog() {
   const open = useAppSelector((s) => s.sessions.dialog === "new");
   const dispatch = useAppDispatch();
   const [title, setTitle] = useState("Observe session");
-  const [gameSlug, setGameSlug] = useState<(typeof GAMES)[number]["slug"]>("ksp");
+  const [gameSlug, setGameSlug] = useState<string>("ksp");
+  const { data: gamesList } = useListGamesQuery(undefined);
   const [createSession, { isLoading: creating }] = useCreateSessionMutation();
   const [startSession, { isLoading: starting }] = useStartSessionMutation();
 
-  const game = GAMES.find((g) => g.slug === gameSlug) ?? GAMES[0];
+  const games: Array<{ slug: string; label: string }> = gamesList?.items.map((g) => ({
+    slug: g.slug,
+    label: g.name,
+  })) ?? [...FALLBACK_GAMES];
+  const game = games.find((g) => g.slug === gameSlug) ?? FALLBACK_GAMES[0];
   const isLoading = creating || starting;
   const onClose = () => {
     dispatch(closeSessionDialog());
@@ -95,11 +100,11 @@ export function NewSessionDialog() {
           label="Game"
           value={gameSlug}
           onChange={(e) => {
-            setGameSlug(e.target.value as (typeof GAMES)[number]["slug"]);
+            setGameSlug(e.target.value);
           }}
           fullWidth
         >
-          {GAMES.map((g) => (
+          {games.map((g) => (
             <MenuItem key={g.slug} value={g.slug}>
               {g.label}
             </MenuItem>

@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from titan_api.auth import Authenticated
+from titan_api.demo_replay import start_demo_replay, stop_demo_replay
 from titan_api.deps import db_session
 from titan_core.clock import SessionClock, utc_now
 from titan_core.config import expand_path
@@ -156,6 +157,25 @@ async def start_session(
         controller.start_orchestrator(session_id, game_slug=game_slug)
     row.state = "live"
     await db.flush()
+    if row.settings.get("demo_telemetry", False):
+        await start_demo_replay(session_id)
+        repo = BlackboardRepository(db)
+        if await repo.latest_entry(session_id, "notes", "director.hello") is None:
+            bb_version = await repo.next_bb_version(session_id)
+            await repo.append(
+                session_id=session_id,
+                section="notes",
+                key="director.hello",
+                version=1,
+                op="put",
+                value={
+                    "text": "I see fixture telemetry. Try to keep up, human — I already optimized the burn.",
+                },
+                author="agent:wernher",
+                confidence=1.0,
+                evidence=[],
+                bb_version=bb_version,
+            )
     return _session_json(row)
 
 
@@ -170,6 +190,7 @@ async def stop_session(
     if row.state in {"ended", "failed"}:
         raise TitanError(ErrorCode.INVALID_STATE_TRANSITION, "session already ended")
     row.state = "stopping"
+    stop_demo_replay(session_id)
     request.app.state.session_controller.stop_orchestrator(session_id)
     row.state = "ended"
     row.ended_at = utc_now()

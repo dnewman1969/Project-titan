@@ -28,6 +28,7 @@ import { useBlackboardAgents } from "../hooks/useBlackboardAgents";
 import { useLiveAgentVoice } from "../hooks/useLiveAgentVoice";
 import { usePlayAttachSync } from "../hooks/usePlayAttachSync";
 import { useRecordingSync } from "../hooks/useRecordingSync";
+import { KrpcObsHelpDialog } from "../features/help/KrpcObsHelpDialog";
 import { MemoryBrowserDialog } from "../features/memory/MemoryBrowserDialog";
 import { YouTubePublishDialog } from "../features/publish/YouTubePublishDialog";
 import { usePhase1Demo } from "../hooks/usePhase1Demo";
@@ -132,6 +133,7 @@ export function App() {
       <FirstRunWizard />
       <YouTubePublishDialog />
       <MemoryBrowserDialog />
+      <KrpcObsHelpDialog />
       <Snackbar
         key={notice?.id}
         open={notice !== null}

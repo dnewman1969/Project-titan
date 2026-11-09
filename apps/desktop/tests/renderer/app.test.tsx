@@ -302,7 +302,7 @@ describe("Operations Center", () => {
     });
   });
 
-  it("handles menu commands: panel toggles, About, and milestone notices", async () => {
+  it("handles menu commands: panels, sessions, logs, kRPC help, and kill", async () => {
     renderApp();
     await waitFor(() => {
       expect(fetchMock.mock.calls.some(([r]) => r.url.endsWith("/settings"))).toBe(true);
@@ -324,15 +324,32 @@ describe("Operations Center", () => {
     expect(screen.getByRole("region", { name: "Webcam" })).toBeInTheDocument();
 
     act(() => {
+      shell.menu("view.toggle.events");
+    });
+    expect(screen.queryByRole("region", { name: "Event Log" })).not.toBeInTheDocument();
+    act(() => {
+      shell.menu("tools.logs");
+    });
+    expect(screen.getByRole("region", { name: "Event Log" })).toBeInTheDocument();
+
+    act(() => {
+      shell.menu("tools.gameDiscovery");
+    });
+    expect(screen.getByText(/Scans Steam/)).toBeInTheDocument();
+
+    act(() => {
       shell.menu("help.about");
     });
     const about = await screen.findByRole("dialog", { name: "About Titan" });
     expect(within(about).getByText("45.2.3")).toBeInTheDocument();
 
     act(() => {
-      shell.menu("view.blackboardInspector");
+      shell.menu("help.krpcObs");
     });
-    expect(await screen.findByText("Blackboard Inspector arrives in M7.T5.")).toBeInTheDocument();
+    const krpc = await screen.findByRole("dialog", { name: "kRPC and OBS" });
+    expect(within(krpc).getByText(/50000/)).toBeInTheDocument();
+    expect(within(krpc).getByText(/4455/)).toBeInTheDocument();
+    expect(screen.queryByText(/arrives in M/)).not.toBeInTheDocument();
 
     act(() => {
       shell.menu("file.newSession");
@@ -342,6 +359,16 @@ describe("Operations Center", () => {
       .setup()
       .click(within(sessionDialog).getByRole("button", { name: "Start learn and play" }));
     expect(await screen.findByText(/Session API is not on this backend yet/)).toBeInTheDocument();
+
+    act(() => {
+      shell.menu("tools.killSwitch");
+    });
+    expect(screen.getAllByText(/Kill switch engaged/).length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([r]) => r.url.endsWith("/safety/kill") && r.method === "POST")).toBe(
+        true,
+      );
+    });
   });
 
   it("filters the event log by category", async () => {

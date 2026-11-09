@@ -40,18 +40,41 @@ function click(menuItem: MenuItemConstructorOptions): void {
 }
 
 describe("menu", () => {
-  it("has the Section 2.13 menus in order", () => {
-    expect(MENU.map((s) => s.label)).toEqual(["FILE", "EDIT", "VIEW", "AI", "RECORD", "TOOLS", "HELP"]);
+  it("has the window menus in order", () => {
+    expect(MENU.map((s) => s.label)).toEqual(["File", "Edit", "View", "AI", "Record", "Tools", "Help"]);
   });
 
-  it("contains every spec menu item", () => {
+  it("uses plain English labels and drops unfinished commands", () => {
     const labels = MENU.flatMap((s) => s.items.flatMap((i) => ("label" in i && i.label ? [i.label] : [])));
-    for (const label of [
-      "New Session",
+    expect(labels).toEqual([
+      "New session",
+      "Exit",
+      "AI agents",
+      "Webcam",
+      "Telemetry",
+      "Event log",
+      "Game discovery",
+      "Memory browser",
+      "Start recording",
+      "Stop recording",
+      "Open recording folder",
+      "Game discovery",
+      "YouTube publish",
+      "Logs",
+      "Kill switch",
+      "Documentation",
+      "Beta test guide",
+      "First-run setup",
+      "kRPC and OBS",
+      "About Titan",
+    ]);
+    for (const label of labels) {
+      expect(label).not.toMatch(/M\d+\.T\d+/);
+    }
+    for (const removed of [
       "Open Session",
       "Replay Session",
       "Settings",
-      "Exit",
       "Personas",
       "Teams",
       "Control Bindings",
@@ -62,50 +85,53 @@ describe("menu", () => {
       "Stop Agents",
       "Models",
       "Director Report",
-      "Memory Browser",
-      "Start Recording",
-      "Stop Recording",
       "Add Marker",
       "Recording Settings",
-      "Open Folder",
-      "Game Discovery",
-      "YouTube Publish",
       "Integration Installer",
-      "Logs",
       "Diagnostics Bundle",
-      "Documentation",
-      "About Titan",
       "Licenses",
     ]) {
-      expect(labels).toContain(label);
+      expect(labels).not.toContain(removed);
     }
-    expect(findMenuItem("record.addMarker")).toMatchObject({ accelerator: "CmdOrCtrl+M" });
+    expect(findMenuItem("file.newSession")).toMatchObject({ accelerator: "CmdOrCtrl+N" });
+    expect(findMenuItem("record.addMarker")).toBeUndefined();
   });
 
   it("builds an Electron template that routes clicks", () => {
     const send = vi.fn();
     const openDocs = vi.fn();
     const template = buildMenuTemplate({ send, openDocs }, { dev: false });
-    const view = section(template, "VIEW");
+    const labels = template.flatMap((sectionItem) =>
+      Array.isArray(sectionItem.submenu)
+        ? sectionItem.submenu.flatMap((entry) => (typeof entry.label === "string" ? [entry.label] : []))
+        : [],
+    );
+    expect(labels.some((label) => /M\d+\.T\d+/.test(label))).toBe(false);
+
+    const view = section(template, "View");
     const agentsToggle = item(view, "view.toggle.agents");
-    expect(agentsToggle).toMatchObject({ type: "checkbox", checked: true });
+    expect(agentsToggle).toMatchObject({ type: "checkbox", checked: true, label: "AI agents" });
     click(agentsToggle);
     expect(send).toHaveBeenCalledWith("view.toggle.agents");
-    click(item(view, "view.blackboardInspector"));
-    expect(send).toHaveBeenCalledWith("view.blackboardInspector");
 
-    const help = section(template, "HELP");
+    const tools = section(template, "Tools");
+    click(item(tools, "tools.killSwitch"));
+    expect(send).toHaveBeenCalledWith("tools.killSwitch");
+    click(item(tools, "tools.logs"));
+    expect(send).toHaveBeenCalledWith("tools.logs");
+
+    const help = section(template, "Help");
     click(item(help, "help.docs"));
     expect(openDocs).toHaveBeenCalledOnce();
-    expect(item(help, "help.licenses").label).toBe("Licenses  (M10.T4)");
+    expect(item(help, "help.krpcObs").label).toBe("kRPC and OBS");
 
-    expect(section(template, "FILE").at(-1)).toEqual({ role: "quit", label: "Exit" });
+    expect(section(template, "File").at(-1)).toEqual({ role: "quit", label: "Exit" });
     expect(view.some((i) => i.role === "toggleDevTools")).toBe(false);
   });
 
   it("adds developer tools only in dev", () => {
     const template = buildMenuTemplate({ send: vi.fn(), openDocs: vi.fn() }, { dev: true });
-    expect(section(template, "VIEW").some((i) => i.role === "toggleDevTools")).toBe(true);
+    expect(section(template, "View").some((i) => i.role === "toggleDevTools")).toBe(true);
   });
 });
 

@@ -83,7 +83,7 @@ class SessionController:
         env = {**os.environ, "TITAN_GAME_SLUG": game_slug}
         if data_dir:
             env["TITAN_SESSION_DATA_DIR"] = data_dir
-        # Fixture / no-install sessions should not pretend to drive kRPC/SCS.
+        # Explicit backend: hil for fixture, krpc/scs when an install is attached.
         if play_backend:
             env["TITAN_PLAY_BACKEND"] = play_backend
         proc = self.spawn(cmd, env=env)

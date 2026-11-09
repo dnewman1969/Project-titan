@@ -207,6 +207,21 @@ export const titanApi = createApi({
           })
           .parse(raw),
     }),
+    getPlayReadiness: build.query<
+      {
+        play_attach: {
+          source: string;
+          backend: string;
+          ready: boolean;
+          message: string;
+          detail?: Record<string, unknown>;
+        };
+      },
+      { gameSlug: string; source: "live" | "fixture" }
+    >({
+      query: ({ gameSlug, source }) =>
+        `/play/readiness?game_slug=${encodeURIComponent(gameSlug)}&source=${source}`,
+    }),
   }),
 });
 
@@ -225,6 +240,7 @@ export const {
   useScanGamesMutation,
   useCreateGameProfileMutation,
   useGetBlackboardQuery,
+  useGetPlayReadinessQuery,
   useKillMutation,
   useResumeMutation,
 } = titanApi;

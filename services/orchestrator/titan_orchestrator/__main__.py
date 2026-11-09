@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import os
 import sys
 from uuid import UUID
 
@@ -32,7 +33,11 @@ async def _run(session_id: UUID, game_slug: str) -> int:
         roster.append({**agent, "instance_id": uuid7()})
     await runtime.register_team(roster)
     await runtime.start()
-    loops = asyncio.create_task(run_session_loops(runtime), name="session-loops")
+    play_enabled = os.environ.get("TITAN_SESSION_PLAY") == "1"
+    loops = asyncio.create_task(
+        run_session_loops(runtime, play_enabled=play_enabled),
+        name="session-loops",
+    )
     log.info("orchestrator_started", session_id=str(session_id), game=game_slug)
     stop = asyncio.Event()
     try:

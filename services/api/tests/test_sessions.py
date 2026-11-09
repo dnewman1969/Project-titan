@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from uuid import UUID
 
 import fakeredis
 import pytest
@@ -189,3 +190,45 @@ def test_session_start_uses_fixture_fallback(
     started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False})
     assert started.status_code == 202
     assert replayed
+
+
+def test_session_start_play_enabled(
+    api_client: TestClient, game_slug: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import titan_api.routers.sessions as sessions_routes
+
+    flags = {"actions": False, "orch": False}
+
+    class _Ctl:
+        def start_orchestrator(self, session_id: UUID, **kwargs: object) -> None:
+            flags["orch"] = True
+
+        def start_actions(self, session_id: UUID) -> None:
+            flags["actions"] = True
+
+        def stop_orchestrator(self, session_id: UUID) -> None:
+            return
+
+        def stop_actions(self, session_id: UUID) -> None:
+            return
+
+    api_client.app.state.session_controller = _Ctl()
+
+    async def noop(*_a: object, **_k: object) -> None:
+        return None
+
+    monkeypatch.setattr(sessions_routes, "start_demo_replay", noop)
+    monkeypatch.setattr(sessions_routes, "_seed_director_demo_line", noop)
+    created = api_client.post(
+        "/api/v1/sessions",
+        headers=AUTH,
+        json={
+            "game_slug": game_slug,
+            "title": "play",
+            "settings": {"agents_enabled": True, "play_enabled": True, "demo_telemetry": True},
+        },
+    )
+    sid = created.json()["id"]
+    started = api_client.post(f"/api/v1/sessions/{sid}/start", headers=AUTH, json={"launch_game": False})
+    assert started.status_code == 202
+    assert flags["actions"] and flags["orch"]

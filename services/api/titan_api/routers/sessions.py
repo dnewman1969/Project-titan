@@ -158,8 +158,11 @@ async def start_session(
     game_row = await db.scalar(select(Game).where(Game.id == row.game_id))
     game_slug = game_row.slug if game_row is not None else "ksp"
     controller = request.app.state.session_controller
+    play_enabled = bool(row.settings.get("play_enabled", False))
     if row.settings.get("agents_enabled", True):
-        controller.start_orchestrator(session_id, game_slug=game_slug)
+        controller.start_orchestrator(session_id, game_slug=game_slug, play_enabled=play_enabled)
+    if play_enabled:
+        controller.start_actions(session_id)
     row.state = "live"
     await db.flush()
     profile: GameProfile | None = None
@@ -227,7 +230,9 @@ async def stop_session(
         raise TitanError(ErrorCode.INVALID_STATE_TRANSITION, "session already ended")
     row.state = "stopping"
     stop_all_session_telemetry(session_id)
-    request.app.state.session_controller.stop_orchestrator(session_id)
+    controller = request.app.state.session_controller
+    controller.stop_actions(session_id)
+    controller.stop_orchestrator(session_id)
     row.state = "ended"
     row.ended_at = utc_now()
     row.outcome = body.outcome

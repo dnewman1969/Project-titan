@@ -6,6 +6,9 @@ requires-python = ">=3.12,<3.13"
 license = "Apache-2.0"
 dependencies = ["titan-core"]
 
+[project.scripts]
+titan-actions = "titan_actions.__main__:main"
+
 [build-system]
 requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"

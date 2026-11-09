@@ -34,6 +34,7 @@ export function NewSessionDialog() {
   const [gameSlug, setGameSlug] = useState<string>("ksp");
   const [profileId, setProfileId] = useState<string>("");
   const [launchGame, setLaunchGame] = useState(false);
+  const [agentPlay, setAgentPlay] = useState(false);
   const { data: gamesList } = useListGamesQuery(undefined);
   const [createSession, { isLoading: creating }] = useCreateSessionMutation();
   const [startSession, { isLoading: starting }] = useStartSessionMutation();
@@ -64,7 +65,10 @@ export function NewSessionDialog() {
       game_profile_id: effectiveProfileId || undefined,
       title: sessionTitle,
       mode: "observe",
-      settings: { agents_enabled: true },
+      settings: {
+        agents_enabled: true,
+        ...(agentPlay ? { play_enabled: true } : {}),
+      },
     });
     if ("data" in result && result.data) {
       const started = await startSession({
@@ -154,6 +158,17 @@ export function NewSessionDialog() {
             label="No install detected — session will use fixture/demo telemetry until you scan."
           />
         )}
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={agentPlay}
+              onChange={(e) => {
+                setAgentPlay(e.target.checked);
+              }}
+            />
+          }
+          label="Enable agent play (beta)"
+        />
         <FormControlLabel
           control={
             <Checkbox

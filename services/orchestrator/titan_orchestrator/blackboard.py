@@ -30,8 +30,10 @@ SECTION_WRITERS: dict[Section, frozenset[str]] = {
     "hypotheses": frozenset({"agent"}),
     "risks": frozenset({"agent", "system"}),
     "discoveries": frozenset({"agent"}),
-    "lessons": frozenset({"director", "system"}),
-    "notes": frozenset({"user"}),
+    # Crew writes lessons/notes as kind=agent (stored author "agent:…"), which is
+    # what the desktop learn strip polls. director/system remain allowed.
+    "lessons": frozenset({"director", "system", "agent"}),
+    "notes": frozenset({"user", "agent"}),
 }
 
 DEFAULT_TTL_S: dict[Section, int | None] = {

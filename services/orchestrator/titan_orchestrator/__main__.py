@@ -35,7 +35,7 @@ async def _run(session_id: UUID, game_slug: str) -> int:
     await runtime.start()
     play_enabled = os.environ.get("TITAN_SESSION_PLAY") == "1"
     loops = asyncio.create_task(
-        run_session_loops(runtime, play_enabled=play_enabled),
+        run_session_loops(runtime, play_enabled=play_enabled, game_slug=game_slug),
         name="session-loops",
     )
     log.info("orchestrator_started", session_id=str(session_id), game=game_slug)

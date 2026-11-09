@@ -10,7 +10,7 @@ from uuid import UUID
 import redis.asyncio as aioredis
 
 from titan_core.protocol.envelope import ENVELOPE_SCHEMA, MAX_ENVELOPE_BYTES, Envelope
-from titan_core.streams import DATA_FIELD, session_bus_stream, xadd_model
+from titan_core.streams import DATA_FIELD, IDLE_READ_ERRORS, session_bus_stream, xadd_model
 
 ORCH_GROUP = "orch"
 ORCH_CONSUMER = "orch-1"
@@ -109,13 +109,19 @@ class SessionBus:
         block_ms: int = 1000,
         last_id: str = ">",
     ) -> list[tuple[str, Envelope]]:
-        rows: Any = await self._client.xreadgroup(
-            group,
-            consumer,
-            {self._stream: last_id},
-            count=count,
-            block=block_ms if block_ms > 0 else None,
-        )
+        try:
+            rows: Any = await self._client.xreadgroup(
+                group,
+                consumer,
+                {self._stream: last_id},
+                count=count,
+                block=block_ms if block_ms > 0 else None,
+            )
+        except IDLE_READ_ERRORS:
+            # Idle BLOCK longer than socket_timeout. Stay in the consumer loop.
+            return []
+        if not rows:
+            return []
         return _parse_xread(rows, session_id=self._session_id)
 
     async def ack(self, group: str, *entry_ids: str) -> int:
@@ -129,7 +135,18 @@ class SessionBus:
         """Blocking tail read without a consumer group (used by the in-process router loop)."""
         cursor = last_id
         while True:
-            rows: Any = await self._client.xread({self._stream: cursor}, count=count, block=block_ms or None)
+            try:
+                rows: Any = await self._client.xread(
+                    {self._stream: cursor}, count=count, block=block_ms or None
+                )
+            except IDLE_READ_ERRORS:
+                if block_ms <= 0:
+                    break
+                continue
+            if not rows:
+                if block_ms <= 0:
+                    break
+                continue
             parsed = _parse_xread(rows, session_id=self._session_id)
             if not parsed:
                 if block_ms <= 0:

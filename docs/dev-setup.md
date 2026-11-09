@@ -157,7 +157,7 @@ CI does not require OBS, Ollama or a real game. Use these when you want tomorrow
 | Milestone       | Local entry point                                       | Offline tests                                                     |
 | --------------- | ------------------------------------------------------- | ----------------------------------------------------------------- |
 | M8 Capture      | `ObsClient` in `services/capture/titan_capture/obs.py`  | `uv run pytest services/capture/tests/test_obs_respx.py`          |
-| M9 Memory tools | `core_tools().call("memory.search", …)` in orchestrator | `uv run pytest services/orchestrator/tests/test_memory_search.py` |
+| M9 Memory | Session stop → Chroma upsert; **AI → Memory Browser**; `memory.search` / `memory.write` tools | `uv run pytest packages/py/titan-memory/tests/test_learnings.py services/api/tests/test_memory_learnings.py` |
 | M10 Installer   | `pnpm --filter @titan/desktop dist`                     | NSIS shell build only until `installer/build-*.ps1` lands         |
 
 When you have OBS running, enable obs-websocket v5 and confirm the API dependency pill shows `obs: up`.

@@ -61,3 +61,20 @@ async def test_chroma_query_and_delete() -> None:
     assert query.called
     await store.delete("risks", ids=["a"])
     assert delete.called
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_chroma_get_lists_documents() -> None:
+    base = "http://127.0.0.1:8766"
+    store = ChromaVectorStore(base)
+    coll_id = "00000000-0000-4000-8000-000000000003"
+    respx.get(f"{base}/api/v1/tenants/titan/databases/default/collections/memories").mock(
+        return_value=httpx.Response(200, json={"id": coll_id, "name": "memories"})
+    )
+    get_route = respx.post(f"{base}/api/v1/tenants/titan/databases/default/collections/{coll_id}/get").mock(
+        return_value=httpx.Response(200, json={"ids": ["a"], "documents": ["doc"], "metadatas": [{}]})
+    )
+    body = await store.get("memories", limit=5)
+    assert body["ids"] == ["a"]
+    assert get_route.called

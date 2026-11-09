@@ -73,6 +73,21 @@ export function useBlackboardAgents(): void {
       const text = valueText(row.value);
       if (!text.trim()) continue;
 
+      if (
+        row.section === "notes" &&
+        typeof row.value === "object" &&
+        row.value !== null &&
+        Reflect.get(row.value, "prior_memory") === true
+      ) {
+        const text = typeof row.value.text === "string" ? row.value.text : JSON.stringify(row.value);
+        dispatch(
+          learnItemReceived({
+            key: `prior:${row.key}`,
+            kind: "lesson",
+            text: `Prior memory: ${text}`,
+          }),
+        );
+      }
       const learnKind = classify(row.section, row.key, row.value);
       if (learnKind) {
         dispatch(

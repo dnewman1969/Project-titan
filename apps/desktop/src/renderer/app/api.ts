@@ -360,6 +360,44 @@ export const titanApi = createApi({
           })
           .parse(raw),
     }),
+    memoryStatus: build.query<{ chroma: { state: string; version?: string; detail?: string } }, undefined>({
+      query: () => "/memory/status",
+    }),
+    browseMemory: build.query<
+      { items: Array<{ id: string; document?: string; metadata?: Record<string, unknown> }>; degraded: boolean },
+      { gameSlug?: string; limit?: number }
+    >({
+      query: ({ gameSlug, limit }) => {
+        const params = new URLSearchParams();
+        if (gameSlug) params.set("game_slug", gameSlug);
+        if (limit != null) params.set("limit", String(limit));
+        const qs = params.toString();
+        return `/memory/browse${qs ? `?${qs}` : ""}`;
+      },
+    }),
+    searchMemory: build.query<
+      { items: Array<{ id: string; document?: string; metadata?: Record<string, unknown>; distance?: number }> },
+      { query: string; gameSlug?: string; n_results?: number }
+    >({
+      query: (body) => ({
+        url: "/memory/search",
+        method: "POST",
+        body: {
+          query: body.query,
+          n_results: body.n_results ?? 12,
+          ...(body.gameSlug ? { game_slug: body.gameSlug } : {}),
+        },
+      }),
+    }),
+    writeMemoryItem: build.mutation<
+      { id: string; written: boolean },
+      { document: string; game_slug: string; kind?: string; session_id?: string }
+    >({
+      query: (body) => ({ url: "/memory/items", method: "POST", body }),
+    }),
+    deleteMemoryItems: build.mutation<{ deleted: number }, { ids: string[] }>({
+      query: (body) => ({ url: "/memory/delete", method: "POST", body }),
+    }),
     getPlayReadiness: build.query<
       {
         play_attach: {
@@ -403,6 +441,12 @@ export const {
   useScanGamesMutation,
   useCreateGameProfileMutation,
   useGetBlackboardQuery,
+  useMemoryStatusQuery,
+  useBrowseMemoryQuery,
+  useLazyBrowseMemoryQuery,
+  useLazySearchMemoryQuery,
+  useWriteMemoryItemMutation,
+  useDeleteMemoryItemsMutation,
   useGetPlayReadinessQuery,
   useLazyGetPlayReadinessQuery,
   useKillMutation,

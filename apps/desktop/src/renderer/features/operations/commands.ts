@@ -2,7 +2,14 @@ import { BETA_TEST_PLAYBOOK_URL, findMenuItem } from "../../../shared/menu";
 import type { AppDispatch, RootState } from "../../app/store";
 import { getTitan } from "../../app/runtime";
 import { openSessionDialog, requestRecordingFromMenu } from "../sessions/sessionsSlice";
-import { setAboutOpen, setFirstRunOpen, setPublishOpen, showNotice, togglePanel } from "./layoutSlice";
+import {
+  setAboutOpen,
+  setFirstRunOpen,
+  setMemoryBrowserOpen,
+  setPublishOpen,
+  showNotice,
+  togglePanel,
+} from "./layoutSlice";
 
 export function handleMenuCommand(id: string, dispatch: AppDispatch, getState: () => RootState): void {
   const item = findMenuItem(id);
@@ -25,6 +32,10 @@ export function handleMenuCommand(id: string, dispatch: AppDispatch, getState: (
   }
   if (item.id === "tools.youtubePublish") {
     dispatch(setPublishOpen(true));
+    return;
+  }
+  if (item.id === "ai.memoryBrowser") {
+    dispatch(setMemoryBrowserOpen(true));
     return;
   }
   if (item.id === "help.firstRun") {

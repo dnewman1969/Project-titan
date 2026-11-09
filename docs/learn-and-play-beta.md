@@ -65,6 +65,8 @@ Linux dev hosts cannot drive SCS; use HIL or a Windows machine.
 | `<session>/recording/manifest.json`   | REC metadata                                                                           |
 | `<session>/recording/timeline.ndjson` | `recording.*`, `play.action`, `lesson.proposed`, `lesson.feedback`, `agent.commentary` |
 | Blackboard `lessons` / `discoveries`  | Crew learnings (UI agents panel / WS)                                                  |
+| Chroma `memories` on session stop     | Persists learnings; **AI → Memory Browser** to search/add/delete                       |
+| Session start `prior.*` notes         | Top prior memories seeded into blackboard for the same `game_slug`                     |
 
 ## Hardware checklist vs software HIL
 

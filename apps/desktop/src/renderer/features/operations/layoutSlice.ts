@@ -13,6 +13,7 @@ export interface LayoutState {
   aboutOpen: boolean;
   firstRunOpen: boolean;
   publishOpen: boolean;
+  memoryBrowserOpen: boolean;
 }
 
 const initialState: LayoutState = {
@@ -23,6 +24,7 @@ const initialState: LayoutState = {
   aboutOpen: false,
   firstRunOpen: false,
   publishOpen: false,
+  memoryBrowserOpen: false,
 };
 
 export const layoutSlice = createSlice({
@@ -58,6 +60,9 @@ export const layoutSlice = createSlice({
     setPublishOpen(state, action: PayloadAction<boolean>) {
       state.publishOpen = action.payload;
     },
+    setMemoryBrowserOpen(state, action: PayloadAction<boolean>) {
+      state.memoryBrowserOpen = action.payload;
+    },
   },
 });
 
@@ -71,4 +76,5 @@ export const {
   setAboutOpen,
   setFirstRunOpen,
   setPublishOpen,
+  setMemoryBrowserOpen,
 } = layoutSlice.actions;

@@ -80,6 +80,30 @@ class ChromaVectorStore:
             )
             response.raise_for_status()
 
+    async def get(
+        self,
+        collection: str,
+        *,
+        limit: int = 50,
+        where: dict[str, Any] | None = None,
+        include: list[str] | None = None,
+    ) -> dict[str, Any]:
+        coll_id = await self._collection_id(collection)
+        payload: dict[str, Any] = {
+            "limit": max(1, min(500, limit)),
+            "include": include or ["metadatas", "documents"],
+        }
+        if where is not None:
+            payload["where"] = where
+        async with local_client(timeout_s=self.timeout_s) as client:
+            response = await client.post(
+                f"{self.base_url}{self._prefix}/collections/{coll_id}/get",
+                json=payload,
+            )
+            response.raise_for_status()
+            body = response.json()
+        return body if isinstance(body, dict) else {}
+
     async def bootstrap(self) -> None:
         for name in COLLECTION_NAMES:
             await self.ensure_collection(name)

@@ -11,8 +11,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from titan_api.auth import LAUNCH_TOKEN_ENV
-from titan_api.memory_ops import format_chroma_rows, format_query_hits
 from titan_api.main import create_app
+from titan_api.memory_ops import format_chroma_rows, format_query_hits
 from titan_core.config import TitanConfig
 from titan_core.protocol.system import SupervisorStatus
 from titan_db.models.games import Game

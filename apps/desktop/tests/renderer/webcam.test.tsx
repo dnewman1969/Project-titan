@@ -113,7 +113,7 @@ describe("WebcamPanel", () => {
       </Provider>,
     );
     expect((await screen.findAllByText("OBS not running")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("No camera").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("OBSBOT Tiny not found.").length).toBeGreaterThan(0);
     expect(screen.getAllByText("no device").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Webcam").textContent).not.toMatch(/stub/i);
   });

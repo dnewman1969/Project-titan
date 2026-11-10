@@ -14,6 +14,7 @@ import {
   ipcMain,
   Menu,
   protocol,
+  screen,
   session,
   shell,
   type OpenDialogOptions,
@@ -25,7 +26,12 @@ import type { GameViewController } from "./gameEmbed/controller";
 import { blankStatus, parseGameViewHold, parseGameViewRect, parseGameViewTarget } from "./gameEmbed/protocol";
 import { DOCS_URL } from "../shared/menu";
 import { resolveMainConfig } from "./config";
-import { applyFirstPaintSwitches, revealWindow } from "./firstPaint";
+import {
+  applyFirstPaintSwitches,
+  describeAcceptedFeatures,
+  nudgeCommittedLayout,
+  revealWindow,
+} from "./firstPaint";
 import { allowCapturePermission } from "./permissions";
 import { postKill, registerKillSwitch } from "./killSwitch";
 import { buildMenuTemplate } from "./menu";
@@ -33,6 +39,7 @@ import {
   APP_INDEX_URL,
   APP_ORIGIN,
   APP_SCHEME,
+  clientFailureReaction,
   isAppUrl,
   readRendererBody,
   resolveAppFile,
@@ -88,6 +95,57 @@ function sendToRenderer(channel: string, payload: unknown): void {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
 }
 
+const nudgeChain = new WeakMap<BrowserWindow, Promise<void>>();
+
+function nudgeWindow(win: BrowserWindow): void {
+  if (win.isDestroyed()) return;
+  const scale = (() => {
+    try {
+      return screen.getPrimaryDisplay().scaleFactor;
+    } catch {
+      return 1;
+    }
+  })();
+  const previous = nudgeChain.get(win) ?? Promise.resolve();
+  const next = previous.then(async () => {
+    if (win.isDestroyed()) return;
+    await nudgeCommittedLayout(
+      {
+        isMaximized: () => win.isMaximized(),
+        getSize: () => win.getSize(),
+        setSize: (width, height) => {
+          win.setSize(width, height);
+        },
+        invalidateClient: () => {
+          void win.webContents.capturePage({ x: 0, y: 0, width: 1, height: 1 }).catch(() => undefined);
+        },
+      },
+      process.platform,
+      scale,
+      () =>
+        new Promise((resolve) => {
+          const timer = setTimeout(resolve, 80);
+          win.once("resize", () => {
+            clearTimeout(timer);
+            resolve();
+          });
+        }),
+    );
+  });
+  nudgeChain.set(
+    win,
+    next.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+}
+
+function showLoadFailure(win: BrowserWindow, page: string | null): void {
+  if (!page || win.isDestroyed()) return;
+  void win.loadURL(page);
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1600,
@@ -109,8 +167,37 @@ function createWindow(): BrowserWindow {
       devTools: !app.isPackaged,
     },
   });
+  const reloadUrl = devServerUrl ?? APP_INDEX_URL;
   win.once("ready-to-show", () => {
     revealWindow(win, process.platform);
+  });
+  win.webContents.on("did-finish-load", () => {
+    setTimeout(() => {
+      nudgeWindow(win);
+    }, 50);
+  });
+  win.webContents.on("did-fail-load", (_event, errorCode, description, url, isMainFrame) => {
+    showLoadFailure(
+      win,
+      clientFailureReaction({
+        kind: "did-fail-load",
+        errorCode,
+        description,
+        url,
+        isMainFrame,
+        reloadUrl,
+      }),
+    );
+  });
+  win.webContents.on("render-process-gone", (_event, details) => {
+    showLoadFailure(
+      win,
+      clientFailureReaction({
+        kind: "render-process-gone",
+        description: details.reason,
+        reloadUrl,
+      }),
+    );
   });
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   win.webContents.on("will-navigate", (event, url) => {
@@ -182,7 +269,13 @@ ipcMain.on(IPC.gameViewHold, (event, payload: unknown) => {
   if (!isAppUrl(event.senderFrame?.url, devServerUrl)) return;
   const hold = parseGameViewHold(payload);
   if (!hold) return;
-  gameView?.setHold("modal", hold.on);
+  gameView?.setHold(hold.reason, hold.on);
+});
+
+ipcMain.on(IPC.rendererCommitted, (event) => {
+  if (!isAppUrl(event.senderFrame?.url, devServerUrl)) return;
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win) nudgeWindow(win);
 });
 
 ipcMain.on(IPC.gameViewFocus, (event) => {
@@ -245,6 +338,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   void app.whenReady().then(() => {
+    console.log(`[paint] ${describeAcceptedFeatures(app.commandLine.getSwitchValue("disable-features"))}`);
     harden();
     serveRenderer();
     Menu.setApplicationMenu(

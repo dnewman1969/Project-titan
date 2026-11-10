@@ -19,6 +19,7 @@ interface SessionsState {
   /** Pid of the game process Titan launched for this session, when the API reported one. */
   gamePid: number | null;
   recordingActive: boolean;
+  recordingStartedAt: number | null;
   recordingMenuRequest: "start" | "stop" | null;
   recordingRootDir: string | null;
 }
@@ -35,6 +36,7 @@ const initialState: SessionsState = {
   playAttachMessage: null,
   gamePid: null,
   recordingActive: false,
+  recordingStartedAt: null,
   recordingMenuRequest: null,
   recordingRootDir: null,
 };
@@ -73,6 +75,7 @@ export const sessionsSlice = createSlice({
       state.activeGameSlug = action.payload.gameSlug ?? null;
       state.gamePid = action.payload.gamePid ?? null;
       state.recordingActive = action.payload.recordingActive ?? false;
+      state.recordingStartedAt = state.recordingActive ? Date.now() : null;
       state.recordingRootDir = action.payload.recordingRootDir ?? null;
       state.sessionSource = action.payload.sessionSource ?? null;
       state.playEnabled = action.payload.playEnabled ?? false;
@@ -81,6 +84,8 @@ export const sessionsSlice = createSlice({
       state.playAttachMessage = action.payload.playAttachMessage ?? null;
     },
     setRecordingActive(state, action: PayloadAction<boolean>) {
+      if (action.payload && !state.recordingActive) state.recordingStartedAt = Date.now();
+      if (!action.payload) state.recordingStartedAt = null;
       state.recordingActive = action.payload;
     },
     setPlayEnabled(
@@ -124,6 +129,7 @@ export const sessionsSlice = createSlice({
       state.playAttachMessage = null;
       state.gamePid = null;
       state.recordingActive = false;
+      state.recordingStartedAt = null;
       state.recordingMenuRequest = null;
       state.recordingRootDir = null;
     },

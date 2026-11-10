@@ -41,24 +41,16 @@ export function formatMetrics(m: SystemMetrics | null): MetricCell[] {
 export function TelemetryBar() {
   const latest = useAppSelector((s) => s.system.latest);
   const history = useAppSelector((s) => s.system.history);
-  const gameFrame = useAppSelector((s) => s.gameTelemetry.latest);
   const gameSpeedHistory = useAppSelector((s) => s.gameTelemetry.speedHistory);
-  const cells = formatMetrics(latest);
-  if (gameFrame?.vehicle.velocity?.speed_mps != null) {
-    const speed = Math.round(gameFrame.vehicle.velocity.speed_mps * 3.6);
-    const fpsCell = cells.find((c) => c.key === "fps");
-    if (fpsCell) fpsCell.label = "Speed";
-    if (fpsCell) fpsCell.value = `${speed} km/h`;
-  }
+  const cells = formatMetrics(latest).filter((cell) => cell.key !== "goals" && cell.key !== "tasks");
   const cpuSeries = history.slice(-120).map((m, i) => ({ i, cpu: m.cpu_pct }));
   const speedSeries = gameSpeedHistory.map((v, i) => ({ i, speed: v * 3.6 }));
   return (
     <Paper
       component="section"
-      aria-label="Telemetry bar"
+      aria-label="Telemetry"
       variant="outlined"
       sx={{
-        gridArea: "telemetry",
         display: "flex",
         alignItems: "center",
         flexWrap: "wrap",
@@ -66,8 +58,12 @@ export function TelemetryBar() {
         px: 1,
         py: 0.5,
         gap: 0.5,
+        bgcolor: "transparent",
       }}
     >
+      <Typography variant="overline" color="text.secondary" sx={{ px: 1, lineHeight: 2 }}>
+        Titan
+      </Typography>
       {cells.map((cell, index) => (
         <Box
           key={cell.key}

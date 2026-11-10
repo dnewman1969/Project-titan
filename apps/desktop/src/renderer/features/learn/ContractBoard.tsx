@@ -152,15 +152,6 @@ export function ContractBoard({ model, emptyMessage }: { model: ContractBoardMod
         </Typography>
       ) : (
         <>
-          <Section title="Offered">
-            {model.offered.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">
-                No contracts offered.
-              </Typography>
-            ) : (
-              model.offered.map((contract) => <OfferedCard key={contract.title} contract={contract} />)
-            )}
-          </Section>
           <Section title="Accepted">
             {model.accepted ? (
               <AcceptedCard contract={model.accepted} />
@@ -168,6 +159,15 @@ export function ContractBoard({ model, emptyMessage }: { model: ContractBoardMod
               <Typography variant="body2" color="text.secondary">
                 No contract has been accepted.
               </Typography>
+            )}
+          </Section>
+          <Section title="Offered">
+            {model.offered.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No contracts offered.
+              </Typography>
+            ) : (
+              model.offered.map((contract) => <OfferedCard key={contract.title} contract={contract} />)
             )}
           </Section>
           <Section title="Lessons from misses">

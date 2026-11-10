@@ -55,6 +55,9 @@ const bridge: TitanBridge = {
   gameViewHold: (reason, on) => {
     ipcRenderer.send(IPC.gameViewHold, { reason, on });
   },
+  rendererCommitted: () => {
+    ipcRenderer.send(IPC.rendererCommitted);
+  },
   gameViewFocus: () => {
     ipcRenderer.send(IPC.gameViewFocus);
   },

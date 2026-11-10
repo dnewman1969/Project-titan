@@ -467,28 +467,30 @@ class GameAdapter(ABC):
 - Disk guard: refuse to start under 20 GB free. Warn at 10 minutes of remaining capacity based on the measured bitrate.
 
 ### 2.13 UI architecture and layout
-Electron with `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`. Preload exposes `window.titan = { apiBase, token, platform, onKillSwitch(), onMenuCommand() }` (plus read-only `backend`, `killHotkey` and `versions` for the About dialog). The packaged renderer is served from the privileged `app://titan` scheme, not `file://` (Section 9.6). State is Redux Toolkit. Server data comes from RTK Query. Realtime data comes from one `WsClient` middleware that dispatches into slices (`chat`, `telemetry`, `events`, `recording`, `system`, `safety`). The telemetry slice keeps a ring buffer (600 frames) for Recharts sparklines.
+Electron with `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`. Preload exposes `window.titan = { apiBase, token, platform, onKillSwitch(), onMenuCommand() }` (plus read-only `backend`, `killHotkey` and `versions` for the About dialog). The packaged renderer is served from the privileged `app://titan` scheme, not `file://` (Section 9.6). `Start-Titan.ps1` launches `pnpm dev`, so the window David opens is the Vite URL, not `app://`. A load failure on either path shows a page that names the error and offers Reload. State is Redux Toolkit. Server data comes from RTK Query. Realtime data comes from one `WsClient` middleware that dispatches into slices (`chat`, `telemetry`, `events`, `recording`, `system`, `safety`). The telemetry slice keeps a ring buffer (600 frames) for Recharts sparklines.
+
+The Operations Center is one program monitor, not a switcher and not a script editor. The game is the only flexible region. On Windows the live game is a borderless owned window locked to the program hole (ADR 0011's capturer preview is not this surface). The hole is the only rectangle sent to that window. A rectangle that starts in the session bar, or that covers the status strip, is rejected and not placed. Record sits on the program. The webcam and the accepted contract stay in the right rail. Crew, the rail, and the event drawer can collapse. The session bar, the program, and transport cannot. Machine numbers are text on the status strip, prefixed Titan, or hidden with View → Telemetry. They are not drawn on the game. An FPS overlay on the game window is RivaTuner, not Titan.
+
+Before React runs, `index.html` already paints the session line and a bordered PROGRAM frame that says "Opening the Operations Center". The shell's min-height is 760px. `height: 100%` on `html`, `body`, and `#root` is not the only size, because a hidden window can report a 0px viewport and a percentage of that viewport stays 0. The window is shown on `ready-to-show` without a size nudge. The nudge runs after the document has loaded and again after React commits, and it waits between the two sizes. A maximized window is not resized with `setSize`.
 ```
-+--------------------------------------------------------------------------------+
-| FILE | EDIT | VIEW | AI | RECORD | TOOLS | HELP              [REC 00:12:31] [KILL] |
-+--------------------------------------------------------------------------------+
-|                                                                                |
-|                         GAME WINDOW (desktopCapturer preview)                  |
-|                         overlay: scene, mission, active event toasts           |
-|                                                                                |
-+-------------------------------------------+------------------------------------+
-| AI AGENTS PANEL                           | WEBCAM PANEL                       |
-|  [Director] [Flight Eng] [Planner] ...    |  MJPEG preview + face box          |
-|  chat stream: avatar, name, role colour,  |  mic level meter (dBFS)            |
-|  streaming text, event chips, @mentions   |  REC state per track, dropped fr.  |
-|  input: "Message the crew..."  [Send]     |                                    |
-+-------------------------------------------+------------------------------------+
-| FPS 72 | CPU 38% | GPU 81% | VRAM 9.8/12G | RAM 21G | TOKENS 4.1k/m | GOALS 2 | TASKS 5 |
-+--------------------------------------------------------------------------------+
-| EVENT LOG (virtualized, filter by category/severity, click -> jump marker)        |
-+--------------------------------------------------------------------------------+
++-- native menu: File Edit View AI Record Tools Help ------------------+
+| SESSION BAR                                                            |
+| Kerbal · session title · Live/Fixture · accepted contract · goals      |
+| Agent play · KILL                                                      |
++-- CREW 280px --+-- PROGRAM (the only flexible region) --+-- RAIL 300 --+
+| portraits      | PROGRAM                                 | Webcam 16:9  |
+| speaking line  | live game, or a named slate             | mic · tracks |
+| chat           | never an unlabeled black page           | Accepted     |
+| timeline       |                                         | contract     |
++----------------+-- TRANSPORT ----------------------------+              |
+|                | REC  00:12:31   reason                  |              |
+|                | Marker · Focus game · Folder            |              |
++----------------+-----------------------------------------+--------------+
+| STATUS: API · Database · Services · OBS · attach · folder · last event  |
+| Titan CPU GPU RAM FPS, only when View → Telemetry is on                  |
++--------------------------------------------------------------------------+
 ```
-Menus: **FILE** (New Session, Open Session, Replay Session, Settings, Exit). **EDIT** (Personas, Teams, Control Bindings). **VIEW** (toggle panels, Blackboard Inspector, Message Inspector, Telemetry Charts). **AI** (Start/Stop Agents, Models, Director Report, Memory Browser). **RECORD** (Start/Stop, Add Marker `Ctrl+M`, Recording Settings, Open Folder). **TOOLS** (Game Discovery, Integration Installer, Logs, Diagnostics bundle). **HELP** (Docs, About, Licenses).
+Menus: **FILE** (New session, Exit). **EDIT** (undo, redo, cut, copy, paste, select all). **VIEW** (Crew, Webcam, Contract, Telemetry, Event log, Game discovery). **AI** (Memory browser). **RECORD** (Start, Stop, Open folder). Marker is `Ctrl+M` on the transport row. **TOOLS** (Game discovery, YouTube publish, Logs, Kill switch). **HELP** (Documentation, Beta test guide, First-run setup, kRPC and OBS, About).
 
 ---
 
@@ -2032,7 +2034,7 @@ Each task becomes a branch and a PR (see "How coding workers use this spec"). Te
 | M7.T1 | Layout and menus from Section 2.13. Resizable panels persisted to `settings` |
 | M7.T2 | Agents panel: streaming chat, persona chips, mute, user chat box with `@persona` autocomplete |
 | M7.T3 | Webcam panel: MJPEG preview, mic meter, face box, per-track recording state |
-| M7.T4 | Telemetry bar and charts. Virtualized event log with filters and click-to-marker |
+| M7.T4 | Titan-labeled machine numbers on the status strip, and charts behind View → Telemetry. Event log is a drawer, not a band beside the game |
 | M7.T5 | Inspectors (blackboard, messages, tasks) and the Director report view |
 | M7.T6 | Session flows: new, start, pause, stop, replay, and the report view |
 
@@ -2070,7 +2072,7 @@ Each task becomes a branch and a PR (see "How coding workers use this spec"). Te
 | M10.T5 | User guide, game-adapter guide, runbooks |
 
 **Phase 1 exit criteria (all required):**
-1. On a clean reference PC, a user installs Titan, completes the wizard, launches KSP, ETS2, or ATS from Titan, and sees agents discussing the game using live telemetry, with the Agents panel, webcam panel, telemetry bar, and event log all live.
+1. On a clean reference PC, a user installs Titan, completes the wizard, launches KSP, ETS2, or ATS from Titan, and sees agents discussing the game using live telemetry, with the program monitor, crew, webcam, and the accepted contract on screen.
 2. All Section 1.6 targets are met for each game in a 2-hour soak.
 3. The session is recorded with separate gameplay, webcam, mic, and game-audio tracks, plus markers, and a session report is written to memory.
 4. A second session references the first.

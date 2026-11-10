@@ -500,5 +500,5 @@ if ($SkipDependencyInstall) {
 }
 
 Write-Host "Launching Titan Operations Center..." -ForegroundColor Green
-Write-Host "If the window is blank for >60s, check the boot splash for Redis/Postgres/API status." -ForegroundColor DarkGray
+Write-Host "The window should show Opening the Operations Center, then the program monitor. A solid black page under the menu is a failed first paint, not the boot splash. Quit, start again, and read the [paint] lines in this window. If the page failed to load, use the Reload link on the failure page." -ForegroundColor DarkGray
 Invoke-Pnpm dev

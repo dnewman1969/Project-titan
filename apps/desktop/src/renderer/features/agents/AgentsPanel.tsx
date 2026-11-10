@@ -14,7 +14,6 @@ import { useCallback, useState, type FormEvent } from "react";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { portraitUrl } from "../../services/avatar/portrait";
 import { speakAgentLine } from "../../services/voice/speak";
-import { LearnFeedbackStrip } from "../learn/LearnFeedbackStrip";
 import { Panel } from "../operations/Panel";
 import { RecTimelineStrip } from "../recording/RecTimelineStrip";
 import { AgentPortrait } from "./AgentPortrait";
@@ -35,6 +34,7 @@ export function AgentsPanel() {
   const speakingSlug = useAppSelector((s) => s.agentsChat.speakingSlug);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const deliver = useCallback(
     async (agent: RosterEntry, text: string) => {
@@ -52,6 +52,9 @@ export function AgentsPanel() {
       try {
         const voice = OWL_VOICE_BY_ROLE[agent.role] ?? "Onyx";
         await speakAgentLine(text, { voiceId: voice });
+        setSendError(null);
+      } catch (error) {
+        setSendError(error instanceof Error ? error.message : "Voice failed");
       } finally {
         dispatch(setSpeaking(null));
         setBusy(false);
@@ -83,10 +86,8 @@ export function AgentsPanel() {
   };
 
   return (
-    <Panel title="AI Agents" subtitle="Mission Control" gridArea="agents" flush>
+    <Panel title="Crew" subtitle="Mission Control" gridArea="crew" flush>
       <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
-        <LearnFeedbackStrip />
-        <RecTimelineStrip />
         <Box
           role="list"
           aria-label="Agent roster"
@@ -166,8 +167,7 @@ export function AgentsPanel() {
         >
           {lines.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", mt: 4 }}>
-              Live sessions load ComfyUI portraits when VITE_COMFYUI_VIEW_URL is set (Owlbox for voice). Tap
-              an agent or Brag / Roast me for a demo.
+              Crew is quiet.
             </Typography>
           ) : (
             lines.map((line) => (
@@ -219,6 +219,12 @@ export function AgentsPanel() {
             <SendIcon fontSize="small" />
           </IconButton>
         </Box>
+        {sendError ? (
+          <Typography variant="caption" color="error" sx={{ px: 1.5, pb: 0.5 }}>
+            {sendError}
+          </Typography>
+        ) : null}
+        <RecTimelineStrip />
       </Box>
     </Panel>
   );

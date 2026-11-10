@@ -161,11 +161,31 @@ export function parseGameViewTarget(value: unknown): { gameSlug: string | null; 
   return { gameSlug, pid };
 }
 
-export function parseGameViewHold(value: unknown): { on: boolean } | null {
+export function parseGameViewHold(value: unknown): { reason: "modal" | "nodock"; on: boolean } | null {
   if (typeof value !== "object" || value === null) return null;
   const record = value as Record<string, unknown>;
-  if (record.reason !== "modal" || typeof record.on !== "boolean") return null;
-  return { on: record.on };
+  if ((record.reason !== "modal" && record.reason !== "nodock") || typeof record.on !== "boolean")
+    return null;
+  return { reason: record.reason, on: record.on };
+}
+
+/**
+ * A docked game is an owned window on top of the page. A rectangle that starts in the
+ * session bar, or that runs through the status strip, would cover every Titan control
+ * and leave only the native menu. Reject that rectangle. Do not place the game.
+ * A tall program that still leaves the status strip is the monitor, not the whole window.
+ */
+export const SESSION_CHROME_MIN_Y = 48;
+export const PROGRAM_MAX_HEIGHT_FRACTION = 0.85;
+export const STATUS_STRIP_MIN_PX = 36;
+export const COVERING_CHROME_REASON = "Game view is the whole window, so it was not placed.";
+
+export function rectCoversSessionChrome(rect: GameViewRect, contentHeight: number): boolean {
+  if (rect.y < SESSION_CHROME_MIN_Y) return true;
+  if (!(contentHeight > 0)) return false;
+  if (rect.height <= contentHeight * PROGRAM_MAX_HEIGHT_FRACTION) return false;
+  const bottomGap = contentHeight - (rect.y + rect.height);
+  return bottomGap < STATUS_STRIP_MIN_PX;
 }
 
 export function blankStatus(reason: string | null): GameViewStatus {

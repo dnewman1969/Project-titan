@@ -137,8 +137,8 @@ pnpm dev
 What to expect:
 
 1. Terminal shows `[supervisor]` lines (postgres, redis, migrate, api).
-2. **Electron** opens with a boot splash, then the **Operations Center**.
-3. Top/status area should move toward **API up** / **database up** (give it 30–60 seconds).
+2. **Electron** opens on the Operations Center shell (`Opening the Operations Center`, then the program monitor). The boot splash is a card on that shell. A solid black page under the menu is a failed paint, not the splash.
+3. The status strip should move toward **API up** / **database up** (give it 30–60 seconds).
 4. Quitting the app stops child processes.
 
 ### Optional: API only (troubleshooting)
@@ -170,13 +170,13 @@ Do these in order. For each item, note **PASS / FAIL / SKIP** and one line of wh
 
 ### E1 — App shell and health
 
-| #   | Action                     | Pass if                                                    |
-| --- | -------------------------- | ---------------------------------------------------------- |
-| 1   | App opens without crashing | Main grid visible (top bar, game area, panels)             |
-| 2   | Boot splash clears         | Not stuck on “Starting…”                                   |
-| 3   | Status / pills             | API and Postgres show healthy (not stuck red)              |
-| 4   | Menu **Help → About**      | Version dialog opens                                       |
-| 5   | Menu **View** toggles      | Panels hide/show; layout should persist after refresh (M7) |
+| #   | Action                     | Pass if                                                                                                                     |
+| --- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 1   | App opens without crashing | Session bar, bordered PROGRAM monitor, crew, and rail are visible                                                           |
+| 2   | Boot splash clears         | Not stuck on “Starting…”                                                                                                    |
+| 3   | Status / pills             | API and Postgres show healthy (not stuck red)                                                                               |
+| 4   | Menu **Help → About**      | Version dialog opens                                                                                                        |
+| 5   | Menu **View** toggles      | Crew, webcam, contract, telemetry, and the event drawer hide/show. The program does not. Layout persists after refresh (M7) |
 
 ### E2 — Games API (M4)
 
@@ -187,27 +187,27 @@ $headers = @{ Authorization = "Bearer dev-token" }   # if you set dev-token
 Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/v1/games" -Headers $headers
 ```
 
-| #   | Pass if                                                                      |
-| --- | ---------------------------------------------------------------------------- |
-| 6   | HTTP 200 and items include slugs like `ksp`, `ets2`, `ats`                   |
-| 7   | **View → toggle Games** (if present) or games panel shows discovery skeleton |
+| #   | Pass if                                                    |
+| --- | ---------------------------------------------------------- |
+| 6   | HTTP 200 and items include slugs like `ksp`, `ets2`, `ats` |
+| 7   | **View → Game discovery** opens the discovery dialog       |
 
 ### E3 — Sessions (M6 + M7)
 
-| #   | Action                             | Pass if                                         |
-| --- | ---------------------------------- | ----------------------------------------------- |
-| 8   | **File → New Session** (or Ctrl+N) | Dialog opens                                    |
-| 9   | Create session with KSP            | “Live session” notice; top bar chip shows title |
-| 10  | Top bar after create               | Session chip filled (not “No session”)          |
+| #   | Action                             | Pass if                                            |
+| --- | ---------------------------------- | -------------------------------------------------- |
+| 8   | **File → New Session** (or Ctrl+N) | Dialog opens                                       |
+| 9   | Create session with KSP            | “Live session” notice; session bar shows the title |
+| 10  | Session bar after create           | Title is shown (not only “No session”)             |
 
 ### E3b — Recording (M8)
 
-| #   | Action                   | Pass if                                                                  |
-| --- | ------------------------ | ------------------------------------------------------------------------ |
-| 11  | Click **REC** (red dot)  | “Recording started” notice; label shows **REC ON**                       |
-| 12  | Click **REC** again      | Stops; notice says stopped                                               |
-| 13  | Optional: OBS on 4455    | No error in API log; manifest still written if OBS offline (degraded OK) |
-| 13b | **Record → Open Folder** | Opens the session `recording` folder in Explorer after REC start         |
+| #   | Action                       | Pass if                                                                  |
+| --- | ---------------------------- | ------------------------------------------------------------------------ |
+| 11  | Click **REC** on the program | “Recording started” notice; the button reads **STOP** and a timer runs   |
+| 12  | Click **REC** again          | Stops; notice says stopped                                               |
+| 13  | Optional: OBS on 4455        | No error in API log; manifest still written if OBS offline (degraded OK) |
+| 13b | **Record → Open Folder**     | Opens the session `recording` folder in Explorer after REC start         |
 
 Manifest path is returned by the API under the session `data_dir/recording/manifest.json`.
 

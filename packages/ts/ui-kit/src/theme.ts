@@ -63,7 +63,7 @@ export function createTitanTheme(): Theme {
     components: {
       MuiCssBaseline: {
         styleOverrides: {
-          "html, body, #root": { height: "100%" },
+          "html, body, #root": { height: "100%", minHeight: SHELL_MIN_HEIGHT_PX },
           body: { overflow: "hidden", userSelect: "none" },
           "code, kbd, .mono": { fontFamily: MONO_STACK },
           "*::-webkit-scrollbar": { width: 10, height: 10 },
@@ -79,5 +79,8 @@ export function createTitanTheme(): Theme {
     },
   });
 }
+
+/** Minimum client height. A `100%` chain alone collapses when the first viewport is 0px. */
+export const SHELL_MIN_HEIGHT_PX = 760;
 
 export const MONO_FONT = MONO_STACK;

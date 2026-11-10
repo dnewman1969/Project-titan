@@ -78,9 +78,91 @@ export function mediaType(file: string): string {
   }
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => {
+    if (char === "&") return "&amp;";
+    if (char === "<") return "&lt;";
+    if (char === ">") return "&gt;";
+    if (char === '"') return "&quot;";
+    return "&#39;";
+  });
+}
+
+/**
+ * A visible failure, for a bad `app://` read and for the dev server `pnpm dev` loads.
+ * Start-Titan uses the dev server, so a file-read fix alone never reaches that window.
+ * The page names the error and offers Reload. It is not a solid background color.
+ */
+export function failurePageHtml(input: { code: string; description: string; reloadUrl: string }): string {
+  const code = escapeHtml(input.code);
+  const description = escapeHtml(input.description);
+  const reload = escapeHtml(input.reloadUrl);
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Titan</title>
+    <style>
+      html, body { margin: 0; height: 100%; min-height: 760px; background: #0b0e14; color: #e6edf7; font-family: "Segoe UI", system-ui, sans-serif; }
+      main { min-height: 760px; box-sizing: border-box; padding: 8px; display: flex; flex-direction: column; }
+      header { background: #121722; border: 1px solid #2a3344; border-radius: 8px; padding: 10px 12px; }
+      section { flex: 1; margin-top: 8px; min-height: 240px; border: 1px solid #8ea0b8; border-radius: 10px; display: grid; place-items: center; text-align: center; padding: 24px; }
+      .label { letter-spacing: 0.12em; font-size: 12px; color: #93a1b8; }
+      a { color: #5ec2ff; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>Titan · The Operations Center did not open</header>
+      <section>
+        <div>
+          <p class="label">PROGRAM</p>
+          <p>The page failed to load (${code}).</p>
+          <p>${description}</p>
+          <p><a href="${reload}">Reload</a></p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>`;
+}
+
+export function failurePageUrl(input: { code: string; description: string; reloadUrl: string }): string {
+  return `data:text/html;charset=utf-8,${encodeURIComponent(failurePageHtml(input))}`;
+}
+
+export type ClientFailure =
+  | {
+      kind: "did-fail-load";
+      errorCode: number;
+      isMainFrame: boolean;
+      url: string;
+      description: string;
+      reloadUrl: string;
+    }
+  | { kind: "render-process-gone"; description: string; reloadUrl: string };
+
+/** Same failure page for a dev-server load and a packaged `app://` load. */
+export function clientFailureReaction(input: ClientFailure): string | null {
+  if (input.kind === "did-fail-load") {
+    if (!input.isMainFrame || input.errorCode === -3 || input.url.startsWith("data:")) return null;
+    return failurePageUrl({
+      code: String(input.errorCode),
+      description: input.description || "The Operations Center page failed to load.",
+      reloadUrl: input.reloadUrl,
+    });
+  }
+  return failurePageUrl({
+    code: "renderer-gone",
+    description: input.description || "The Operations Center renderer stopped.",
+    reloadUrl: input.reloadUrl,
+  });
+}
+
 /**
  * Read a renderer file into a response. `net.fetch(file://)` rejects with ERR_FILE_NOT_FOUND on
  * Windows even when the file exists, and a rejected protocol handler leaves the client area blank.
+ * A missing document is the failure page, not an empty body.
  */
 export async function readRendererBody(
   file: string,
@@ -90,6 +172,16 @@ export async function readRendererBody(
     const body = await read(file);
     return new Response(body, { headers: { "content-type": mediaType(file) } });
   } catch {
+    if (extname(file).toLowerCase() === ".html") {
+      return new Response(
+        failurePageHtml({
+          code: "ENOENT",
+          description: "The Operations Center page could not be read.",
+          reloadUrl: APP_INDEX_URL,
+        }),
+        { status: 404, headers: { "content-type": "text/html; charset=utf-8" } },
+      );
+    }
     return new Response("Not found", {
       status: 404,
       headers: { "content-type": "text/plain; charset=utf-8" },

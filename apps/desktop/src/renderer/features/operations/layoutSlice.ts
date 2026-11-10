@@ -10,6 +10,11 @@ export interface LayoutState {
   settingsVersion: number | null;
   settingsHydrated: boolean;
   notice: { id: number; text: string } | null;
+  /** Stays on the session bar until the next successful play toggle. */
+  sessionBarError: string | null;
+  /** Stays beside REC until the next start or stop attempt. */
+  transportError: string | null;
+  gamesOpen: boolean;
   aboutOpen: boolean;
   firstRunOpen: boolean;
   krpcObsHelpOpen: boolean;
@@ -18,10 +23,13 @@ export interface LayoutState {
 }
 
 const initialState: LayoutState = {
-  panels: { agents: true, webcam: true, telemetry: true, events: true, games: false },
+  panels: { crew: true, webcam: true, contract: true, telemetry: true, events: false },
   settingsVersion: null,
   settingsHydrated: false,
   notice: null,
+  sessionBarError: null,
+  transportError: null,
+  gamesOpen: false,
   aboutOpen: false,
   firstRunOpen: false,
   krpcObsHelpOpen: false,
@@ -38,6 +46,18 @@ export const layoutSlice = createSlice({
     },
     showPanel(state, action: PayloadAction<PanelId>) {
       state.panels[action.payload] = true;
+    },
+    setPanel(state, action: PayloadAction<{ id: PanelId; on: boolean }>) {
+      state.panels[action.payload.id] = action.payload.on;
+    },
+    setSessionBarError(state, action: PayloadAction<string | null>) {
+      state.sessionBarError = action.payload;
+    },
+    setTransportError(state, action: PayloadAction<string | null>) {
+      state.transportError = action.payload;
+    },
+    setGamesOpen(state, action: PayloadAction<boolean>) {
+      state.gamesOpen = action.payload;
     },
     hydrateFromSettings(state, action: PayloadAction<SettingsDocument>) {
       state.panels = panelsFromSettings(action.payload.values, state.panels);
@@ -74,6 +94,10 @@ export const layoutSlice = createSlice({
 export const {
   togglePanel,
   showPanel,
+  setPanel,
+  setSessionBarError,
+  setTransportError,
+  setGamesOpen,
   hydrateFromSettings,
   setSettingsVersion,
   showNotice,

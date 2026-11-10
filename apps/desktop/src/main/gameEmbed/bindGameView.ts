@@ -38,6 +38,14 @@ export function bindGameView(win: BrowserWindow, send: (status: GameViewStatus) 
       return hwndFromNativeHandle(win.getNativeWindowHandle());
     },
     mapRect: (viewport, mode) => mapPreview(win, viewport, mode),
+    contentHeight: () => {
+      try {
+        if (win.isDestroyed()) return 0;
+        return win.getContentSize()[1] ?? 0;
+      } catch {
+        return 0;
+      }
+    },
   });
   controller.onStatus((status) => {
     const where = status.attached

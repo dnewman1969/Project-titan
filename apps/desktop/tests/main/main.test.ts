@@ -10,8 +10,23 @@ import { DEFAULT_KILL_HOTKEY, resolveMainConfig } from "../../src/main/config";
 import { postKill, registerKillSwitch } from "../../src/main/killSwitch";
 import { allowCapturePermission } from "../../src/main/permissions";
 import { buildMenuTemplate } from "../../src/main/menu";
-import { applyFirstPaintSwitches, firstPaintSwitches, revealWindow } from "../../src/main/firstPaint";
-import { APP_ORIGIN, isAppUrl, mediaType, readRendererBody, resolveAppFile } from "../../src/main/navigation";
+import {
+  applyFirstPaintSwitches,
+  describeAcceptedFeatures,
+  firstPaintSwitches,
+  layoutBump,
+  nudgeCommittedLayout,
+  revealWindow,
+} from "../../src/main/firstPaint";
+import {
+  APP_INDEX_URL,
+  APP_ORIGIN,
+  clientFailureReaction,
+  isAppUrl,
+  mediaType,
+  readRendererBody,
+  resolveAppFile,
+} from "../../src/main/navigation";
 import {
   CrashBudget,
   startSupervisor,
@@ -51,8 +66,9 @@ describe("menu", () => {
     expect(labels).toEqual([
       "New session",
       "Exit",
-      "AI agents",
+      "Crew",
       "Webcam",
+      "Contract",
       "Telemetry",
       "Event log",
       "Game discovery",
@@ -111,10 +127,12 @@ describe("menu", () => {
     expect(labels.some((label) => /M\d+\.T\d+/.test(label))).toBe(false);
 
     const view = section(template, "View");
-    const agentsToggle = item(view, "view.toggle.agents");
-    expect(agentsToggle).toMatchObject({ type: "checkbox", checked: true, label: "AI agents" });
-    click(agentsToggle);
-    expect(send).toHaveBeenCalledWith("view.toggle.agents");
+    const crewToggle = item(view, "view.toggle.crew");
+    expect(crewToggle).toMatchObject({ type: "checkbox", checked: true, label: "Crew" });
+    click(crewToggle);
+    expect(send).toHaveBeenCalledWith("view.toggle.crew");
+    click(item(view, "view.gameDiscovery"));
+    expect(send).toHaveBeenCalledWith("view.gameDiscovery");
 
     const tools = section(template, "Tools");
     click(item(tools, "tools.killSwitch"));
@@ -425,7 +443,7 @@ describe("navigation guard", () => {
 });
 
 describe("Windows first paint", () => {
-  it("disables the features that keep the hidden window's blank client frame", () => {
+  it("requests the occlusion switches and reports when Chromium did not accept them", () => {
     expect(firstPaintSwitches("win32")).toEqual([
       { switchName: "disable-features", value: "CalculateNativeWinOcclusion,WidgetLayering" },
     ]);
@@ -440,9 +458,11 @@ describe("Windows first paint", () => {
       "win32",
     );
     expect(applied).toEqual(["disable-features=CalculateNativeWinOcclusion,WidgetLayering"]);
+    expect(describeAcceptedFeatures("")).toContain("missing=CalculateNativeWinOcclusion,WidgetLayering");
+    expect(describeAcceptedFeatures("CalculateNativeWinOcclusion,WidgetLayering")).toContain("missing=none");
   });
 
-  it("shows the window and forces a second layout on Windows", () => {
+  it("shows the window on ready-to-show without resizing the blank frame", () => {
     const sizes: [number, number][] = [];
     let shown = 0;
     const win = {
@@ -455,34 +475,128 @@ describe("Windows first paint", () => {
       },
     };
     revealWindow(win, "win32");
-    expect(shown).toBe(1);
-    expect(sizes).toEqual([
-      [1600, 1001],
-      [1600, 1000],
-    ]);
     revealWindow(win, "linux");
     expect(shown).toBe(2);
-    expect(sizes).toEqual([
-      [1600, 1001],
-      [1600, 1000],
-    ]);
+    expect(sizes).toEqual([]);
   });
 
-  it("does not resize a window that has not been given a size yet", () => {
+  it("nudges layout only after a commit, waits between sizes, and skips setSize while maximized", async () => {
+    expect(layoutBump(1)).toBe(2);
+    expect(layoutBump(1.75)).toBe(2);
+    expect(layoutBump(2.5)).toBe(3);
     const sizes: [number, number][] = [];
-    revealWindow(
+    const waits: string[] = [];
+    const resized = await nudgeCommittedLayout(
       {
-        show() {
-          /* shown */
-        },
-        getSize: () => [0, 0],
+        isMaximized: () => false,
+        getSize: () => [1600, 1000],
         setSize(width, height) {
           sizes.push([width, height]);
         },
+        invalidateClient() {
+          throw new Error("not maximized");
+        },
       },
       "win32",
+      1.75,
+      () => {
+        waits.push("resize");
+        return Promise.resolve();
+      },
     );
-    expect(sizes).toEqual([]);
+    expect(resized).toBe("resized");
+    expect(waits).toEqual(["resize"]);
+    expect(sizes).toEqual([
+      [1600, 1002],
+      [1600, 1000],
+    ]);
+    const skipped = await nudgeCommittedLayout(
+      {
+        isMaximized: () => false,
+        getSize: () => [0, 0],
+        setSize() {
+          throw new Error("no size");
+        },
+        invalidateClient() {
+          throw new Error("no size");
+        },
+      },
+      "win32",
+      1,
+      () => Promise.resolve(),
+    );
+    expect(skipped).toBe("skipped");
+    let invalidated = 0;
+    const maximized = await nudgeCommittedLayout(
+      {
+        isMaximized: () => true,
+        getSize: () => [1600, 1000],
+        setSize() {
+          throw new Error("maximized");
+        },
+        invalidateClient() {
+          invalidated += 1;
+        },
+      },
+      "win32",
+      1.5,
+      () => Promise.reject(new Error("no resize")),
+    );
+    expect(maximized).toBe("invalidated");
+    expect(invalidated).toBe(1);
+    expect(
+      await nudgeCommittedLayout(
+        {
+          isMaximized: () => false,
+          getSize: () => [1600, 1000],
+          setSize() {
+            throw new Error("linux");
+          },
+          invalidateClient() {
+            throw new Error("linux");
+          },
+        },
+        "linux",
+        1,
+        () => Promise.resolve(),
+      ),
+    ).toBe("skipped");
+  });
+
+  it("uses one failure page for the dev server and for a bad app:// load", () => {
+    const dev = clientFailureReaction({
+      kind: "did-fail-load",
+      errorCode: -105,
+      isMainFrame: true,
+      url: "http://localhost:5173/",
+      description: "ERR_NAME_NOT_RESOLVED",
+      reloadUrl: "http://localhost:5173/",
+    });
+    expect(dev).toContain("data:text/html");
+    const devHtml = decodeURIComponent(dev?.slice("data:text/html;charset=utf-8,".length) ?? "");
+    expect(devHtml).toContain("PROGRAM");
+    expect(devHtml).toContain("-105");
+    expect(devHtml).toContain("Reload");
+    expect(devHtml).toContain("http://localhost:5173/");
+    expect(
+      clientFailureReaction({
+        kind: "did-fail-load",
+        errorCode: -3,
+        isMainFrame: true,
+        url: "http://localhost:5173/",
+        description: "ERR_ABORTED",
+        reloadUrl: "http://localhost:5173/",
+      }),
+    ).toBeNull();
+    const crashed = clientFailureReaction({
+      kind: "render-process-gone",
+      description: "crashed",
+      reloadUrl: APP_INDEX_URL,
+    });
+    const crashedHtml = decodeURIComponent(crashed?.slice("data:text/html;charset=utf-8,".length) ?? "");
+    expect(crashedHtml).toContain("renderer-gone");
+    expect(crashedHtml).toContain(APP_INDEX_URL);
+    expect(crashedHtml).toContain("PROGRAM");
   });
 });
 

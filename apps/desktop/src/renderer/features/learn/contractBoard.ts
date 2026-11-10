@@ -41,6 +41,15 @@ export interface MissLesson {
   lesson: string;
 }
 
+/** One line for the session bar: accepted title and how many goals are done. */
+export function contractSessionLine(accepted: AcceptedContract | null): string | null {
+  if (!accepted) return null;
+  const counted = accepted.parameters.filter((parameter) => !parameter.optional);
+  if (counted.length === 0) return accepted.title;
+  const done = counted.filter((parameter) => parameter.state === "done").length;
+  return `${accepted.title}  ${done}/${counted.length}`;
+}
+
 export interface ContractBoardModel {
   /** True once a career note or contract snapshot has been read. */
   reported: boolean;

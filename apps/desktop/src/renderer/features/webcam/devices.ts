@@ -96,35 +96,54 @@ export function browserMedia(): MediaDevices | null {
   return candidate as MediaDevices;
 }
 
-export async function openObsbotPreview(): Promise<{ stream: MediaStream; label: string } | null> {
+export type CameraBlock = "missing" | "denied" | "busy";
+
+export function cameraBlockFromError(error: unknown): CameraBlock {
+  const name = error instanceof DOMException ? error.name : "";
+  if (name === "NotAllowedError" || name === "SecurityError" || name === "PermissionDeniedError") {
+    return "denied";
+  }
+  if (name === "NotReadableError" || name === "AbortError" || name === "TrackStartError") return "busy";
+  return "missing";
+}
+
+export function cameraBlockMessage(block: CameraBlock, obsDevice: string | null): string {
+  if (block === "denied") return "Camera permission was denied.";
+  if (block === "busy") return "The camera is busy.";
+  if (obsDevice) return `OBSBOT Tiny not found. ${obsDevice} is selected in OBS. This tile is not live.`;
+  return "OBSBOT Tiny not found.";
+}
+
+export type ObsbotPreview =
+  { ok: true; stream: MediaStream; label: string } | { ok: false; block: CameraBlock };
+
+export async function openObsbotPreview(): Promise<ObsbotPreview> {
   const media = browserMedia();
-  if (!media) return null;
+  if (!media) return { ok: false, block: "missing" };
   let devices: MediaDeviceInfo[];
   try {
     devices = await media.enumerateDevices();
-  } catch {
-    return null;
+  } catch (error) {
+    return { ok: false, block: cameraBlockFromError(error) };
   }
   let choice = pickObsbotDevice(devices);
   if (!choice) {
-    let probe: MediaStream | null = null;
+    let probe: MediaStream;
     try {
       probe = await media.getUserMedia({ video: true, audio: false });
       devices = await media.enumerateDevices();
       choice = pickObsbotDevice(devices);
-    } catch {
-      choice = null;
+    } catch (error) {
+      return { ok: false, block: cameraBlockFromError(error) };
     }
-    const probeTrack = probe?.getVideoTracks()[0];
-    const probeId = probeTrack?.getSettings().deviceId;
-    const probeLabel = probeTrack?.label ?? "";
-    if (probe && choice && (choice.deviceId === probeId || choice.label === probeLabel)) {
-      return { stream: probe, label: choice.label || probeLabel };
+    const probeTrack = probe.getVideoTracks()[0];
+    const probeId = probeTrack ? probeTrack.getSettings().deviceId : undefined;
+    const probeLabel = probeTrack ? probeTrack.label : "";
+    if (choice && (choice.deviceId === probeId || choice.label === probeLabel)) {
+      return { ok: true, stream: probe, label: choice.label || probeLabel };
     }
-    probe?.getTracks().forEach((track) => {
-      track.stop();
-    });
-    if (!choice) return null;
+    for (const track of probe.getTracks()) track.stop();
+    if (!choice) return { ok: false, block: "missing" };
   }
   try {
     const stream = await media.getUserMedia({
@@ -132,8 +151,8 @@ export async function openObsbotPreview(): Promise<{ stream: MediaStream; label:
       audio: false,
     });
     const label = stream.getVideoTracks()[0]?.label || choice.label;
-    return { stream, label };
-  } catch {
-    return null;
+    return { ok: true, stream, label };
+  } catch (error) {
+    return { ok: false, block: cameraBlockFromError(error) };
   }
 }

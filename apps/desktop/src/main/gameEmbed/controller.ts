@@ -6,10 +6,12 @@ import type { GameViewRect, GameViewStatus } from "../../shared/ipc";
 
 import {
   blankStatus,
+  COVERING_CHROME_REASON,
   exesForSlug,
   exeBase,
   initialMode,
   pickWindow,
+  rectCoversSessionChrome,
   waitingReason,
   type EmbedMode,
   type EmbedPreference,
@@ -54,6 +56,8 @@ export interface GameViewControllerOptions {
   host: EmbedHost;
   electronHwnd: () => string | null;
   mapRect: (viewport: GameViewRect, mode: EmbedMode) => GameViewRect | null;
+  /** Content height of the Titan window, in DIP. When set, a rect that covers the chrome is not placed. */
+  contentHeight?: () => number;
   preference?: EmbedPreference;
   now?: () => number;
   /** How long an embed may fail to stay a child before we dock instead. */
@@ -76,6 +80,7 @@ export class GameViewController {
   private readonly host: EmbedHost;
   private readonly electronHwnd: () => string | null;
   private readonly mapRect: (viewport: GameViewRect, mode: EmbedMode) => GameViewRect | null;
+  private readonly contentHeight: (() => number) | null;
   private readonly preference: EmbedPreference;
   private readonly now: () => number;
   private readonly embedGraceMs: number;
@@ -100,6 +105,7 @@ export class GameViewController {
     this.host = options.host;
     this.electronHwnd = options.electronHwnd;
     this.mapRect = options.mapRect;
+    this.contentHeight = options.contentHeight ?? null;
     this.preference = options.preference ?? "auto";
     this.now = options.now ?? Date.now;
     this.embedGraceMs = options.embedGraceMs ?? 500;
@@ -227,6 +233,13 @@ export class GameViewController {
     return Boolean(viewport && viewport.width >= this.minEdge && viewport.height >= this.minEdge);
   }
 
+  /** A real preview that would paint over the session bar or the status strip. */
+  private coveringChrome(): boolean {
+    const viewport = this.viewport;
+    if (!this.hasFrame() || !viewport || !this.contentHeight) return false;
+    return rectCoversSessionChrome(viewport, this.contentHeight());
+  }
+
   private mapped(mode: EmbedMode): GameViewRect | null {
     const viewport = this.viewport;
     if (!viewport || viewport.width < this.minEdge || viewport.height < this.minEdge) return null;
@@ -264,6 +277,15 @@ export class GameViewController {
       }
       const reason = this.attached ? null : waitingReason(this.slug);
       this.publish(this.attached ? this.statusOf(reason) : blankStatus(reason));
+      return;
+    }
+
+    if (this.coveringChrome()) {
+      if (this.attached && !this.hidden) {
+        await this.host.setVisible(this.attached.hwnd, false);
+        this.hidden = true;
+      }
+      this.publish(blankStatus(COVERING_CHROME_REASON));
       return;
     }
 

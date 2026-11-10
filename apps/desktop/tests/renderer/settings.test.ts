@@ -3,11 +3,11 @@ import { describe, expect, it } from "vitest";
 import { panelsFromSettings } from "../../src/renderer/app/settings";
 
 const DEFAULT = {
-  agents: true,
+  crew: true,
   webcam: true,
+  contract: true,
   telemetry: true,
-  events: true,
-  games: false,
+  events: false,
 };
 
 describe("panelsFromSettings", () => {
@@ -21,6 +21,6 @@ describe("panelsFromSettings", () => {
         { "ui.layout": { panels: { agents: false, webcam: true, telemetry: false } } },
         DEFAULT,
       ),
-    ).toEqual({ ...DEFAULT, agents: false, telemetry: false });
+    ).toEqual({ ...DEFAULT, crew: false, telemetry: false });
   });
 });

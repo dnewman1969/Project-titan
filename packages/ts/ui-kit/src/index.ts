@@ -4,6 +4,7 @@ export { StatusPill, type StatusPillProps } from "./StatusPill";
 export {
   createTitanTheme,
   MONO_FONT,
+  SHELL_MIN_HEIGHT_PX,
   ROLE_COLORS,
   roleColor,
   STATUS_COLORS,

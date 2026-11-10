@@ -33,6 +33,7 @@ const BROWSER_FALLBACK: TitanBridge = {
   gameViewSync: () => undefined,
   gameViewConfigure: () => undefined,
   gameViewHold: () => undefined,
+  rendererCommitted: () => undefined,
   gameViewFocus: () => undefined,
   onGameViewStatus: () => () => undefined,
   getGameViewStatus: () => Promise.resolve(IDLE_GAME_VIEW),

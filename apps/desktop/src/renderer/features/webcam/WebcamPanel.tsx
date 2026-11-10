@@ -8,7 +8,7 @@ import { useEffect, useRef } from "react";
 import { useGetObsCaptureStatusQuery, type ObsCaptureStatus } from "../../app/api";
 import { Panel } from "../operations/Panel";
 
-import { captureTrackViews } from "./devices";
+import { cameraBlockMessage, captureTrackViews } from "./devices";
 import { useCaptureDevices } from "./useCaptureDevices";
 
 function versionLabel(obs: ObsCaptureStatus | undefined): string {
@@ -47,7 +47,9 @@ export function WebcamPanel() {
     ? (devices.cameraLabel ?? "Camera")
     : obsDevice
       ? `${obsDevice} in OBS`
-      : "No camera";
+      : "OBSBOT Tiny";
+  const blocked =
+    devices.cameraStream || !devices.cameraBlock ? null : cameraBlockMessage(devices.cameraBlock, obsDevice);
 
   useEffect(() => {
     const node = videoRef.current;
@@ -103,8 +105,8 @@ export function WebcamPanel() {
           ) : (
             <Box sx={{ textAlign: "center", px: 2 }}>
               <VideocamOffOutlinedIcon sx={{ color: "text.disabled", fontSize: 36 }} />
-              <Typography variant="caption" display="block" color="text.disabled">
-                {obsDevice ? `${obsDevice} is selected in OBS` : "No camera"}
+              <Typography variant="body2" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                {blocked ?? "OBSBOT Tiny not found."}
               </Typography>
             </Box>
           )}

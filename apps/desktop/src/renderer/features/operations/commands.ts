@@ -6,6 +6,7 @@ import { openSessionDialog, requestRecordingFromMenu } from "../sessions/session
 import {
   setAboutOpen,
   setFirstRunOpen,
+  setGamesOpen,
   setKrpcObsHelpOpen,
   setMemoryBrowserOpen,
   setPublishOpen,
@@ -47,8 +48,9 @@ export function handleMenuCommand(id: string, dispatch: AppDispatch, getState: (
         });
       return;
     }
+    case "view.gameDiscovery":
     case "tools.gameDiscovery":
-      dispatch(showPanel("games"));
+      dispatch(setGamesOpen(true));
       return;
     case "tools.youtubePublish":
       dispatch(setPublishOpen(true));

@@ -97,9 +97,8 @@ pnpm dev                             # just the app, with whatever TITAN__* sett
 `pnpm dev` starts electron-vite with hot reload. The Electron main process generates a per-launch
 bearer token and starts `uv run titan-supervisor` with it (and its own PID, so the supervisor exits
 if Electron dies). The supervisor brings up the services, runs migrations and starts the API; a boot
-splash shows progress. Its output appears in the terminal prefixed `[supervisor]`. The status bar
-shows API, database and services health, the telemetry bar shows live CPU/GPU/RAM/FPS over the
-WebSocket gateway, and `Ctrl+Shift+F12` engages the kill switch through `POST /safety/kill`.
+splash shows progress on top of the Operations Center shell. Its output appears in the terminal prefixed `[supervisor]`. The status strip
+shows API, database and services health. CPU, GPU, RAM, and FPS are on that same strip, prefixed Titan, when View → Telemetry is on. They are not drawn on the game. `Ctrl+Shift+F12` engages the kill switch through `POST /safety/kill`.
 Quitting the app stops every child.
 
 To run the backend on its own, for example under a debugger:

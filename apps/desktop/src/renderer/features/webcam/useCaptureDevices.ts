@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 
-import { browserMedia, levelDbFromTimeDomain, openObsbotPreview } from "./devices";
+import { browserMedia, levelDbFromTimeDomain, openObsbotPreview, type CameraBlock } from "./devices";
 
 export interface CaptureDevicesState {
   cameraLabel: string | null;
   cameraStream: MediaStream | null;
+  cameraBlock: CameraBlock | null;
   micDb: number | null;
   micLive: boolean;
 }
@@ -12,6 +13,7 @@ export interface CaptureDevicesState {
 const IDLE: CaptureDevicesState = {
   cameraLabel: null,
   cameraStream: null,
+  cameraBlock: null,
   micDb: null,
   micLive: false,
 };
@@ -52,19 +54,21 @@ export function useCaptureDevices(): CaptureDevicesState {
     };
 
     const run = async () => {
-      let preview: { stream: MediaStream; label: string } | null = null;
-      try {
-        preview = await openObsbotPreview();
-      } catch {
-        preview = null;
-      }
+      const preview = await openObsbotPreview();
       if (!alive()) {
-        stopStream(preview?.stream ?? null);
+        stopStream(preview.ok ? preview.stream : null);
         return;
       }
-      if (preview) {
+      if (!preview.ok) {
+        setState((prev) => ({ ...prev, cameraBlock: preview.block, cameraStream: null, cameraLabel: null }));
+      } else {
         camera = preview.stream;
-        setState((prev) => ({ ...prev, cameraLabel: preview.label, cameraStream: preview.stream }));
+        setState((prev) => ({
+          ...prev,
+          cameraLabel: preview.label,
+          cameraStream: preview.stream,
+          cameraBlock: null,
+        }));
       }
       const media = browserMedia();
       if (!media) return;

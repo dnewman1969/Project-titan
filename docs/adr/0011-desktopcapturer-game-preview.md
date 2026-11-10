@@ -24,3 +24,7 @@ Zero encode cost and no extra plugin.
 ## Consequences
 
 - The in-app game view is a display-only `desktopCapturer` stream and is never recorded.
+
+## Later
+
+The Operations Center program surface that actually ships is the Win32 owned window described in section 2.13, locked to the program hole. Do not put a `desktopCapturer` preview back in that hole. Recording is still OBS, not the preview.

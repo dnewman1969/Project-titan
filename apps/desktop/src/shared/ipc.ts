@@ -14,6 +14,7 @@ export const IPC = {
   gameViewFocus: "titan:game-view-focus",
   gameViewStatus: "titan:game-view-status",
   gameViewSnapshot: "titan:game-view-snapshot",
+  rendererCommitted: "titan:renderer-committed",
 } as const;
 
 /** CSS pixels of the game viewport, relative to the Electron page. */
@@ -90,8 +91,10 @@ export interface TitanBridge extends TitanRuntime {
   gameViewSync(rect: GameViewRect): void;
   /** Which game the preview should prefer, plus the pid Titan just launched. */
   gameViewConfigure(target: GameViewTarget): void;
-  /** Hide the docked game while a modal covers the preview. */
-  gameViewHold(reason: "modal", on: boolean): void;
+  /** Hide the docked game while a modal covers the preview, or while there is nothing to dock. */
+  gameViewHold(reason: "modal" | "nodock", on: boolean): void;
+  /** The React tree has committed. Main uses this to relayout, not the blank ready-to-show frame. */
+  rendererCommitted(): void;
   /** Hand keyboard focus to the game window sitting in the preview. */
   gameViewFocus(): void;
   onGameViewStatus(listener: (status: GameViewStatus) => void): () => void;

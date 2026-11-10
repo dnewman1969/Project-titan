@@ -9,8 +9,10 @@ import {
   parseGameViewHold,
   parseGameViewRect,
   parseGameViewTarget,
+  COVERING_CHROME_REASON,
   pickWindow,
   prefersDock,
+  rectCoversSessionChrome,
   scaleRect,
   viewportToScreenDip,
   waitingReason,
@@ -184,8 +186,13 @@ describe("game window selection", () => {
     expect(parseGameViewRect({ x: Number.NaN, y: 0, width: 1, height: 1 })).toBeNull();
     expect(parseGameViewTarget({ gameSlug: "KSP", pid: 42 })).toEqual({ gameSlug: "ksp", pid: 42 });
     expect(parseGameViewTarget({ gameSlug: "nope", pid: 0 })).toEqual({ gameSlug: null, pid: null });
-    expect(parseGameViewHold({ reason: "modal", on: true })).toEqual({ on: true });
+    expect(parseGameViewHold({ reason: "modal", on: true })).toEqual({ reason: "modal", on: true });
+    expect(parseGameViewHold({ reason: "nodock", on: false })).toEqual({ reason: "nodock", on: false });
     expect(parseGameViewHold({ reason: "other", on: true })).toBeNull();
+    expect(rectCoversSessionChrome({ x: 0, y: 0, width: 900, height: 980 }, 1000)).toBe(true);
+    expect(rectCoversSessionChrome({ x: 8, y: 20, width: 800, height: 400 }, 1000)).toBe(true);
+    expect(rectCoversSessionChrome({ x: 8, y: 80, width: 800, height: 700 }, 1000)).toBe(false);
+    expect(rectCoversSessionChrome({ x: 8, y: 64, width: 1200, height: 1180 }, 1400)).toBe(false);
   });
 });
 
@@ -258,6 +265,27 @@ describe("GameViewController", () => {
     expect(result.released).toBe(true);
     expect(host.calls).toContain("releaseAll");
     expect(host.calls).toContain("stop");
+  });
+
+  it("does not dock a viewport that would cover the session chrome", async () => {
+    const host = new FakeHost();
+    host.windows = [windowOf({ hwnd: "77", pid: 4242 })];
+    const view = new GameViewController({
+      host,
+      electronHwnd: () => "100",
+      mapRect: (viewport) => viewport,
+      contentHeight: () => 1000,
+    });
+    view.setViewport({ x: 0, y: 0, width: 900, height: 980 });
+    view.setTarget({ gameSlug: "ksp", pid: 4242 });
+    await view.tick(true);
+    expect(host.calls.some((call) => call.startsWith("apply:"))).toBe(false);
+    expect(view.currentStatus().attached).toBe(false);
+    expect(view.currentStatus().reason).toBe(COVERING_CHROME_REASON);
+    view.setViewport({ x: 8, y: 80, width: 800, height: 700 });
+    await vi.waitFor(() => {
+      expect(host.calls.some((call) => call.startsWith("apply:dock:77"))).toBe(true);
+    });
   });
 
   it("does not move the game onto a tiny preview", async () => {

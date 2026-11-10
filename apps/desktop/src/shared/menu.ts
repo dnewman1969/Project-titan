@@ -2,7 +2,7 @@
  * Menu definition shared by the main process (native menu) and the renderer (command routing).
  * Every command here has a handler. Items with no product behavior are omitted.
  */
-export type PanelId = "agents" | "webcam" | "telemetry" | "events" | "games";
+export type PanelId = "crew" | "webcam" | "contract" | "telemetry" | "events";
 
 export interface MenuCommand {
   kind: "command";
@@ -79,11 +79,12 @@ export const MENU: readonly MenuSection[] = [
   {
     label: "View",
     items: [
-      toggle("agents", "AI agents"),
+      toggle("crew", "Crew"),
       toggle("webcam", "Webcam"),
+      toggle("contract", "Contract"),
       toggle("telemetry", "Telemetry"),
       toggle("events", "Event log"),
-      toggle("games", "Game discovery"),
+      cmd("view.gameDiscovery", "Game discovery"),
     ],
   },
   {

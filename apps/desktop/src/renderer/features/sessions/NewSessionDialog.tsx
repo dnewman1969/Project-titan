@@ -24,7 +24,7 @@ import { formatApiError } from "../../app/formatApiError";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { getTitan } from "../../app/runtime";
 import { logEvent } from "../events/eventsSlice";
-import { showNotice, showPanel } from "../operations/layoutSlice";
+import { setGamesOpen, showNotice } from "../operations/layoutSlice";
 import { closeSessionDialog, setActiveSession, type PlayBackendKind } from "./sessionsSlice";
 
 const FALLBACK_GAMES = [
@@ -114,7 +114,7 @@ export function NewSessionDialog() {
   };
 
   const onOpenGameDiscovery = () => {
-    dispatch(showPanel("games"));
+    dispatch(setGamesOpen(true));
     dispatch(closeSessionDialog());
     dispatch(
       showNotice(

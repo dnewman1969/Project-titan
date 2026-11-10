@@ -165,6 +165,7 @@ function fakeBridge(snapshot: SupervisorUpdate | null = null): FakeBridge {
       gameViewSync: () => undefined,
       gameViewConfigure: () => undefined,
       gameViewHold: () => undefined,
+      rendererCommitted: () => undefined,
       gameViewFocus: () => undefined,
       onGameViewStatus: () => () => undefined,
       getGameViewStatus: () => Promise.resolve(IDLE_GAME_VIEW),
@@ -248,26 +249,22 @@ afterEach(() => {
 describe("Operations Center", () => {
   it("renders every main-screen region from Section 2.13", () => {
     renderApp();
-    for (const name of [
-      "Titan status bar",
-      "Game window",
-      "AI Agents",
-      "Webcam",
-      "Telemetry bar",
-      "Event Log",
-    ]) {
-      expect(
-        screen.getByRole(name === "Titan status bar" ? "banner" : "region", { name }),
-      ).toBeInTheDocument();
+    for (const name of ["Program", "Crew", "Webcam", "Contracts", "Transport", "Status", "Rail"]) {
+      expect(screen.getByRole("region", { name })).toBeInTheDocument();
     }
+    expect(screen.getByRole("banner", { name: "Session bar" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /kill/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start recording" })).toBeInTheDocument();
     expect(screen.getAllByRole("listitem").length).toBeGreaterThanOrEqual(5);
     expect(screen.getByRole("textbox", { name: "Message the crew" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Brag" })).toBeInTheDocument();
-    const game = screen.getByRole("region", { name: "Game window" });
-    expect(game).toHaveTextContent(/locks into this rectangle/i);
-    expect(game).not.toHaveTextContent(/desktop capture/i);
-    expect(game.querySelector("[data-testid='game-viewport']")).toBeTruthy();
+    const program = screen.getByRole("region", { name: "Program" });
+    expect(program).toHaveTextContent("PROGRAM");
+    expect(program).toHaveTextContent("No session.");
+    expect(program).toHaveTextContent("File → New session.");
+    expect(program).not.toHaveTextContent(/desktop capture/i);
+    expect(program.querySelector("[data-testid='game-viewport']")).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Crew" })).toHaveTextContent("Crew is quiet.");
   });
 
   it("shows API and database health from the backend, sending the launch token", async () => {
@@ -282,6 +279,9 @@ describe("Operations Center", () => {
       .map(([request]) => request)
       .find((r) => r.url.endsWith("/system/status"));
     expect(statusCall?.headers.get("authorization")).toBe("Bearer test-token");
+    act(() => {
+      shell.menu("view.toggle.events");
+    });
     expect(
       within(screen.getByRole("region", { name: "Event Log" })).getByText("API connected"),
     ).toBeInTheDocument();
@@ -342,6 +342,11 @@ describe("Operations Center", () => {
     });
     expect(screen.getByRole("region", { name: "Webcam" })).toBeInTheDocument();
 
+    expect(screen.queryByRole("region", { name: "Event Log" })).not.toBeInTheDocument();
+    act(() => {
+      shell.menu("view.toggle.events");
+    });
+    expect(screen.getByRole("region", { name: "Event Log" })).toBeInTheDocument();
     act(() => {
       shell.menu("view.toggle.events");
     });
@@ -394,6 +399,7 @@ describe("Operations Center", () => {
     const user = userEvent.setup();
     renderApp();
     await user.click(screen.getByRole("button", { name: /kill/i }));
+    await user.click(screen.getByRole("button", { name: "Last event" }));
     const log = screen.getByRole("region", { name: "Event Log" });
     await user.click(within(log).getByRole("button", { name: "System" }));
     expect(within(log).queryByText(/Kill switch engaged/)).not.toBeInTheDocument();
@@ -433,6 +439,9 @@ describe("platform services (M1)", () => {
     expect(within(splash).getByText("Database (PostgreSQL)")).toBeInTheDocument();
     expect(within(splash).getByRole("status", { name: /^postgres: degraded/ })).toBeInTheDocument();
     expect(within(splash).getByText("waiting to start")).toBeInTheDocument();
+    act(() => {
+      shell.menu("view.toggle.events");
+    });
     const log = screen.getByRole("region", { name: "Event Log" });
     expect(within(log).getByText("api exited (exit code 1)")).toBeInTheDocument();
     act(() => {
@@ -600,42 +609,54 @@ describe("formatMetrics", () => {
 });
 
 describe("gridTemplate", () => {
-  it("fills the root so a zero viewport-height first layout cannot blank the client area", () => {
-    expect(operationsFrameSize).toEqual({ height: "100%", minHeight: 0 });
+  it("gives the shell a pixel min-height so a 0px viewport cannot be the only size", () => {
+    expect(operationsFrameSize.height).toBe("100%");
+    expect(operationsFrameSize.minHeight).toBeGreaterThanOrEqual(760);
     renderApp();
-    expect(screen.getByRole("main")).toBeInTheDocument();
+    const program = screen.getByRole("region", { name: "Program" });
+    expect(program).toHaveTextContent("No session.");
+    expect(program).toHaveTextContent("PROGRAM");
   });
 
-  it("makes the game the only flexible row between the agents column and the side rail", () => {
+  it("keeps one program between the crew and the rail, with transport on the program", () => {
     const t = gridTemplate({
-      agents: true,
+      crew: true,
       webcam: true,
+      contract: true,
       telemetry: true,
-      events: true,
-      games: false,
+      events: false,
     });
-    expect(t.areas).toBe('"top top top" "agents game rail"');
-    expect(t.rows).toBe("auto minmax(0, 1fr)");
-    expect(t.columns).toBe("minmax(240px, 280px) minmax(0, 1fr) minmax(208px, 240px)");
+    expect(t.areas).toBe(
+      '"session session session" "crew program rail" "crew transport rail" "status status status"',
+    );
+    expect(t.rows).toBe("auto minmax(0, 1fr) auto auto");
+    expect(t.columns).toBe("280px minmax(0, 1fr) 300px");
   });
 
-  it("keeps a rail when only the webcam is open and spans the game when both side columns are hidden", () => {
+  it("collapses the crew and the rail without collapsing the program or transport", () => {
     const rail = gridTemplate({
-      agents: false,
+      crew: false,
       webcam: true,
+      contract: false,
       telemetry: false,
       events: false,
-      games: false,
     });
-    expect(rail.areas).toBe('"top top top" "game game rail"');
+    expect(rail.areas).toBe(
+      '"session session session" "program program rail" "transport transport rail" "status status status"',
+    );
     const full = gridTemplate({
-      agents: false,
+      crew: false,
       webcam: false,
+      contract: false,
       telemetry: false,
       events: false,
-      games: false,
     });
-    expect(full.areas).toBe('"top top top" "game game game"');
+    expect(full.areas).toBe(
+      '"session session session" "program program program" "transport transport transport" "status status status"',
+    );
     expect(full.columns).toBe("minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)");
+    expect(full.areas).toContain("program");
+    expect(full.areas).toContain("transport");
+    expect(full.areas).toContain("session");
   });
 });

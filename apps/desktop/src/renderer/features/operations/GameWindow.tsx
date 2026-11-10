@@ -1,8 +1,5 @@
-import SportsEsportsOutlinedIcon from "@mui/icons-material/SportsEsportsOutlined";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import { useEffect, useRef, useState } from "react";
@@ -18,51 +15,15 @@ function exeFile(exe: string | null): string {
   return parts[parts.length - 1] ?? "";
 }
 
-function statusLine(status: GameViewStatus | null, platform: string): string | null {
-  if (status?.attached) {
-    const name = status.title?.trim() || exeFile(status.exe) || "Game";
-    return status.mode === "embed" ? `${name} · embedded` : `${name} · in view`;
-  }
-  if (status?.reason) return status.reason;
-  if (platform === "win32") return "Looking for the game window";
-  return null;
+export function gameLabel(slug: string | null): string {
+  if (slug === "ksp") return "Kerbal Space Program";
+  if (slug === "ets2") return "Euro Truck Simulator 2";
+  if (slug === "ats") return "American Truck Simulator";
+  return "the game";
 }
 
-/**
- * The hero preview. On Windows the running game is locked to this rectangle
- * (borderless owned window for Unity/KSP; SetParent only when that stays reliable).
- */
-export function GameWindow() {
-  const sessionId = useAppSelector((s) => s.sessions.activeSessionId);
-  const sessionSource = useAppSelector((s) => s.sessions.sessionSource);
-  const playEnabled = useAppSelector((s) => s.sessions.playEnabled);
-  const playBackend = useAppSelector((s) => s.sessions.playBackend);
-  const playReady = useAppSelector((s) => s.sessions.playReady);
-  const playAttachMessage = useAppSelector((s) => s.sessions.playAttachMessage);
-  const activeTitle = useAppSelector((s) => s.sessions.activeTitle);
-  const gameSlug = useAppSelector((s) => s.sessions.activeGameSlug);
-  const gamePid = useAppSelector((s) => s.sessions.gamePid);
-  const modalOpen = useAppSelector((s) => {
-    const boot =
-      getTitan().backend === "managed" &&
-      !s.supervisor.splashDismissed &&
-      s.supervisor.status?.ready !== true;
-    return (
-      boot ||
-      s.layout.aboutOpen ||
-      s.layout.firstRunOpen ||
-      s.layout.publishOpen ||
-      s.layout.memoryBrowserOpen ||
-      s.sessions.dialog !== null
-    );
-  });
+export function useGameViewStatus(): GameViewStatus | null {
   const [status, setStatus] = useState<GameViewStatus | null>(null);
-  const holeRef = useRef<HTMLDivElement>(null);
-  const platform = getTitan().platform;
-  const fixture = sessionSource === "fixture";
-  const live = sessionSource === "live";
-  const line = statusLine(status, platform);
-
   useEffect(() => {
     let liveEffect = true;
     void getTitan()
@@ -78,6 +39,79 @@ export function GameWindow() {
       unsubscribe();
     };
   }, []);
+  return status;
+}
+
+function holeCopy(input: {
+  sessionId: string | null;
+  fixture: boolean;
+  live: boolean;
+  status: GameViewStatus | null;
+  gameSlug: string | null;
+}): { title: string; body: string } | null {
+  if (!input.sessionId) {
+    return { title: "No session.", body: "File → New session." };
+  }
+  if (input.fixture) {
+    return {
+      title: "Fixture session.",
+      body: "Demo telemetry only. Register a game install (View → Game discovery), then File → New session with that profile for a live attach.",
+    };
+  }
+  if (input.status?.attached) return null;
+  const reason = input.status?.reason?.trim();
+  if (reason) {
+    const retry = /fail|reject|could not|fell back/i.test(reason);
+    return {
+      title: reason,
+      body: retry ? "Trying again." : "The game has not locked into this monitor yet.",
+    };
+  }
+  return {
+    title: `Looking for ${gameLabel(input.gameSlug)}.`,
+    body: "The game has not locked into this monitor yet.",
+  };
+}
+
+/**
+ * The program monitor. The hole under the header is the only rectangle sent to the game view.
+ * A fixture or an empty session does not dock a window over the slate.
+ */
+export function GameWindow() {
+  const sessionId = useAppSelector((s) => s.sessions.activeSessionId);
+  const sessionSource = useAppSelector((s) => s.sessions.sessionSource);
+  const playEnabled = useAppSelector((s) => s.sessions.playEnabled);
+  const playBackend = useAppSelector((s) => s.sessions.playBackend);
+  const playReady = useAppSelector((s) => s.sessions.playReady);
+  const playAttachMessage = useAppSelector((s) => s.sessions.playAttachMessage);
+  const gameSlug = useAppSelector((s) => s.sessions.activeGameSlug);
+  const gamePid = useAppSelector((s) => s.sessions.gamePid);
+  const modalOpen = useAppSelector((s) => {
+    const boot =
+      getTitan().backend === "managed" &&
+      !s.supervisor.splashDismissed &&
+      s.supervisor.status?.ready !== true;
+    return (
+      boot ||
+      s.layout.aboutOpen ||
+      s.layout.firstRunOpen ||
+      s.layout.publishOpen ||
+      s.layout.memoryBrowserOpen ||
+      s.layout.gamesOpen ||
+      s.layout.panels.events ||
+      s.sessions.dialog !== null
+    );
+  });
+  const status = useGameViewStatus();
+  const holeRef = useRef<HTMLDivElement>(null);
+  const fixture = sessionSource === "fixture";
+  const live = sessionSource === "live";
+  const dock = Boolean(sessionId) && live;
+  const copy = holeCopy({ sessionId, fixture, live, status, gameSlug });
+  const headerName = status?.attached
+    ? status.title?.trim() || exeFile(status.exe) || gameLabel(gameSlug)
+    : gameLabel(gameSlug);
+  const headerPlace = status?.attached ? (status.mode === "embed" ? "embedded" : "in view") : null;
 
   useEffect(() => {
     getTitan().gameViewConfigure({ gameSlug, pid: gamePid });
@@ -88,14 +122,22 @@ export function GameWindow() {
   }, [modalOpen]);
 
   useEffect(() => {
+    getTitan().gameViewHold("nodock", !dock);
+  }, [dock]);
+
+  useEffect(() => {
     return () => {
       getTitan().gameViewHold("modal", false);
+      getTitan().gameViewHold("nodock", true);
     };
   }, []);
 
   useEffect(() => {
     const el = holeRef.current;
-    if (!el) return;
+    if (!el || !dock) {
+      getTitan().gameViewSync({ x: 0, y: 0, width: 0, height: 0 });
+      return;
+    }
     let frame = 0;
     const send = () => {
       const rect = el.getBoundingClientRect();
@@ -116,79 +158,54 @@ export function GameWindow() {
       observer?.disconnect();
       window.removeEventListener("resize", send);
     };
-  }, []);
+  }, [dock]);
 
   return (
     <Paper
       component="section"
-      aria-label="Game window"
+      aria-label="Program"
       variant="outlined"
       sx={{
-        gridArea: "game",
+        gridArea: "program",
         minWidth: 0,
-        minHeight: 0,
-        height: "100%",
+        minHeight: 160,
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
+        border: "1px solid #8ea0b8",
         background:
-          "radial-gradient(1200px 500px at 50% 120%, rgba(94,194,255,0.10), transparent 60%), radial-gradient(800px 400px at 10% -20%, rgba(169,139,255,0.10), transparent 60%), #0d1119",
+          "radial-gradient(1200px 500px at 50% 120%, rgba(94,194,255,0.10), transparent 60%), radial-gradient(800px 400px at 10% -20%, rgba(169,139,255,0.10), transparent 60%), #121722",
       }}
     >
       <Box
         sx={{
           display: "flex",
           gap: 1,
-          flexWrap: "wrap",
-          alignItems: "center",
+          alignItems: "baseline",
           px: 1.25,
           py: 0.75,
           flex: "0 0 auto",
+          borderBottom: "1px solid #8ea0b8",
         }}
       >
-        <Chip size="small" label={activeTitle ? `Session: ${activeTitle}` : "Scene: none"} />
-        {sessionSource ? (
-          <Chip
-            size="small"
-            color={live ? (playEnabled && playReady === false ? "warning" : "success") : "default"}
-            label={live ? "Live install" : "Fixture telemetry"}
-          />
-        ) : (
-          <Chip size="small" label="Mission: none" />
-        )}
-        {playEnabled ? <Chip size="small" color="primary" label={`Play: ${playBackend ?? "on"}`} /> : null}
-        {line ? (
-          <Chip
-            size="small"
-            color={status?.attached ? "success" : "default"}
-            variant="outlined"
-            label={line}
-          />
-        ) : null}
-        <Box sx={{ flex: 1 }} />
-        {status?.attached ? (
-          <Button
-            size="small"
-            onClick={() => {
-              getTitan().gameViewFocus();
-            }}
-          >
-            Focus game
-          </Button>
+        <Typography variant="overline" color="text.secondary">
+          PROGRAM
+        </Typography>
+        <Typography variant="body2" noWrap sx={{ minWidth: 0 }}>
+          {headerName}
+          {headerPlace ? ` · ${headerPlace}` : ""}
+        </Typography>
+        {playEnabled ? (
+          <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
+            Play {playBackend ?? "on"}
+          </Typography>
         ) : null}
       </Box>
-      {sessionId && fixture ? (
-        <Alert severity="info" variant="outlined" sx={{ mx: 1.25, mb: 0.75, flex: "0 0 auto" }}>
-          Fixture mode — demo telemetry only. Register a game install (View → Game discovery), then File → New
-          session with that profile for live kRPC/SCS attach
-          {playEnabled ? " (current play is software HIL)." : "."}
-        </Alert>
-      ) : null}
       {sessionId && live && playAttachMessage ? (
         <Alert
           severity={playReady === false ? "warning" : "success"}
           variant="outlined"
-          sx={{ mx: 1.25, mb: 0.75, flex: "0 0 auto" }}
+          sx={{ mx: 1.25, mt: 0.75, flex: "0 0 auto" }}
         >
           {playReady === false ? (
             <>
@@ -203,26 +220,28 @@ export function GameWindow() {
         ref={holeRef}
         data-testid="game-viewport"
         onPointerDown={() => {
-          getTitan().gameViewFocus();
+          if (status?.attached) getTitan().gameViewFocus();
         }}
         sx={{
           flex: "1 1 auto",
-          minHeight: 0,
+          minHeight: 120,
           position: "relative",
           display: "grid",
           placeItems: "center",
+          m: 1,
+          borderRadius: 1,
+          border: "1px solid rgba(142, 160, 184, 0.45)",
+          bgcolor: "#0d1119",
         }}
       >
-        <Box sx={{ textAlign: "center", maxWidth: 520, px: 3 }}>
-          <SportsEsportsOutlinedIcon sx={{ fontSize: 56, color: "text.disabled" }} />
-          <Typography variant="h6" sx={{ mt: 1 }}>
-            {sessionId ? (live ? "Live session" : "Fixture session") : "No game running"}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            This is the live game view. On Windows, Kerbal Space Program locks into this rectangle while it
-            runs. ETS2 and ATS use the same frame.
-          </Typography>
-        </Box>
+        {copy ? (
+          <Box sx={{ textAlign: "center", maxWidth: 520, px: 3 }}>
+            <Typography variant="h6">{copy.title}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {copy.body}
+            </Typography>
+          </Box>
+        ) : null}
       </Box>
     </Paper>
   );

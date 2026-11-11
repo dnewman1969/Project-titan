@@ -161,7 +161,7 @@ jobs:
       - uses: ./.github/actions/setup
       # The runner's preinstalled PostgreSQL is 17; D1 pins 16, so use the portable build from the
       # manifest (the same zip M1.T1 ships), which also exercises tools/fetch-third-party.py.
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         with:
           path: third_party/cache/postgresql-16.15-1-windows-x64-binaries.zip
           key: pgsql-${{ hashFiles('third_party/manifest.yaml') }}

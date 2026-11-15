@@ -816,12 +816,12 @@ wheels = [
 
 [[package]]
 name = "krpc"
-version = "0.5.4"
+version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "protobuf" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1d/d9/fe6f07c1fa993e23ec5d8d9d02165c7ae72b5362ae5713dd9768753c41f2/krpc-0.5.4.zip", hash = "sha256:95b4512a080c92d45a1b60ebb9eff9290c5263a19ff1abdb351e12ffb51fb615", size = 173455, upload-time = "2024-06-10T11:45:27.516Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ee/a6/40db1dafec2812d9d9a9d8546301a26a9fbe11282389ab8b93791e2b2f0c/krpc-0.7.0.tar.gz", hash = "sha256:2dd96873219d57f26354c702fee9cc36cc598c441c1d634a0f4ae3e7d981938a", size = 394099, upload-time = "2026-10-21T20:38:44.427Z" }
 
 [[package]]
 name = "langchain-core"
@@ -1928,7 +1928,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "krpc", specifier = ">=0.5.4,<0.6" },
+    { name = "krpc", specifier = ">=0.5.4,<0.8" },
     { name = "titan-core", editable = "packages/py/titan-core" },
     { name = "vgamepad", specifier = ">=0.1.0" },
 ]
